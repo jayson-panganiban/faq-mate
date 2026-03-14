@@ -1,5 +1,6 @@
 import threading
 
+import gradio as gr
 import uvicorn
 from dotenv import load_dotenv
 
@@ -17,7 +18,13 @@ def run_api_server():
 
 def run_chatbot_interface():
     """Create and run the Gradio interface"""
-    demo.launch(server_name="0.0.0.0", server_port=7860, share=False)
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=7860,
+        share=False,
+        theme=gr.themes.Soft(),
+        css="footer {visibility: hidden}",
+    )
 
 
 # Run the application

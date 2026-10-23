@@ -4,6 +4,7 @@ import { CitationPill } from "./CitationPill";
 import { StatutoryGaw } from "./StatutoryGaw";
 import { STATUTORY_GAW } from "../../constants/statutory";
 import type { GroundedChunk } from "../../types/chat";
+import { findMatchingChunk } from "../utils/citations";
 
 export interface AssistantMessageProps {
   /**
@@ -33,60 +34,17 @@ export interface AssistantMessageProps {
 }
 
 /**
+ * Generalized regex pattern detecting ungrounded, silent, or non-covered PDS statements.
+ * Matches standard non-coverage/silent phrasing without test-fixture hardcoding.
+ */
+const SILENT_PDS_REGEX =
+  /(?:does not|do not|cannot)\s+(?:specify|cover|provide cover)|not\s+(?:covered|insured|listed)|unlisted domestic hazard|silent on|unspecified|policy is silent|pds is silent|silent pds|no cover for unlisted|not named in the insured events/i;
+
+/**
  * Checks if a block of text represents an ungrounded or silent PDS statement.
  */
 function isSilentPdsNotice(text: string): boolean {
-  const lower = text.toLowerCase();
-  return (
-    lower.includes("does not specify or cover") ||
-    lower.includes("does not specify") ||
-    lower.includes("policy is silent") ||
-    lower.includes("pds is silent") ||
-    lower.includes("pet chimpanzee") ||
-    lower.includes("unlisted exotic") ||
-    lower.includes("unlisted domestic hazard") ||
-    lower.includes("unlisted hazard") ||
-    lower.includes("no cover for unlisted") ||
-    lower.includes("not named in the insured events") ||
-    lower.includes("silent pds")
-  );
-}
-
-/**
- * Finds a matching GroundedChunk from the provided chunks array based on citation text.
- */
-function findMatchingChunk(citationText: string, chunks?: GroundedChunk[]): GroundedChunk | undefined {
-  if (!chunks || chunks.length === 0) return undefined;
-  const clean = citationText.replace(/[\[\]]/g, "").toLowerCase();
-
-  // 1. Direct ID match
-  const byId = chunks.find((c) => clean.includes(c.id.toLowerCase()));
-  if (byId) return byId;
-
-  // 2. Both product AND section match
-  const byBoth = chunks.find((c) => {
-    const prod = c.source.product.toLowerCase();
-    const sec = c.source.section.toLowerCase();
-    return clean.includes(prod) && clean.includes(sec);
-  });
-  if (byBoth) return byBoth;
-
-  // 3. Section match
-  const bySec = chunks.find((c) => {
-    const sec = c.source.section.toLowerCase();
-    const secPrefix = sec.split(":")[0]?.trim();
-    return clean.includes(sec) || (secPrefix ? clean.includes(secPrefix) : false);
-  });
-  if (bySec) return bySec;
-
-  // 4. Product match
-  const byProd = chunks.find((c) => {
-    const prod = c.source.product.toLowerCase();
-    return clean.includes(prod);
-  });
-  if (byProd) return byProd;
-
-  return undefined;
+  return SILENT_PDS_REGEX.test(text);
 }
 
 /**
@@ -219,6 +177,7 @@ function renderInlineText(
 type MarkdownBlock =
   | { type: "header"; level: number; text: string }
   | { type: "table"; headers: string[]; alignments: ("left" | "center" | "right")[]; rows: string[][] }
+  | { type: "code"; language: string; code: string }
   | { type: "ul"; items: string[] }
   | { type: "ol"; items: string[] }
   | { type: "silent-notice"; text: string }
@@ -227,6 +186,7 @@ type MarkdownBlock =
 function isStartOfOtherBlock(lines: string[], idx: number): boolean {
   const line = lines[idx]?.trim() ?? "";
   if (!line) return true;
+  if (line.startsWith("```")) return true;
   if (/^#{1,6}\s+/.test(line)) return true;
   if (/^[-*]\s+/.test(line)) return true;
   if (/^\d+\.\s+/.test(line)) return true;
@@ -234,6 +194,72 @@ function isStartOfOtherBlock(lines: string[], idx: number): boolean {
     return true;
   }
   return false;
+}
+
+/**
+ * Fenced Code Block Component with syntax styling, line numbers, and copy action.
+ */
+function CodeBlock({ code, language }: { code: string; language: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyCode = async () => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback
+    }
+  };
+
+  const lines = code.split("\n");
+
+  return (
+    <div
+      data-testid="code-block"
+      className="my-3 rounded-xl border border-slate-700 bg-slate-900 text-slate-100 shadow-md overflow-hidden font-mono text-xs sm:text-sm"
+    >
+      <div className="flex items-center justify-between px-3.5 py-1.5 bg-slate-800/90 border-b border-slate-700/80 text-xs text-slate-400">
+        <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-300">
+          {language || "code"}
+        </span>
+        <button
+          type="button"
+          onClick={handleCopyCode}
+          aria-label="Copy code block"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-colors cursor-pointer"
+        >
+          {copied ? (
+            <>
+              <Check className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
+              <span className="text-emerald-400 font-medium">Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+      <div className="p-3.5 overflow-x-auto leading-relaxed">
+        <pre className="m-0 font-mono text-xs sm:text-sm">
+          <code>
+            {lines.map((l, lIdx) => (
+              <div key={lIdx} className="table-row">
+                <span className="table-cell pr-3 text-slate-500 select-none text-right w-6 text-[11px]">
+                  {lIdx + 1}
+                </span>
+                <span className="table-cell text-slate-100">{l || "\n"}</span>
+              </div>
+            ))}
+          </code>
+        </pre>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -299,7 +325,27 @@ export function AssistantMessage({
       continue;
     }
 
-    // 1. Table
+    // 1. Fenced Code Block
+    if (trimmed.startsWith("```")) {
+      const language = trimmed.slice(3).trim();
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      if (i < lines.length && lines[i].trim().startsWith("```")) {
+        i++; // consume closing ```
+      }
+      blocks.push({
+        type: "code",
+        language: language || "text",
+        code: codeLines.join("\n"),
+      });
+      continue;
+    }
+
+    // 2. Table
     if (line.includes("|") && lines[i + 1]?.includes("|") && isTableDelimiter(lines[i + 1])) {
       const headers = parseTableRow(line);
       const alignments = parseAlignments(lines[i + 1]);
@@ -485,6 +531,16 @@ export function AssistantMessage({
                     </tbody>
                   </table>
                 </div>
+              );
+            }
+
+            if (block.type === "code") {
+              return (
+                <CodeBlock
+                  key={bIdx}
+                  code={block.code}
+                  language={block.language}
+                />
               );
             }
 

@@ -1,6 +1,7 @@
 import React from "react";
-import { BookOpen, FileText } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import type { GroundedChunk } from "../../types/chat";
+import { formatProductDoc } from "../utils/citations";
 
 export interface CitationPillProps {
   /**
@@ -62,14 +63,12 @@ export function CitationPill({
   const resolvedChunkId = chunk?.id ?? chunkId;
 
   // Derive display metadata
-  const effectiveProduct = chunk?.source.product ?? product ?? "Policy Document";
-  const effectiveDocType = chunk?.source.docType ?? docType ?? "PDS";
+  const effectiveProduct = chunk?.source.product ?? product;
+  const effectiveDocType = chunk?.source.docType ?? docType;
   const effectiveSection = chunk?.source.section ?? section ?? "General Terms";
 
   // Build document reference, avoiding duplicate docType if product already includes it
-  const productDoc = effectiveProduct.toLowerCase().includes(effectiveDocType.toLowerCase())
-    ? effectiveProduct
-    : `${effectiveProduct} ${effectiveDocType}`;
+  const productDoc = formatProductDoc(effectiveProduct, effectiveDocType);
 
   // Formatted display text
   const displayText =

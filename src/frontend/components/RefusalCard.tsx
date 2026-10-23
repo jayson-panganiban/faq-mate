@@ -1,6 +1,6 @@
 import React from "react";
 import { AlertTriangle, UserCheck } from "lucide-react";
-import { STATUTORY_GAW } from "../../constants/statutory";
+import { STATUTORY_SAFE_HARBOR_REFUSAL } from "../../constants/statutory";
 import { StatutoryGaw } from "./StatutoryGaw";
 
 export interface RefusalCardProps {
@@ -17,13 +17,15 @@ export interface RefusalCardProps {
  */
 export function RefusalCard({
   code = "ADVICE_BOUNDARY_VIOLATION",
-  reason,
+  reason: _reason,
   message,
   className = "",
 }: RefusalCardProps) {
   if (code && code !== "ADVICE_BOUNDARY_VIOLATION") {
     return null;
   }
+
+  const effectiveMessage = message || STATUTORY_SAFE_HARBOR_REFUSAL;
 
   return (
     <section
@@ -46,10 +48,9 @@ export function RefusalCard({
             </h3>
           </div>
 
-          <p className="text-sm leading-relaxed text-amber-950 dark:text-amber-100 font-medium">
-            {message ||
-              "I cannot provide personal financial product advice or recommend which insurance policy suits your individual financial situation, objectives, or budget."}
-          </p>
+          <div className="text-sm leading-relaxed text-amber-950 dark:text-amber-100 font-medium whitespace-pre-line space-y-2">
+            {effectiveMessage}
+          </div>
 
           <div className="rounded-lg border border-amber-200 bg-white/80 p-3.5 text-xs leading-relaxed text-amber-950 dark:border-amber-800/60 dark:bg-amber-900/30 dark:text-amber-100">
             <p className="font-semibold mb-1 flex items-center gap-1.5 text-amber-900 dark:text-amber-200">
@@ -61,7 +62,9 @@ export function RefusalCard({
             </p>
           </div>
 
-          <StatutoryGaw className="border-amber-200 bg-amber-100/60 text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200" />
+          {!effectiveMessage.includes("⚠️ General Advice Warning:") && (
+            <StatutoryGaw className="border-amber-200 bg-amber-100/60 text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200" />
+          )}
         </div>
       </div>
     </section>

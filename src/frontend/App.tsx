@@ -3,8 +3,10 @@ import { AppShell } from "./components/AppShell";
 import { ChatContainer } from "./components/ChatContainer";
 import { InputBar } from "./components/InputBar";
 import { CitationDrawer } from "./components/CitationDrawer";
+import { PolicyComparisonView } from "./components/PolicyComparisonView";
 import { useChatStream } from "./hooks/useChatStream";
 import type { ChatMessage, GroundedChunk } from "./types/chat-ui";
+import { findMatchingChunk } from "./utils/citations";
 
 const STORAGE_KEY = "faq_mate_chat_session";
 
@@ -75,6 +77,7 @@ export function App() {
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedChunkId, setSelectedChunkId] = useState<string | undefined>(undefined);
+  const [isComparisonMode, setIsComparisonMode] = useState(false);
 
   // Sync message updates to sessionStorage
   useEffect(() => {
@@ -110,13 +113,7 @@ export function App() {
       }
 
       // If a string citation was passed, find matching chunk by id or section name
-      const rawText = String(chunkOrText).replace(/[\[\]]/g, "").toLowerCase();
-      const matched = allChunks.find(
-        (c) =>
-          c.id.toLowerCase().includes(rawText) ||
-          c.source.section.toLowerCase().includes(rawText) ||
-          rawText.includes(c.source.product.toLowerCase())
-      );
+      const matched = findMatchingChunk(String(chunkOrText), allChunks);
 
       if (matched) {
         setSelectedChunkId(matched.id);
@@ -147,6 +144,7 @@ export function App() {
     clearPersistedMessages();
     setIsDrawerOpen(false);
     setSelectedChunkId(undefined);
+    setIsComparisonMode(false);
   }, [reset]);
 
   const handleSend = useCallback(
@@ -172,28 +170,42 @@ export function App() {
       telemetry={telemetry}
       rateLimit={rateLimit}
       isThrottled={isThrottled}
+      isComparisonMode={isComparisonMode}
+      onToggleComparison={() => setIsComparisonMode((prev) => !prev)}
       onReset={handleReset}
     >
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden w-full max-w-full">
-        {/* Chat Feed & Empty State Prompts */}
-        <ChatContainer
-          messages={messages}
-          status={status}
-          citations={allChunks.length > 0 ? allChunks : citations}
+      {isComparisonMode ? (
+        <PolicyComparisonView
+          chunks={allChunks}
           onSelectCitation={handleSelectCitation}
-          onSelectStarterQuery={handleSelectStarterQuery}
+          onSelectQuery={(q, ins) => {
+            setIsComparisonMode(false);
+            handleSelectStarterQuery(q, ins);
+          }}
+          onClose={() => setIsComparisonMode(false)}
         />
-
-        {/* User Input Bar & Insurer Filter */}
-        <div className="pt-2 pb-1 shrink-0 bg-transparent">
-          <InputBar
-            onSend={handleSend}
-            isLoading={isLoading}
-            isThrottled={isThrottled}
-            disabled={isThrottled}
+      ) : (
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden w-full max-w-full">
+          {/* Chat Feed & Empty State Prompts */}
+          <ChatContainer
+            messages={messages}
+            status={status}
+            citations={allChunks.length > 0 ? allChunks : citations}
+            onSelectCitation={handleSelectCitation}
+            onSelectStarterQuery={handleSelectStarterQuery}
           />
+
+          {/* User Input Bar & Insurer Filter */}
+          <div className="pt-2 pb-1 shrink-0 bg-transparent">
+            <InputBar
+              onSend={handleSend}
+              isLoading={isLoading}
+              isThrottled={isThrottled}
+              disabled={isThrottled}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Slide-over Grounding Inspector Drawer */}
       <CitationDrawer

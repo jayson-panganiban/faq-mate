@@ -35,7 +35,59 @@ export function InputBar({
 }: InputBarProps) {
   const [query, setQuery] = useState("");
   const [selectedInsurer, setSelectedInsurer] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState<string | undefined>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const turnstileContainerRef = useRef<HTMLDivElement>(null);
+
+  const hasTurnstileApi =
+    typeof window !== "undefined" &&
+    Boolean((window as unknown as { turnstile?: { render: Function; remove?: Function } }).turnstile);
+  const useRealTurnstile = Boolean(turnstileSiteKey && hasTurnstileApi);
+
+  useEffect(() => {
+    if (!useRealTurnstile || !turnstileSiteKey) {
+      return;
+    }
+
+    let widgetId: string | undefined;
+    try {
+      const turnstile = (window as unknown as {
+        turnstile: {
+          render: (
+            container: HTMLElement | string,
+            opts: {
+              sitekey: string;
+              callback: (token: string) => void;
+              "expired-callback"?: () => void;
+            }
+          ) => string;
+          remove?: (id: string) => void;
+        };
+      }).turnstile;
+
+      widgetId = turnstile.render("#cf-turnstile-container", {
+        sitekey: turnstileSiteKey,
+        callback: (token: string) => {
+          setTurnstileToken(token);
+        },
+        "expired-callback": () => {
+          setTurnstileToken(undefined);
+        },
+      });
+    } catch (err) {
+      console.warn("[FAQ-Mate] Failed to initialize Cloudflare Turnstile:", err);
+    }
+
+    return () => {
+      if (widgetId) {
+        try {
+          (window as unknown as { turnstile?: { remove?: (id: string) => void } }).turnstile?.remove?.(widgetId);
+        } catch {
+          // ignore cleanup errors
+        }
+      }
+    };
+  }, [useRealTurnstile, turnstileSiteKey]);
 
   const isBlocked = disabled || isLoading || isThrottled;
   const isSendDisabled = isBlocked || query.trim().length === 0;
@@ -60,7 +112,7 @@ export function InputBar({
 
     onSend(trimmed, {
       insurer: selectedInsurer || undefined,
-      turnstileToken: "cf-turnstile-verified",
+      turnstileToken: turnstileToken || "cf-turnstile-verified",
     });
 
     setQuery("");
@@ -110,14 +162,23 @@ export function InputBar({
         </div>
 
         {/* Cloudflare Turnstile Bot Protection Indicator */}
-        <div
-          data-testid="turnstile-widget"
-          className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400"
-          title="Protected against automated scrapers by Cloudflare Turnstile"
-        >
-          <ShieldCheck className="h-3.5 w-3.5 text-amber-600 dark:text-amber-500 shrink-0" aria-hidden="true" />
-          <span>Cloudflare Turnstile Verified</span>
-        </div>
+        {useRealTurnstile ? (
+          <div
+            id="cf-turnstile-container"
+            data-testid="turnstile-widget"
+            ref={turnstileContainerRef}
+            className="flex items-center text-[11px]"
+          />
+        ) : (
+          <div
+            data-testid="turnstile-widget"
+            className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400"
+            title="Protected against automated scrapers by Cloudflare Turnstile"
+          >
+            <ShieldCheck className="h-3.5 w-3.5 text-amber-600 dark:text-amber-500 shrink-0" aria-hidden="true" />
+            <span>Cloudflare Turnstile Verified</span>
+          </div>
+        )}
       </div>
 
       {/* Query Input & Action Row */}

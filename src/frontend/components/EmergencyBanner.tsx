@@ -1,6 +1,6 @@
 import React from "react";
 import { AlertOctagon, PhoneCall } from "lucide-react";
-import { EMERGENCY_HOTLINES } from "../../constants/statutory";
+import { EMERGENCY_HOTLINES, EMERGENCY_REFUSAL_MESSAGE } from "../../constants/statutory";
 
 export interface EmergencyBannerProps {
   code?: string;
@@ -9,6 +9,38 @@ export interface EmergencyBannerProps {
   className?: string;
 }
 
+interface HotlineConfig {
+  id: string;
+  tel: string;
+  name: string;
+  label: string;
+  primary: boolean;
+}
+
+const HOTLINES: HotlineConfig[] = [
+  {
+    id: "000",
+    tel: "tel:000",
+    name: "Call Triple Zero (000)",
+    label: `Call ${EMERGENCY_HOTLINES.lifeThreat} for immediate life-threatening emergencies`,
+    primary: true,
+  },
+  {
+    id: "132500",
+    tel: "tel:132500",
+    name: "Call SES 132 500",
+    label: `Call ${EMERGENCY_HOTLINES.ses} for flood and storm assistance`,
+    primary: false,
+  },
+  {
+    id: "1800018444",
+    tel: "tel:1800018444",
+    name: "Call Disaster Welfare 1800 018 444",
+    label: `Call ${EMERGENCY_HOTLINES.disasterWelfare} for emergency accommodation and crisis support`,
+    primary: false,
+  },
+];
+
 /**
  * Life-Safety Emergency Interception Card
  * Triggered under Code of Practice (COP) for vulnerable policyholders or active perils.
@@ -16,7 +48,7 @@ export interface EmergencyBannerProps {
  */
 export function EmergencyBanner({
   code = "EMERGENCY_INTERCEPTION",
-  reason,
+  reason: _reason,
   message,
   className = "",
 }: EmergencyBannerProps) {
@@ -45,38 +77,31 @@ export function EmergencyBanner({
             </h3>
           </div>
 
-          <p className="text-sm leading-relaxed text-red-50 font-medium">
-            {message ||
-              "If you or your property are in immediate life danger, please immediately call Triple Zero (000). Automated insurance policy search is paused during active emergencies."}
+          <p className="text-sm leading-relaxed text-red-50 font-medium whitespace-pre-line">
+            {message || EMERGENCY_REFUSAL_MESSAGE}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-            <a
-              href="tel:000"
-              aria-label="Call Triple Zero at 000 for immediate life-threatening emergencies"
-              className="min-h-[44px] min-w-[44px] px-4 py-2.5 rounded-lg bg-white text-red-700 hover:bg-red-50 active:bg-red-100 font-bold text-sm shadow-md flex items-center justify-center gap-2 focus:outline-none focus:ring-4 focus:ring-white/60 transition-colors"
-            >
-              <PhoneCall className="h-4 w-4 shrink-0 text-red-700" aria-hidden="true" />
-              <span>Triple Zero (000)</span>
-            </a>
-
-            <a
-              href="tel:132500"
-              aria-label="Call State Emergency Service on 132 500 for flood and storm assistance"
-              className="min-h-[44px] min-w-[44px] px-4 py-2.5 rounded-lg bg-red-900/90 hover:bg-red-950 active:bg-black text-white font-bold text-sm shadow-md border border-red-500 flex items-center justify-center gap-2 focus:outline-none focus:ring-4 focus:ring-red-300 transition-colors"
-            >
-              <PhoneCall className="h-4 w-4 shrink-0 text-red-200" aria-hidden="true" />
-              <span>SES (132 500)</span>
-            </a>
-
-            <a
-              href="tel:1800018444"
-              aria-label="Call Disaster Welfare Services on 1800 018 444 for accommodation and crisis support"
-              className="min-h-[44px] min-w-[44px] px-4 py-2.5 rounded-lg bg-red-900/90 hover:bg-red-950 active:bg-black text-white font-bold text-sm shadow-md border border-red-500 flex items-center justify-center gap-2 focus:outline-none focus:ring-4 focus:ring-red-300 transition-colors"
-            >
-              <PhoneCall className="h-4 w-4 shrink-0 text-red-200" aria-hidden="true" />
-              <span>Disaster Welfare (1800 018 444)</span>
-            </a>
+            {HOTLINES.map((hotline) => (
+              <a
+                key={hotline.id}
+                href={hotline.tel}
+                aria-label={hotline.label}
+                className={`min-h-[44px] min-w-[44px] px-4 py-2.5 rounded-lg font-bold text-sm shadow-md flex items-center justify-center gap-2 focus:outline-none focus:ring-4 transition-colors ${
+                  hotline.primary
+                    ? "bg-white text-red-700 hover:bg-red-50 active:bg-red-100 focus:ring-white/60"
+                    : "bg-red-900/90 hover:bg-red-950 active:bg-black text-white border border-red-500 focus:ring-red-300"
+                }`}
+              >
+                <PhoneCall
+                  className={`h-4 w-4 shrink-0 ${
+                    hotline.primary ? "text-red-700" : "text-red-200"
+                  }`}
+                  aria-hidden="true"
+                />
+                <span>{hotline.name}</span>
+              </a>
+            ))}
           </div>
         </div>
       </div>

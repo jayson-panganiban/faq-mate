@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { sanitizeClientPii } from "../utils/client-pii-scrubber";
 import type {
   UseChatStreamOptions,
   UseChatStreamReturn,
@@ -52,6 +53,9 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
         return;
       }
 
+      // Pre-ingress client-side PII sanitization (APP 3 & 11)
+      const { sanitized: cleanQuery } = sanitizeClientPii(trimmedQuery);
+
       // Clear previous refusal and citations for the new turn
       setActiveRefusal(null);
       setCitations([]);
@@ -60,7 +64,7 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
       const userMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: "user",
-        content: trimmedQuery,
+        content: cleanQuery,
         timestamp: Date.now(),
         insurer: sendOptions?.insurer,
       };
@@ -87,7 +91,7 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
       }
 
       const bodyPayload: Record<string, unknown> = {
-        query: trimmedQuery,
+        query: cleanQuery,
         conversationId: crypto.randomUUID(),
       };
 

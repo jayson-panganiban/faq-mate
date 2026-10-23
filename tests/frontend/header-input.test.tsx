@@ -216,6 +216,29 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
       expect(handleReset).toHaveBeenCalledTimes(1);
     });
 
+    it("renders comparison toggle button when onToggleComparison is provided and fires callback", () => {
+      const handleToggle = vi.fn();
+      const { rerender } = render(
+        <AppShell onToggleComparison={handleToggle} isComparisonMode={false}>
+          <div>Body</div>
+        </AppShell>
+      );
+
+      const toggleBtn = screen.getByTestId("comparison-toggle");
+      expect(toggleBtn).toBeInTheDocument();
+      expect(toggleBtn).toHaveTextContent("Compare");
+
+      fireEvent.click(toggleBtn);
+      expect(handleToggle).toHaveBeenCalledTimes(1);
+
+      rerender(
+        <AppShell onToggleComparison={handleToggle} isComparisonMode={true}>
+          <div>Body</div>
+        </AppShell>
+      );
+      expect(screen.getByTestId("comparison-toggle")).toHaveTextContent("Chat View");
+    });
+
     it("renders persistent statutory Section 949A GAW and PII badge in footer", () => {
       render(
         <AppShell>
@@ -283,6 +306,51 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
       const turnstile = screen.getByTestId("turnstile-widget");
       expect(turnstile).toBeInTheDocument();
       expect(turnstile).toHaveTextContent(/Turnstile/i);
+    });
+
+    it("renders real Turnstile container element when turnstileSiteKey is provided and window.turnstile exists", () => {
+      const renderMock = vi.fn((_container, options) => {
+        options.callback("mock-real-turnstile-token");
+        return "widget-123";
+      });
+      const removeMock = vi.fn();
+
+      (window as any).turnstile = {
+        render: renderMock,
+        remove: removeMock,
+      };
+
+      const handleSend = vi.fn();
+      const { unmount } = render(
+        <InputBar
+          onSend={handleSend}
+          isLoading={false}
+          isThrottled={false}
+          turnstileSiteKey="0x4AAAAAAAMockSiteKey"
+        />
+      );
+
+      const turnstileContainer = screen.getByTestId("turnstile-widget");
+      expect(turnstileContainer).toHaveAttribute("id", "cf-turnstile-container");
+      expect(renderMock).toHaveBeenCalledWith(
+        "#cf-turnstile-container",
+        expect.objectContaining({ sitekey: "0x4AAAAAAAMockSiteKey" })
+      );
+
+      // Submit a query and verify the real turnstile token was included
+      const textarea = screen.getByTestId("chat-input-textarea");
+      fireEvent.change(textarea, { target: { value: "Test query" } });
+      const sendButton = screen.getByTestId("send-button");
+      fireEvent.click(sendButton);
+
+      expect(handleSend).toHaveBeenCalledWith(
+        "Test query",
+        expect.objectContaining({ turnstileToken: "mock-real-turnstile-token" })
+      );
+
+      unmount();
+      expect(removeMock).toHaveBeenCalledWith("widget-123");
+      delete (window as any).turnstile;
     });
 
     it("disables send button when textarea is empty or whitespace only", () => {

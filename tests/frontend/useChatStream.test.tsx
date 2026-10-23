@@ -347,4 +347,30 @@ describe("useChatStream Hook (Spec 05 Section 1 & 2)", () => {
     expect(global.fetch).not.toHaveBeenCalled();
     expect(result.current.status).toBe("IDLE");
   });
+
+  it("scrubs client-side PII before network dispatch and stores sanitized query in message state (APP 3 & 11)", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(createSseStream([`event: done\ndata: {}\n\n`]), {
+        status: 200,
+        headers: new Headers({ "Content-Type": "text/event-stream" }),
+      })
+    );
+
+    const { result } = renderHook(() => useChatStream());
+
+    await act(async () => {
+      await result.current.sendMessage("My TFN is 123 456 789 and Medicare is 2345678901 1");
+    });
+
+    // Check that message in state is sanitized
+    const userMsg = result.current.messages[0];
+    expect(userMsg.content).toBe("My TFN is [REDACTED_TFN] and Medicare is [REDACTED_MEDICARE]");
+    expect(userMsg.content).not.toContain("123 456 789");
+
+    // Check that outgoing fetch payload is sanitized
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const fetchBody = JSON.parse((global.fetch as any).mock.calls[0][1].body);
+    expect(fetchBody.query).toBe("My TFN is [REDACTED_TFN] and Medicare is [REDACTED_MEDICARE]");
+    expect(fetchBody.query).not.toContain("123 456 789");
+  });
 });

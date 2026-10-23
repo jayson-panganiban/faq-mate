@@ -59,6 +59,18 @@ describe("UserMessage Component (Ticket 5)", () => {
     const avatar = article.querySelector('[data-testid="user-avatar"]');
     expect(avatar).toBeInTheDocument();
   });
+
+  it("sanitizes raw PII in user query and displays sanitized indicator badge", () => {
+    render(
+      <UserMessage query="My TFN is 123 456 789 and Medicare is 2345678901 1" />
+    );
+
+    expect(screen.getByTestId("pii-sanitized-badge")).toBeInTheDocument();
+    expect(screen.getByText(/Sanitized/i)).toBeInTheDocument();
+    expect(screen.getByText(/\[REDACTED_TFN\]/)).toBeInTheDocument();
+    expect(screen.getByText(/\[REDACTED_MEDICARE\]/)).toBeInTheDocument();
+    expect(screen.queryByText(/123 456 789/)).not.toBeInTheDocument();
+  });
 });
 
 describe("AssistantMessage Component (Ticket 5)", () => {
@@ -350,6 +362,31 @@ describe("AssistantMessage Component (Ticket 5)", () => {
       });
 
       expect(screen.queryByText(/copied/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Fenced Code Block Support", () => {
+    it("renders fenced code block with language badge, line numbers, and copy action", async () => {
+      const codeSnippet = '```typescript\nconst excess = 500;\nconst isCovered = true;\n```';
+      render(<AssistantMessage message={codeSnippet} isStreaming={false} />);
+
+      const codeBlock = screen.getByTestId("code-block");
+      expect(codeBlock).toBeInTheDocument();
+      expect(codeBlock).toHaveTextContent("typescript");
+      expect(codeBlock).toHaveTextContent("const excess = 500;");
+      expect(codeBlock).toHaveTextContent("const isCovered = true;");
+
+      const copyCodeBtn = screen.getByRole("button", { name: /copy code block/i });
+      expect(copyCodeBtn).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(copyCodeBtn);
+      });
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        "const excess = 500;\nconst isCovered = true;"
+      );
+      expect(screen.getByText(/copied!/i)).toBeInTheDocument();
     });
   });
 });

@@ -616,4 +616,22 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
       screen.getByText("Standard excess is $500 as noted in your policy schedule.")
     ).toBeInTheDocument();
   });
+
+  it("toggles between chat view and policy comparison view via comparison toggle (Spec 05 US-15)", () => {
+    render(<App />);
+
+    expect(screen.queryByTestId("policy-comparison-view")).not.toBeInTheDocument();
+
+    // Click comparison toggle
+    const toggleBtn = screen.getByTestId("comparison-toggle");
+    fireEvent.click(toggleBtn);
+
+    // Verify comparison matrix is rendered
+    expect(screen.getByTestId("policy-comparison-view")).toBeInTheDocument();
+    expect(screen.getByText("Broker Policy Comparison Matrix")).toBeInTheDocument();
+
+    // Toggle back
+    fireEvent.click(toggleBtn);
+    expect(screen.queryByTestId("policy-comparison-view")).not.toBeInTheDocument();
+  });
 });

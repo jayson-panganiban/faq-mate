@@ -11,6 +11,7 @@ import {
   Layers,
 } from "lucide-react";
 import type { GroundedChunk } from "../../types/chat";
+import { formatProductDoc } from "../utils/citations";
 
 export interface CitationDrawerProps {
   /**
@@ -110,9 +111,7 @@ export function CitationDrawer({
 
   // Derive breadcrumb product document title
   const productDoc = currentChunk
-    ? currentChunk.source.product.toLowerCase().includes(currentChunk.source.docType.toLowerCase())
-      ? currentChunk.source.product
-      : `${currentChunk.source.product} ${currentChunk.source.docType}`
+    ? formatProductDoc(currentChunk.source.product, currentChunk.source.docType)
     : "";
 
   // Calculate percentage match

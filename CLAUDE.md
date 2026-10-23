@@ -1,3 +1,3 @@
 # FAQ-Mate Development Guide
 
-See [`AGENTS.md`](AGENTS.md) for full context pointers, specifications, glossary invariants, and test commands.
+See [`AGENTS.md`](AGENTS.md) for the Antigravity operating loop, non-negotiable engineering rules, context pointers, and verification commands.

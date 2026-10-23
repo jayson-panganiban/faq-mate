@@ -1,0 +1,35 @@
+{
+  "name": "faq-mate",
+  "version": "1.0.0",
+  "description": "Australian General Insurance FAQ Edge RAG System on Cloudflare",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:evals": "vitest run tests/evals",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "cloudflare-workers",
+    "workers-ai",
+    "ai-search",
+    "rag",
+    "edge-computing",
+    "insurance",
+    "asic-compliance"
+  ],
+  "author": "Engineering Portfolio",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.7.4",
+    "@cloudflare/workers-types": "^4.20250224.0",
+    "typescript": "^5.7.3",
+    "unpdf": "^0.12.1",
+    "vitest": "^2.1.8"
+  }
+}

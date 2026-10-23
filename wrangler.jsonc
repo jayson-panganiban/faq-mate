@@ -1,0 +1,42 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "faq-mate-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  
+  // Workers AI Binding (Llama 3.3 70B & BGE Large Embeddings)
+  "ai": {
+    "binding": "AI"
+  },
+
+  // Cloudflare D1 Database (Chat Telemetry & Audit Trail)
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "faq-mate-telemetry",
+      "database_id": "local-dev-d1-placeholder"
+    }
+  ],
+
+  // Cloudflare R2 Bucket (Normalized Markdown & Source Documents)
+  "r2_buckets": [
+    {
+      "binding": "CORPUS_BUCKET",
+      "bucket_name": "faq-mate-corpus"
+    }
+  ],
+
+  // Cloudflare KV Namespace (Prompt Templates & Feature Flags)
+  "kv_namespaces": [
+    {
+      "binding": "CONFIG_KV",
+      "id": "local-dev-kv-placeholder"
+    }
+  ],
+
+  // Observability & Distributed Tracing
+  "observability": {
+    "enabled": true
+  }
+}

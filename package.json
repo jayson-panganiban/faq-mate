@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "ingest": "tsx scripts/ingest-faqs.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:evals": "vitest run tests/evals",
@@ -28,6 +29,9 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.7.4",
     "@cloudflare/workers-types": "^4.20250224.0",
+    "@types/node": "^26.6.5",
+    "cheerio": "^1.2.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.7.3",
     "unpdf": "^0.12.1",
     "vitest": "^2.1.8"

@@ -1,0 +1,164 @@
+[
+  {
+    "id": "allianz-home-001",
+    "brand": "allianz",
+    "category": "home",
+    "question": "Does Allianz Home and Contents insurance cover flood damage?",
+    "answer": "Yes, flood and rainwater run-off are covered under Allianz Home and Contents Insurance. However, a 72-hour exclusion period applies: Allianz does not provide cover for loss or damage caused by flood, flood water combined with run-off, cyclone, or bushfires during the first 72 hours after purchasing a new policy or increasing cover.",
+    "url": "https://www.allianz.com.au/home-insurance/home-and-contents.html",
+    "topics": ["flood", "embargo", "exclusions"]
+  },
+  {
+    "id": "allianz-home-002",
+    "brand": "allianz",
+    "category": "home",
+    "question": "Do I have to pay two excesses if both my building and contents are damaged?",
+    "answer": "No. When you combine both Home Building and Contents cover under one policy, you generally only pay one excess if your building and contents are damaged by the same insured event.",
+    "url": "https://www.allianz.com.au/home-insurance/home-and-contents.html",
+    "topics": ["excess", "combined-policy"]
+  },
+  {
+    "id": "allianz-home-003",
+    "brand": "allianz",
+    "category": "home",
+    "question": "Are home renovations covered under my policy?",
+    "answer": "Allianz covers your home while renovations, alterations, demolition, or repairs costing up to $75,000 are underway. If the planned work costs more than $75,000, you must notify Allianz before work begins. Allianz does not cover damage caused by the renovation work itself or water entering through openings created by the work.",
+    "url": "https://www.allianz.com.au/home-insurance/home-and-contents.html",
+    "topics": ["renovations", "exclusions", "building"]
+  },
+  {
+    "id": "allianz-home-004",
+    "brand": "allianz",
+    "category": "home",
+    "question": "Does Allianz cover temporary accommodation for pets?",
+    "answer": "Yes. If your home building is damaged by an insured event and becomes uninhabitable, Allianz pays reasonable temporary accommodation costs for you and your pets, up to 10% of your building or contents sum insured.",
+    "url": "https://www.allianz.com.au/home-insurance/home-and-contents.html",
+    "topics": ["temporary-accommodation", "pets", "claims"]
+  },
+  {
+    "id": "allianz-home-005",
+    "brand": "allianz",
+    "category": "home",
+    "question": "What is the sub-limit for replacement of locks after a burglary?",
+    "answer": "Allianz will pay up to $2,000 to replace external door or window locks if your keys are stolen following a theft or burglary.",
+    "url": "https://www.allianz.com.au/home-insurance/home-and-contents.html",
+    "topics": ["burglary", "locks", "sub-limits"]
+  },
+  {
+    "id": "allianz-home-006",
+    "brand": "allianz",
+    "category": "home",
+    "question": "Are electric bikes (eBikes) and eScooters covered?",
+    "answer": "Allianz covers eBikes and eScooters damaged at home by an insured event (or away from home if Portable Contents is added), provided they have a maximum speed of 25 km/h and are not used for racing or competition. However, Allianz does NOT cover legal liability for eBikes or eScooters (e.g. if you injure someone or cause a battery fire).",
+    "url": "https://www.allianz.com.au/home-insurance/home-and-contents.html",
+    "topics": ["escooter", "ebike", "liability", "sub-limits"]
+  },
+  {
+    "id": "allianz-home-007",
+    "brand": "allianz",
+    "category": "home",
+    "question": "What happens if my house is unoccupied for more than 60 days?",
+    "answer": "You must inform Allianz if your home building has not been lived in, or will not be lived in, for more than 60 consecutive days. Failure to notify Allianz may result in claims being declined.",
+    "url": "https://www.allianz.com.au/home-insurance/home-and-contents.html",
+    "topics": ["unoccupied", "conditions", "exclusions"]
+  },
+  {
+    "id": "nrma-home-001",
+    "brand": "nrma",
+    "category": "home",
+    "question": "Am I covered if I accidentally leave a window or door unlocked and someone breaks in?",
+    "answer": "Yes. Under NRMA Home Contents Insurance, you are still covered if you accidentally leave a window or door unlocked and someone breaks into your home.",
+    "url": "https://www.nrma.com.au/home-insurance",
+    "topics": ["theft", "unforced-entry", "burglary"]
+  },
+  {
+    "id": "nrma-home-002",
+    "brand": "nrma",
+    "category": "home",
+    "question": "How long does NRMA pay for temporary accommodation after an insured event?",
+    "answer": "NRMA pays for reasonable temporary accommodation costs for up to 1 year under the Home Buildings and Contents Standard policy (up to 10% of sum insured), or up to 2 years under Home Buildings and Contents Plus (up to 20% of sum insured), if your home is unliveable.",
+    "url": "https://www.nrma.com.au/home-insurance",
+    "topics": ["temporary-accommodation", "claims", "limits"]
+  },
+  {
+    "id": "nrma-home-003",
+    "brand": "nrma",
+    "category": "home",
+    "question": "Does NRMA cover damage from actions of the sea or high tides?",
+    "answer": "No. NRMA explicitly does not cover loss or damage caused by actions of the sea, such as high tides and tidal waves. Escaped water from shower recesses or erosion is also excluded.",
+    "url": "https://www.nrma.com.au/home-insurance",
+    "topics": ["actions-of-the-sea", "flood", "exclusions"]
+  },
+  {
+    "id": "nrma-home-004",
+    "brand": "nrma",
+    "category": "home",
+    "question": "Does NRMA guarantee the workmanship of repairs?",
+    "answer": "Yes. NRMA offers a lifetime guarantee on the workmanship of all authorized repairs completed through their network of approved partner repairers and suppliers.",
+    "url": "https://www.nrma.com.au/home-insurance",
+    "topics": ["repairs", "guarantee", "claims"]
+  },
+  {
+    "id": "qbe-home-001",
+    "brand": "qbe",
+    "category": "home",
+    "question": "What is the QBE Buildings Sum Insured Safeguard benefit?",
+    "answer": "QBE's Buildings Sum Insured Safeguard may pay up to an additional 30% above your nominated buildings sum insured to cover unexpected increases in labor and rebuilding costs due to a surge after a major catastrophe.",
+    "url": "https://www.qbe.com/au/home-insurance",
+    "topics": ["sum-insured", "safeguard", "rebuilding"]
+  },
+  {
+    "id": "qbe-home-002",
+    "brand": "qbe",
+    "category": "home",
+    "question": "What is the legal liability limit on QBE Home Insurance?",
+    "answer": "QBE provides up to $30 million in legal liability cover worldwide if you are found legally responsible for accidental injury to someone or damage to third-party property.",
+    "url": "https://www.qbe.com/au/home-insurance",
+    "topics": ["liability", "sub-limits"]
+  },
+  {
+    "id": "qbe-home-003",
+    "brand": "qbe",
+    "category": "home",
+    "question": "Are my contents covered while moving between my old and new home?",
+    "answer": "Yes. QBE covers your contents for up to 60 days across both your old and new residences while you are moving.",
+    "url": "https://www.qbe.com/au/home-insurance",
+    "topics": ["moving", "contents", "transit"]
+  },
+  {
+    "id": "aami-home-001",
+    "brand": "aami",
+    "category": "home",
+    "question": "Can I remove flood cover from my AAMI Home Insurance policy to lower my premium?",
+    "answer": "No. Flood cover is automatically included on AAMI Home Insurance policies and cannot be removed. However, AAMI does not cover flood damage for the first 72 hours of a new policy (embargo period).",
+    "url": "https://www.aami.com.au/home-insurance.html",
+    "topics": ["flood", "embargo", "pricing"]
+  },
+  {
+    "id": "aami-home-002",
+    "brand": "aami",
+    "category": "home",
+    "question": "Does AAMI replace damaged or stolen contents with new items?",
+    "answer": "Yes. AAMI provides 'new for old' replacement on insured content items, meaning lost or damaged items are repaired or replaced with equivalent brand-new items regardless of age (subject to policy sub-limits).",
+    "url": "https://www.aami.com.au/home-insurance.html",
+    "topics": ["contents", "new-for-old", "replacement"]
+  },
+  {
+    "id": "suncorp-home-001",
+    "brand": "suncorp",
+    "category": "home",
+    "question": "How does Suncorp define a flood under the Insurance Contracts Regulations?",
+    "answer": "Under the Insurance Contracts Regulations 2012 (Cth), Suncorp defines flood as the covering of normally dry land by water that has escaped or been released from the normal confines of any natural watercourse, lake, reservoir, canal, or dam. Suncorp policies exclude flood damage occurring in the first 72 hours of policy purchase.",
+    "url": "https://www.suncorp.com.au/insurance/home-contents.html",
+    "topics": ["flood", "prescribed-definition", "embargo"]
+  },
+  {
+    "id": "suncorp-home-002",
+    "brand": "suncorp",
+    "category": "home",
+    "question": "What is Suncorp's standard sub-limit for jewelry and watches?",
+    "answer": "Under Suncorp Classic Home Contents, jewelry and watches have a standard policy sub-limit of $2,500 total, with a maximum of $1,000 for any single item, unless individually listed on the policy certificate.",
+    "url": "https://www.suncorp.com.au/insurance/home-contents.html",
+    "topics": ["jewelry", "sub-limits", "contents"]
+  }
+]

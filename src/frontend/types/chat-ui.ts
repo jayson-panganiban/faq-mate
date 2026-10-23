@@ -19,6 +19,8 @@ export interface TelemetryInfo {
   latencyMs?: number;
   ttftMs?: number;
   popLocation?: string;
+  hybrid_retrieval_latency_ms?: number;
+  inference_ttft_ms?: number;
 }
 
 export interface RefusalPayload {

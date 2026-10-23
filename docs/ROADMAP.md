@@ -16,7 +16,7 @@
 | **Phase 3** | **Data Ingestion & R2 Normalizer**       | **DONE** | PDF/Markdown normalizer script, table serializer, seed corpus & R2 upload utility.  |
 | **Phase 4** | **Cloudflare AI Search Binding**         | **DONE** | `AI_SEARCH` binding in `wrangler.jsonc`, hybrid search + local retriever fallback. |
 | **Phase 5** | **AFCA Evals & Groundedness Benchmarks** | **DONE** | Full AFCA-10 red-teaming test suite, LLM-as-a-Judge groundedness gate ($\ge 0.98$). |
-| **Phase 6** | **Frontend Chat Interface (Pages)**      | **UPCOMING** | High-density UI, citation drawers, latency badges, Turnstile abuse shield.      |
+| **Phase 6** | **Frontend Chat Interface (Pages)**      | **DONE** | High-density UI, citation drawers, latency badges, Turnstile abuse shield, 154 tests. |
 
 ---
 
@@ -71,7 +71,13 @@
 
 ### Phase 6: Cloudflare Pages Frontend ([`docs/specs/05-frontend-chat-interface.md`](specs/05-frontend-chat-interface.md))
 
-- [ ] Scaffold Vite + React 19 UI in `packages/ui` or `src/frontend/`
-- [ ] Citation preview modal & PDS page deep-links
-- [ ] Edge latency meter (TTFT, Cloudflare PoP location pill)
-- [ ] Cloudflare Turnstile bot protection
+- [x] Scaffold Vite + React 19 UI in `src/frontend/` with Tailwind CSS & Lucide React
+- [x] Stream state machine & custom `useChatStream` hook with full SSE protocol
+- [x] Citation preview drawer (`CitationDrawer`) & inline citation chips (`CitationPill`)
+- [x] Edge latency meter (Anycast PoP pill, hybrid retrieval latency, TTFT badge)
+- [x] Regulatory guardrail cards (ASIC RG 244 `RefusalCard`, COP `EmergencyBanner`, Section 949A `StatutoryGaw`)
+- [x] Markdown tabular sub-limits renderer & negative constraint silent PDS notices
+- [x] Side-by-side policy comparison matrix (`PolicyComparisonView`)
+- [x] Client-side APP 3/11 PII redaction and `RateLimitBadge`
+- [x] Cloudflare Turnstile bot protection support
+- [x] Complete frontend unit and E2E integration test suite (154/154 tests passing)

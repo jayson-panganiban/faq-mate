@@ -9,6 +9,7 @@ node_modules/
 .dev.vars.*
 dist/
 .mf/
+.worktrees/
 
 # Environment Variables & Secrets
 .env

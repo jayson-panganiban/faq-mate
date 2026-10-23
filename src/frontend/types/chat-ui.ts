@@ -46,6 +46,7 @@ export interface ChatMessage {
 
 export interface UseChatStreamOptions {
   apiEndpoint?: string;
+  initialMessages?: ChatMessage[];
 }
 
 export interface SendMessageOptions {

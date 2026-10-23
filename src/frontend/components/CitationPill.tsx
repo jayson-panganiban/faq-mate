@@ -86,6 +86,7 @@ export function CitationPill({
   return (
     <button
       type="button"
+      data-testid="citation-pill"
       onClick={handleClick}
       aria-label={`View citation source: ${productDoc}, ${effectiveSection}`}
       className={`inline-flex items-center gap-1.5 px-2.5 py-1 my-0.5 mx-0.5 rounded-full text-xs font-medium bg-sky-50 text-sky-800 border border-sky-200 hover:bg-sky-100 hover:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition-colors cursor-pointer select-none align-middle touch-manipulation min-h-[32px] sm:min-h-[28px] ${className}`}

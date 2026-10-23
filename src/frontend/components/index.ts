@@ -18,3 +18,6 @@ export type { UserMessageProps } from "./UserMessage";
 
 export { AssistantMessage } from "./AssistantMessage";
 export type { AssistantMessageProps } from "./AssistantMessage";
+
+export { ChatContainer } from "./ChatContainer";
+export type { ChatContainerProps, StarterPrompt } from "./ChatContainer";

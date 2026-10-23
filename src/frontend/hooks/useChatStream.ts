@@ -20,7 +20,7 @@ const DEFAULT_RATE_LIMIT: RateLimitInfo = {
 export function useChatStream(options?: UseChatStreamOptions): UseChatStreamReturn {
   const apiEndpoint = options?.apiEndpoint || "/api/chat";
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(options?.initialMessages || []);
   const [status, setStatus] = useState<StreamState>("IDLE");
   const [rateLimit, setRateLimit] = useState<RateLimitInfo>(DEFAULT_RATE_LIMIT);
   const [telemetry, setTelemetry] = useState<TelemetryInfo>({});

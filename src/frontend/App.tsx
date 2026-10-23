@@ -1,17 +1,209 @@
-import React from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { AppShell } from "./components/AppShell";
+import { ChatContainer } from "./components/ChatContainer";
+import { InputBar } from "./components/InputBar";
+import { CitationDrawer } from "./components/CitationDrawer";
+import { useChatStream } from "./hooks/useChatStream";
+import type { ChatMessage, GroundedChunk } from "./types/chat-ui";
 
+const STORAGE_KEY = "faq_mate_chat_session";
+
+/**
+ * Safely load persisted messages from browser sessionStorage.
+ * Includes defensive fallback when sessionStorage is restricted or unavailable.
+ */
+function loadPersistedMessages(): ChatMessage[] {
+  try {
+    if (typeof window === "undefined" || !window.sessionStorage) {
+      return [];
+    }
+    const item = window.sessionStorage.getItem(STORAGE_KEY);
+    if (!item) return [];
+    const parsed = JSON.parse(item);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.warn("[FAQ-Mate] Failed to restore sessionStorage session:", e);
+    return [];
+  }
+}
+
+/**
+ * Safely persist message history to sessionStorage.
+ */
+function persistMessages(messages: ChatMessage[]): void {
+  try {
+    if (typeof window === "undefined" || !window.sessionStorage) return;
+    if (messages.length > 0) {
+      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    } else {
+      window.sessionStorage.removeItem(STORAGE_KEY);
+    }
+  } catch (e) {
+    console.warn("[FAQ-Mate] Failed to persist messages to sessionStorage:", e);
+  }
+}
+
+/**
+ * Safely clear persisted messages in sessionStorage.
+ */
+function clearPersistedMessages(): void {
+  try {
+    if (typeof window === "undefined" || !window.sessionStorage) return;
+    window.sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Safe fallback
+  }
+}
+
+/**
+ * Main Application Component for FAQ-Mate Edge RAG
+ * Implements Spec 05 full assembly wiring useChatStream, AppShell, ChatContainer, InputBar, and CitationDrawer.
+ */
 export function App() {
+  const [initialMessages] = useState<ChatMessage[]>(() => loadPersistedMessages());
+
+  const {
+    messages,
+    status,
+    rateLimit,
+    telemetry,
+    citations,
+    setSelectedCitation,
+    sendMessage,
+    reset,
+  } = useChatStream({ initialMessages });
+
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [selectedChunkId, setSelectedChunkId] = useState<string | undefined>(undefined);
+
+  // Sync message updates to sessionStorage
+  useEffect(() => {
+    persistMessages(messages);
+  }, [messages]);
+
+  // Aggregate all grounded chunks across active citations and historical message metadata
+  const allChunks = useMemo(() => {
+    const chunkMap = new Map<string, GroundedChunk>();
+    for (const c of citations) {
+      chunkMap.set(c.id, c);
+    }
+    for (const msg of messages) {
+      if (msg.metadata?.retrievedChunks) {
+        for (const c of msg.metadata.retrievedChunks) {
+          if (!chunkMap.has(c.id)) {
+            chunkMap.set(c.id, c);
+          }
+        }
+      }
+    }
+    return Array.from(chunkMap.values());
+  }, [citations, messages]);
+
+  // Handle citation selection (from inline pills or starter prompts)
+  const handleSelectCitation = useCallback(
+    (chunkOrText: GroundedChunk | string) => {
+      if (typeof chunkOrText === "object" && chunkOrText !== null) {
+        setSelectedChunkId(chunkOrText.id);
+        setSelectedCitation(chunkOrText);
+        setIsDrawerOpen(true);
+        return;
+      }
+
+      // If a string citation was passed, find matching chunk by id or section name
+      const rawText = String(chunkOrText).replace(/[\[\]]/g, "").toLowerCase();
+      const matched = allChunks.find(
+        (c) =>
+          c.id.toLowerCase().includes(rawText) ||
+          c.source.section.toLowerCase().includes(rawText) ||
+          rawText.includes(c.source.product.toLowerCase())
+      );
+
+      if (matched) {
+        setSelectedChunkId(matched.id);
+        setSelectedCitation(matched);
+      } else {
+        setSelectedChunkId(typeof chunkOrText === "string" ? chunkOrText : undefined);
+      }
+      setIsDrawerOpen(true);
+    },
+    [allChunks, setSelectedCitation]
+  );
+
+  const handleCloseDrawer = useCallback(() => {
+    setIsDrawerOpen(false);
+  }, []);
+
+  const handleSelectDrawerChunk = useCallback(
+    (id: string) => {
+      setSelectedChunkId(id);
+      const chunk = allChunks.find((c) => c.id === id) || null;
+      setSelectedCitation(chunk);
+    },
+    [allChunks, setSelectedCitation]
+  );
+
+  const handleReset = useCallback(() => {
+    reset();
+    clearPersistedMessages();
+    setIsDrawerOpen(false);
+    setSelectedChunkId(undefined);
+  }, [reset]);
+
+  const handleSend = useCallback(
+    (query: string, options?: { insurer?: string; turnstileToken?: string }) => {
+      sendMessage(query, options);
+    },
+    [sendMessage]
+  );
+
+  const handleSelectStarterQuery = useCallback(
+    (query: string, insurer?: string) => {
+      sendMessage(query, { insurer });
+    },
+    [sendMessage]
+  );
+
+  const isLoading =
+    status === "CONNECTING" || status === "METADATA_RECEIVED" || status === "STREAMING";
+  const isThrottled = status === "THROTTLED" || rateLimit.remaining <= 0;
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between">
-      <header className="p-4 border-b border-slate-200 bg-white shadow-sm">
-        <h1 className="text-xl font-bold text-slate-800">FAQ-Mate Edge RAG</h1>
-      </header>
-      <main className="flex-1 p-4 max-w-4xl mx-auto w-full">
-        <p className="text-slate-600">Frontend shell initialized.</p>
-      </main>
-      <footer className="p-4 border-t border-slate-200 bg-white text-xs text-slate-500">
-        Statutory GAW Shell
-      </footer>
-    </div>
+    <AppShell
+      telemetry={telemetry}
+      rateLimit={rateLimit}
+      isThrottled={isThrottled}
+      onReset={handleReset}
+    >
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden w-full max-w-full">
+        {/* Chat Feed & Empty State Prompts */}
+        <ChatContainer
+          messages={messages}
+          status={status}
+          citations={allChunks.length > 0 ? allChunks : citations}
+          onSelectCitation={handleSelectCitation}
+          onSelectStarterQuery={handleSelectStarterQuery}
+        />
+
+        {/* User Input Bar & Insurer Filter */}
+        <div className="pt-2 pb-1 shrink-0 bg-transparent">
+          <InputBar
+            onSend={handleSend}
+            isLoading={isLoading}
+            isThrottled={isThrottled}
+            disabled={isThrottled}
+          />
+        </div>
+      </div>
+
+      {/* Slide-over Grounding Inspector Drawer */}
+      <CitationDrawer
+        isOpen={isDrawerOpen}
+        onClose={handleCloseDrawer}
+        chunks={allChunks}
+        selectedChunkId={selectedChunkId}
+        onSelectChunk={handleSelectDrawerChunk}
+      />
+    </AppShell>
   );
 }
+export default App;

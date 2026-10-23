@@ -12,3 +12,9 @@ export { RateLimitBadge, type RateLimitBadgeProps } from "./RateLimitBadge";
 export { PiiAssuranceBadge, type PiiAssuranceBadgeProps } from "./PiiAssuranceBadge";
 export { AppShell, type AppShellProps } from "./AppShell";
 export { InputBar, type InputBarProps } from "./InputBar";
+
+export { UserMessage } from "./UserMessage";
+export type { UserMessageProps } from "./UserMessage";
+
+export { AssistantMessage } from "./AssistantMessage";
+export type { AssistantMessageProps } from "./AssistantMessage";

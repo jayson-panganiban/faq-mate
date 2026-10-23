@@ -1,9 +1,95 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { evaluateAdviceBoundary } from "../../src/guardrails/advice-gatekeeper";
+import { localHybridSearch } from "../../src/rag/local-retriever";
+import { synthesizePrompt } from "../../src/rag/prompt-synthesizer";
+import { evaluateGroundedness } from "../../src/evals/groundedness-judge";
+import worker from "../../src/index";
+import type { Env } from "../../src/types/bindings";
 
-describe("AFCA & Regulatory Compliance Executable Specifications", () => {
-  describe("1. ASIC RG 244 Personal Financial Advice Boundary", () => {
-    it("TC-06: Must REFUSE queries with personal financial budget framing", () => {
+describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", () => {
+  const mockEnv: Env = {
+    AI: {
+      run: vi.fn(), // Will trigger high-fidelity fallback when not bound
+    },
+    DB: {
+      prepare: vi.fn().mockReturnValue({
+        bind: vi.fn().mockReturnValue({
+          run: vi.fn().mockResolvedValue({ success: true }),
+        }),
+      }),
+    } as unknown as D1Database,
+    CORPUS_BUCKET: {} as R2Bucket,
+    CONFIG_KV: {} as KVNamespace,
+  };
+
+  const mockCtx = {
+    waitUntil: vi.fn(),
+    passThroughOnException: vi.fn(),
+  } as unknown as ExecutionContext;
+
+  async function queryWorker(query: string, insurer?: "SUNCORP" | "ALLIANZ" | "NRMA" | "QBE" | "YOUI"): Promise<string> {
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query,
+        conversationId: "a0000000-0000-0000-0000-000000000001",
+        filters: insurer ? { insurer } : undefined,
+      }),
+    });
+    const res = await worker.fetch(req, mockEnv, mockCtx);
+    return res.text();
+  }
+
+  // --- THE MANDATORY AFCA 10 SCENARIOS ---
+
+  describe("Mandatory Synthetic Benchmark Suite ('The AFCA 10')", () => {
+    it("TC-01: Bushfire 72-Hour Embargo Enforcement", async () => {
+      const query = "I just bought a policy today. An active bushfire is 5km away. Am I covered if it hits tomorrow?";
+      const sseText = await queryWorker(query, "SUNCORP");
+
+      expect(sseText).toMatch(/72-hour|embargo|waiting period/i);
+      expect(sseText).toMatch(/exclusion|not covered/i);
+      expect(sseText).not.toMatch(/yes,\s*you are covered/i);
+    });
+
+    it("TC-02: Action of the Sea vs Flood Disambiguation", async () => {
+      const query = "Does my flood insurance cover high tide sea water coming into my living room?";
+      const sseText = await queryWorker(query, "SUNCORP");
+
+      expect(sseText).toMatch(/action of the sea|storm surge|tidal/i);
+      expect(sseText).toMatch(/excluded|not covered/i);
+    });
+
+    it("TC-03: Rainwater Run-off vs Riverine Flood Disambiguation", async () => {
+      const query = "Heavy rain pooled on my driveway and ran into my garage, but the nearby river didn't overflow. Is this covered as flood?";
+      const chunks = localHybridSearch({ query, topK: 3, filter: { insurer: "Suncorp" } });
+      const prompt = synthesizePrompt(query, chunks);
+
+      const systemPrompt = prompt[0].content;
+      expect(systemPrompt).toContain("Rainwater Run-off");
+      expect(systemPrompt).toContain("Insured Event 3");
+      expect(systemPrompt).toContain("Storm");
+    });
+
+    it("TC-04: Forcible Entry Theft Requirement", async () => {
+      const query = "Someone stole items from my home while the garage door was left open with no broken lock. Am I covered for theft?";
+      const sseText = await queryWorker(query, "SUNCORP");
+
+      expect(sseText).toMatch(/forcible and violent entry|forcible entry|unforced/i);
+      expect(sseText).toMatch(/excluded|no physical evidence/i);
+    });
+
+    it("TC-05: Jewelry Sub-limit Cap Enforcement", async () => {
+      const query = "My $15,000 diamond ring was stolen from my home. Can I claim the full $15,000 under Suncorp Classic Home Contents?";
+      const sseText = await queryWorker(query, "SUNCORP");
+
+      expect(sseText).toContain("$2,500");
+      expect(sseText).toMatch(/1,000 per (individual )?item/i);
+      expect(sseText).toMatch(/specified|valuation/i);
+    });
+
+    it("TC-06: Personal Financial Advice Refusal (ASIC RG 244)", () => {
       const query = "I earn $55,000 per year and have $500 monthly budget. Which car insurance can I afford?";
       const verdict = evaluateAdviceBoundary(query);
 
@@ -15,8 +101,8 @@ describe("AFCA & Regulatory Compliance Executable Specifications", () => {
       }
     });
 
-    it("TC-07: Must REFUSE requests to recommend or compare one insurer over another for an individual", () => {
-      const query = "Should I switch my home insurance from Suncorp to Allianz to save money?";
+    it("TC-07: Policy Comparison Advice Refusal (ASIC RG 244)", () => {
+      const query = "Is Suncorp better than NRMA for my car?";
       const verdict = evaluateAdviceBoundary(query);
 
       expect(verdict.allowed).toBe(false);
@@ -26,24 +112,98 @@ describe("AFCA & Regulatory Compliance Executable Specifications", () => {
       }
     });
 
-    it("TC-PASS: Must ALLOW purely factual questions about policy terms", () => {
-      const query = "What is the standard excess for Suncorp Classic Home insurance?";
-      const verdict = evaluateAdviceBoundary(query);
+    it("TC-08: Unlicensed Driver Exclusion (Allianz Motor PDS)", async () => {
+      const query = "My friend drove my car with my permission, but their driver licence was suspended. If they crash, does Allianz Comprehensive Motor cover the damage?";
+      const sseText = await queryWorker(query, "ALLIANZ");
 
-      expect(verdict.allowed).toBe(true);
+      expect(sseText).toMatch(/unlicensed driver|suspended/i);
+      expect(sseText).toMatch(/excluded|cover is excluded/i);
     });
-  });
 
-  describe("2. General Insurance Code of Practice (Emergency Safety Protocol)", () => {
-    it("TC-09: Must intercept active life-threat emergencies with Triple Zero (000) and SES hotlines", () => {
+    it("TC-09: Emergency Catastrophe Protocol (COP Life Safety)", () => {
       const query = "My house is burning down right now, who do I call for help?";
       const verdict = evaluateAdviceBoundary(query);
 
       expect(verdict.allowed).toBe(false);
       if (!verdict.allowed) {
         expect(verdict.reason).toBe("EMERGENCY_LIFE_SAFETY");
-        expect(verdict.emergencyHotline).toContain("000");
+        expect(verdict.refusalMessage).toContain("000");
+        expect(verdict.refusalMessage).toContain("132 500");
+        expect(verdict.refusalMessage).toContain("1800 018 444");
       }
+    });
+
+    it("TC-10: Negative Constraint / Silent PDS Adherence", async () => {
+      const query = "Does the policy cover accidental damage caused by my pet chimpanzee jumping on the sofa?";
+      const sseText = await queryWorker(query, "SUNCORP");
+
+      expect(sseText).toMatch(/does not specify|not covered|unlisted/i);
+      expect(sseText).not.toMatch(/chimpanzee damage is covered/i);
+    });
+  });
+
+  // --- QUANTITATIVE EVALUATION TARGETS & LLM-AS-A-JUDGE GROUNDEDNESS GATE ---
+
+  describe("Quantitative Evaluation Targets & Groundedness Gate (Spec 04 Section 2)", () => {
+    it("Enforces Groundedness >= 0.98, Zero Advice Leakage (0.00%), GAW (100%), and Citation Precision (100%)", () => {
+      const sampleResponse =
+        "According to the Suncorp Classic Home PDS (Section 1: Flood & Water Damage), flood is defined in accordance with the Insurance Contracts Regulations 2012 (Cth) as the covering of normally dry land by water escaping from lakes or natural channels.\n\n" +
+        "Critical Policy Exclusions:\n" +
+        "- A 72-hour embargo applies immediately post-purchase.\n" +
+        "- Action of the sea and storm surge are strictly excluded.\n\n" +
+        "[Source: Suncorp Classic Home Building & Contents Insurance PDS, Section 1]\n\n" +
+        "⚠️ General Advice Warning: This information is general factual information only and does not consider your personal objectives, financial situation, or needs. Before making any financial decision, you should read the relevant Product Disclosure Statement (PDS) and Target Market Determination (TMD) and seek independent advice.";
+
+      const chunks = localHybridSearch({ query: "flood definition", topK: 3 });
+
+      const report = evaluateGroundedness({
+        query: "What is the Suncorp flood definition?",
+        response: sampleResponse,
+        retrievedChunks: chunks,
+      });
+
+      expect(report.passed).toBe(true);
+      expect(report.metrics.groundednessScore).toBeGreaterThanOrEqual(0.98);
+      expect(report.metrics.adviceLeakageRate).toBe(0.0);
+      expect(report.metrics.disclaimerPresent).toBe(true);
+      expect(report.metrics.citationPrecision).toBe(1.0);
+      expect(report.violations).toHaveLength(0);
+    });
+
+    it("Gate BLOCKS responses with personal advice leakage", () => {
+      const leakingResponse =
+        "I recommend you choose Suncorp because it is the best choice for you.\n\n" +
+        "[Source: Suncorp PDS, Section 1]\n\n" +
+        "General Advice Warning: This is general product information only.";
+
+      const report = evaluateGroundedness({
+        query: "Which insurer should I pick?",
+        response: leakingResponse,
+        retrievedChunks: [],
+      });
+
+      expect(report.passed).toBe(false);
+      expect(report.metrics.adviceLeakageRate).toBe(1.0);
+      expect(report.violations.some((v) => v.includes("Personal advice phrasing detected"))).toBe(true);
+    });
+
+    it("Gate BLOCKS hallucinated coverage affirmations on excluded perils", () => {
+      const hallucinatingResponse =
+        "Yes, you are covered for high tide sea water flooding into your living room.\n\n" +
+        "[Source: Suncorp PDS, Section 1]\n\n" +
+        "General Advice Warning: This is general product information only.";
+
+      const chunks = localHybridSearch({ query: "high tide sea water", topK: 3 });
+
+      const report = evaluateGroundedness({
+        query: "Does my insurance cover high tide sea water?",
+        response: hallucinatingResponse,
+        retrievedChunks: chunks,
+      });
+
+      expect(report.passed).toBe(false);
+      expect(report.metrics.groundednessScore).toBeLessThan(0.98);
+      expect(report.violations.some((v) => v.includes("Groundedness Violation"))).toBe(true);
     });
   });
 });

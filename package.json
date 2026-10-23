@@ -7,6 +7,8 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "ingest": "tsx scripts/ingest-faqs.ts",
+    "normalize": "tsx scripts/normalize-pds.ts",
+    "upload:r2": "tsx scripts/upload-to-r2.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:evals": "vitest run tests/evals",

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import worker from "../../src/index";
 import type { Env } from "../../src/types/bindings";
+import { sanitizePii } from "../../src/guardrails/pii-sanitizer";
 
-describe("Worker End-to-End Integration Suite", () => {
+describe("Worker End-to-End Integration Suite (Spec 02 & Spec 03)", () => {
   const mockEnv: Env = {
     AI: {
       run: vi.fn().mockResolvedValue(
@@ -53,7 +54,7 @@ describe("Worker End-to-End Integration Suite", () => {
     expect(res.status).toBe(422);
   });
 
-  it("3. POST /api/chat intercepts personal financial advice framing", async () => {
+  it("3. POST /api/chat intercepts personal financial advice framing with event: error", async () => {
     const req = new Request("http://localhost/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -67,19 +68,42 @@ describe("Worker End-to-End Integration Suite", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toContain("text/event-stream");
     const text = await res.text();
+    expect(text).toContain("event: error");
+    expect(text).toContain("ADVICE_BOUNDARY_VIOLATION");
     expect(text).toContain("PERSONAL_ADVICE_REQUESTED");
     expect(text).toContain("cannot provide personal financial product advice");
     // Verify non-blocking telemetry recorded with advice flag
     expect(mockCtx.waitUntil).toHaveBeenCalled();
   });
 
-  it("4. POST /api/chat streams factual response for compliant queries", async () => {
+  it("4. POST /api/chat intercepts emergency life threats with emergency hotlines", async () => {
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: "My house is burning down right now, who do I call for help?",
+        conversationId: "550e8400-e29b-41d4-a716-446655440000",
+      }),
+    });
+    const res = await worker.fetch(req, mockEnv, mockCtx);
+
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain("event: error");
+    expect(text).toContain("EMERGENCY_INTERCEPTION");
+    expect(text).toContain("000");
+    expect(text).toContain("132 500");
+    expect(text).toContain("1800 018 444");
+  });
+
+  it("5. POST /api/chat streams SSE events (metadata, token, done) for compliant queries", async () => {
     const req = new Request("http://localhost/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         query: "What is the standard flood definition?",
         conversationId: "550e8400-e29b-41d4-a716-446655440000",
+        filters: { insurer: "SUNCORP" },
       }),
     });
     const res = await worker.fetch(req, mockEnv, mockCtx);
@@ -87,6 +111,26 @@ describe("Worker End-to-End Integration Suite", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toContain("text/event-stream");
     const text = await res.text();
+    expect(text).toContain("event: metadata");
+    expect(text).toContain("event: token");
     expect(text).toContain("flood is defined");
+    expect(text).toContain("event: done");
+    expect(text).toContain('"finish_reason":"stop"');
+  });
+
+  it("6. PII Sanitizer strips Australian Driver Licences, TFNs, Cards, Medicare and Phone numbers", async () => {
+    const dirtyQuery =
+      "My driver licence is NSW licence 12345678, my TFN is 123 456 789, medicare 21234567891, card 4532 1234 5678 9010, phone 0412 345 678. What is my cover?";
+    const result = await sanitizePii(dirtyQuery);
+
+    expect(result.wasRedacted).toBe(true);
+    expect(result.sanitized).toContain("[REDACTED_LICENCE]");
+    expect(result.sanitized).toContain("[REDACTED_TFN]");
+    expect(result.sanitized).toContain("[REDACTED_MEDICARE]");
+    expect(result.sanitized).toContain("[REDACTED_CARD]");
+    expect(result.sanitized).toContain("[REDACTED_PHONE]");
+    expect(result.sanitized).not.toContain("12345678");
+    expect(result.queryHash).toBeDefined();
+    expect(result.queryHash.length).toBe(64);
   });
 });

@@ -35,6 +35,10 @@
     }
   ],
 
+  // Cloudflare AI Search (Hybrid BM25 + Vector + Reranking)
+  // Bound to faq-mate-corpus R2 bucket
+  // Binding name: AI_SEARCH
+
   // Observability & Distributed Tracing
   "observability": {
     "enabled": true

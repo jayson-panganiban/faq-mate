@@ -1,16 +1,18 @@
 import { z } from "zod";
 
 /**
- * Validated Inbound Chat Request Schema
+ * Validated Inbound Chat Request Schema (Spec 02 Section 1.1)
  */
 export const ChatRequestSchema = z.object({
-  query: z.string().trim().min(2, "Query must be at least 2 characters").max(500, "Query exceeds 500 characters"),
+  query: z.string().trim().min(3, "Query must be at least 3 characters").max(500, "Query exceeds 500 characters"),
   conversationId: z.string().uuid("Invalid conversation UUID"),
-  filters: z.object({
-    insurer: z.enum(["NRMA", "SUNCORP", "ALLIANZ", "QBE", "YOUI"]).optional(),
-    product: z.string().optional(),
-    docType: z.enum(["PDS", "TMD", "SPDS"]).default("PDS"),
-  }).optional(),
+  filters: z
+    .object({
+      insurer: z.enum(["NRMA", "SUNCORP", "ALLIANZ", "QBE", "YOUI"]).optional(),
+      product: z.string().optional(),
+      docType: z.enum(["PDS", "TMD", "SPDS"]).default("PDS"),
+    })
+    .optional(),
 });
 
 export type ChatRequest = z.infer<typeof ChatRequestSchema>;

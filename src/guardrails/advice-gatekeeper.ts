@@ -1,9 +1,9 @@
 import type { GatekeeperVerdict } from "../types/chat";
-
-const STATUTORY_SAFE_HARBOR_REFUSAL =
-  "I cannot provide personal financial product advice or recommend which insurance policy suits your individual financial situation, objectives, or budget.\n" +
-  "I can, however, provide factual information regarding what is covered or excluded under published Product Disclosure Statements (PDS).\n\n" +
-  "⚠️ General Advice Warning: Any information provided is general factual information only and does not consider your personal objectives, financial situation, or needs. Please review the relevant PDS and TMD before making a decision.";
+import {
+  STATUTORY_SAFE_HARBOR_REFUSAL,
+  EMERGENCY_REFUSAL_MESSAGE,
+  EMERGENCY_HOTLINES,
+} from "../constants/statutory";
 
 /**
  * Heuristics indicating personal financial advice requests under ASIC RG 244 & Corporations Act 2001
@@ -41,11 +41,8 @@ export function evaluateAdviceBoundary(query: string): GatekeeperVerdict {
       return {
         allowed: false,
         reason: "EMERGENCY_LIFE_SAFETY",
-        emergencyHotline: "Triple Zero (000), SES (132 500), or Disaster Welfare Services (1800 018 444)",
-        refusalMessage:
-          "🚨 EMERGENCY ASSISTANCE: If you or your property are in immediate life danger, please immediately call Triple Zero (000).\n" +
-          "• For storm or flood emergency assistance, contact the State Emergency Service (SES) on 132 500.\n" +
-          "• For emergency accommodation and disaster support, contact Disaster Welfare Services on 1800 018 444.",
+        emergencyHotline: EMERGENCY_HOTLINES.summary,
+        refusalMessage: EMERGENCY_REFUSAL_MESSAGE,
       };
     }
   }

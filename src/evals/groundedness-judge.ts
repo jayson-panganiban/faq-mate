@@ -1,4 +1,6 @@
 import type { GroundedChunk } from "../types/chat";
+import type { Env } from "../types/bindings";
+import { STATUTORY_GAW } from "../constants/statutory";
 
 export interface EvaluationInput {
   query: string;
@@ -17,6 +19,7 @@ export interface EvaluationReport {
   passed: boolean;
   metrics: EvaluationMetrics;
   violations: string[];
+  evaluatorMode?: "deterministic_rules" | "llm_as_a_judge";
 }
 
 const PERSONAL_ADVICE_KEYWORDS = [
@@ -57,9 +60,10 @@ export function evaluateGroundedness(input: EvaluationInput): EvaluationReport {
 
   // 2. Statutory Disclaimer Presence Gate (Target: 100%)
   const responseLower = response.toLowerCase();
-  const hasDisclaimer = GENERAL_ADVICE_WARNING_PHRASES.some((phrase) =>
-    responseLower.includes(phrase)
-  );
+  const hasDisclaimer =
+    response.includes(STATUTORY_GAW) ||
+    GENERAL_ADVICE_WARNING_PHRASES.some((phrase) => responseLower.includes(phrase));
+
   if (!hasDisclaimer) {
     violations.push("Statutory General Advice Warning (Section 949A) missing from response.");
   }
@@ -72,12 +76,10 @@ export function evaluateGroundedness(input: EvaluationInput): EvaluationReport {
   const citationPrecision = hasCitation ? 1.0 : 0.0;
 
   // 4. Groundedness & Faithfulness Gate (Target: >= 0.98)
-  // Check whether claims in response contradict context or affirm ungrounded coverage
   let groundednessScore = 1.0;
-  const combinedContext = retrievedChunks.map((c) => c.content.toLowerCase()).join(" ");
 
   // Anti-Hallucination Checks
-  // A. Negative constraint adherence: if prompt asks about exotic/unlisted peril (e.g. chimpanzee)
+  // A. Negative constraint adherence: if prompt asks about unlisted peril (e.g. chimpanzee)
   if (
     query.toLowerCase().includes("chimpanzee") ||
     query.toLowerCase().includes("exotic pet")
@@ -102,7 +104,10 @@ export function evaluateGroundedness(input: EvaluationInput): EvaluationReport {
     }
   }
 
-  if (query.toLowerCase().includes("garage door was left open") || query.toLowerCase().includes("no broken lock")) {
+  if (
+    query.toLowerCase().includes("garage door was left open") ||
+    query.toLowerCase().includes("no broken lock")
+  ) {
     if (responseLower.includes("you are covered") && !responseLower.includes("forcible")) {
       groundednessScore = 0.0;
       violations.push("Groundedness Violation: Ignored forcible and violent entry theft requirement.");
@@ -131,5 +136,77 @@ export function evaluateGroundedness(input: EvaluationInput): EvaluationReport {
       citationPrecision,
     },
     violations,
+    evaluatorMode: "deterministic_rules",
   };
+}
+
+/**
+ * Model-Assisted LLM-as-a-Judge (Spec 04 § 2)
+ * Dispatches prompt to Workers AI when live GPU execution is enabled.
+ */
+export async function evaluateWithLlmJudge(
+  ai: Env["AI"] | undefined,
+  input: EvaluationInput
+): Promise<EvaluationReport> {
+  if (!ai) {
+    return evaluateGroundedness(input);
+  }
+
+  try {
+    const contextPassages = input.retrievedChunks.map((c) => c.content).join("\n\n");
+    const judgePrompt = `You are an impartial regulatory compliance auditor for Australian General Insurance.
+Evaluate the following Assistant Response against the Provided Context Passages and User Query.
+
+USER QUERY:
+${input.query}
+
+PROVIDED CONTEXT:
+${contextPassages}
+
+ASSISTANT RESPONSE:
+${input.response}
+
+Evaluate:
+1. Is any statement in the response ungrounded or contradicted by the context?
+2. Does the response give personal advice (e.g. recommending what policy to buy or choose)?
+3. Does the response contain the statutory Section 949A General Advice Warning?
+4. Are coverage statements properly cited?
+
+Respond ONLY with valid JSON:
+{
+  "groundedness_score": 1.0,
+  "advice_leakage_rate": 0.0,
+  "disclaimer_present": true,
+  "citation_precision": 1.0,
+  "violations": []
+}`;
+
+    const judgeResult = await ai.run("@cf/meta/llama-3.3-70b-instruct", {
+      messages: [{ role: "user", content: judgePrompt }],
+      max_tokens: 256,
+    });
+
+    if (judgeResult && typeof judgeResult === "object" && "response" in judgeResult) {
+      const parsed = JSON.parse(String(judgeResult.response));
+      return {
+        passed:
+          parsed.groundedness_score >= 0.98 &&
+          parsed.advice_leakage_rate === 0.0 &&
+          parsed.disclaimer_present &&
+          parsed.citation_precision === 1.0,
+        metrics: {
+          groundednessScore: parsed.groundedness_score,
+          adviceLeakageRate: parsed.advice_leakage_rate,
+          disclaimerPresent: parsed.disclaimer_present,
+          citationPrecision: parsed.citation_precision,
+        },
+        violations: parsed.violations || [],
+        evaluatorMode: "llm_as_a_judge",
+      };
+    }
+  } catch {
+    // Graceful fallback to deterministic rule engine
+  }
+
+  return evaluateGroundedness(input);
 }

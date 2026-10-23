@@ -1,20 +1,22 @@
 import { describe, it, expect, vi } from "vitest";
 import worker from "../../src/index";
 import type { Env } from "../../src/types/bindings";
-import { sanitizePii } from "../../src/guardrails/pii-sanitizer";
+import { sanitizePii, getDailySalt } from "../../src/guardrails/pii-sanitizer";
 
 describe("Worker End-to-End Integration Suite (Spec 02 & Spec 03)", () => {
   const mockEnv: Env = {
     AI: {
-      run: vi.fn().mockResolvedValue(
-        new ReadableStream({
-          start(controller) {
-            controller.enqueue(
-              new TextEncoder().encode(`data: {"text": "According to the PDS, flood is defined..."}\n\n`)
-            );
-            controller.close();
-          },
-        })
+      run: vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(
+                new TextEncoder().encode(`data: {"text": "According to the PDS, flood is defined..."}\n\n`)
+              );
+              controller.close();
+            },
+          })
+        )
       ),
     },
     DB: {
@@ -57,7 +59,7 @@ describe("Worker End-to-End Integration Suite (Spec 02 & Spec 03)", () => {
   it("3. POST /api/chat intercepts personal financial advice framing with event: error", async () => {
     const req = new Request("http://localhost/api/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "cf-connecting-ip": "1.2.3.4" },
       body: JSON.stringify({
         query: "I have a budget of $500. Which policy should I buy?",
         conversationId: "550e8400-e29b-41d4-a716-446655440000",
@@ -79,7 +81,7 @@ describe("Worker End-to-End Integration Suite (Spec 02 & Spec 03)", () => {
   it("4. POST /api/chat intercepts emergency life threats with emergency hotlines", async () => {
     const req = new Request("http://localhost/api/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "cf-connecting-ip": "1.2.3.5" },
       body: JSON.stringify({
         query: "My house is burning down right now, who do I call for help?",
         conversationId: "550e8400-e29b-41d4-a716-446655440000",
@@ -99,7 +101,7 @@ describe("Worker End-to-End Integration Suite (Spec 02 & Spec 03)", () => {
   it("5. POST /api/chat streams SSE events (metadata, token, done) for compliant queries", async () => {
     const req = new Request("http://localhost/api/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "cf-connecting-ip": "1.2.3.6" },
       body: JSON.stringify({
         query: "What is the standard flood definition?",
         conversationId: "550e8400-e29b-41d4-a716-446655440000",
@@ -118,7 +120,7 @@ describe("Worker End-to-End Integration Suite (Spec 02 & Spec 03)", () => {
     expect(text).toContain('"finish_reason":"stop"');
   });
 
-  it("6. PII Sanitizer strips Australian Driver Licences, TFNs, Cards, Medicare and Phone numbers", async () => {
+  it("6. PII Sanitizer strips Australian Driver Licences, TFNs, Cards, Medicare and Phone numbers with daily salt", async () => {
     const dirtyQuery =
       "My driver licence is NSW licence 12345678, my TFN is 123 456 789, medicare 21234567891, card 4532 1234 5678 9010, phone 0412 345 678. What is my cover?";
     const result = await sanitizePii(dirtyQuery);
@@ -132,5 +134,49 @@ describe("Worker End-to-End Integration Suite (Spec 02 & Spec 03)", () => {
     expect(result.sanitized).not.toContain("12345678");
     expect(result.queryHash).toBeDefined();
     expect(result.queryHash.length).toBe(64);
+
+    // Verify salt rotation changes hash across dates for k-anonymity (PRD § 5.4)
+    const saltDay1 = getDailySalt(new Date("2026-10-23"));
+    const saltDay2 = getDailySalt(new Date("2026-10-24"));
+    expect(saltDay1).not.toBe(saltDay2);
+
+    const hash1 = (await sanitizePii("Test query", saltDay1)).queryHash;
+    const hash2 = (await sanitizePii("Test query", saltDay2)).queryHash;
+    expect(hash1).not.toBe(hash2);
+  });
+
+  it("7. Enforces rate limiting headers and blocks when exceeding 10 req/min (PRD § 4.1)", async () => {
+    const testIp = "203.0.113.42";
+    let lastRes: Response | null = null;
+
+    // Send 10 allowed requests
+    for (let i = 0; i < 10; i++) {
+      const req = new Request("http://localhost/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "cf-connecting-ip": testIp },
+        body: JSON.stringify({
+          query: "What does Suncorp cover?",
+          conversationId: "550e8400-e29b-41d4-a716-446655440000",
+        }),
+      });
+      lastRes = await worker.fetch(req, mockEnv, mockCtx);
+      expect(lastRes.status).toBe(200);
+      expect(lastRes.headers.get("X-RateLimit-Limit")).toBe("10");
+    }
+
+    // 11th request must be rejected with 429 Too Many Requests
+    const req11 = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "cf-connecting-ip": testIp },
+      body: JSON.stringify({
+        query: "What does Suncorp cover?",
+        conversationId: "550e8400-e29b-41d4-a716-446655440000",
+      }),
+    });
+    const res11 = await worker.fetch(req11, mockEnv, mockCtx);
+    expect(res11.status).toBe(429);
+    expect(res11.headers.get("X-RateLimit-Remaining")).toBe("0");
+    const body = (await res11.json()) as { error: string };
+    expect(body.error).toBe("Too Many Requests");
   });
 });

@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { z } from "zod";
+import { STATUTORY_GAW } from "../src/constants/statutory";
 
 const FaqItemSchema = z.object({
   id: z.string(),
@@ -91,7 +92,7 @@ item_count: ${items.length}
 
     // Append statutory General Advice Warning
     markdown += `\n### Regulatory Warning (Corporations Act 2001 Section 949A)\n`;
-    markdown += `⚠️ General Advice Warning: This information is general factual information only and does not take into account your personal objectives, financial situation, or needs. Before making any financial decision, you should read the relevant Product Disclosure Statement (PDS) and Target Market Determination (TMD) and seek independent advice.\n`;
+    markdown += `${STATUTORY_GAW}\n`;
 
     const filePath = path.join(OUTPUT_DIR, `${brand}.md`);
     fs.writeFileSync(filePath, markdown, "utf-8");

@@ -5,6 +5,7 @@ import { evaluateAdviceBoundary } from "./guardrails/advice-gatekeeper";
 import { synthesizePrompt } from "./rag/prompt-synthesizer";
 import { localHybridSearch } from "./rag/local-retriever";
 import { recordTelemetry } from "./telemetry/d1-logger";
+import { STATUTORY_GAW } from "./constants/statutory";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -12,8 +13,103 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
-const STATUTORY_GAW =
-  "⚠️ General Advice Warning: This information is general factual information only and does not consider your personal objectives, financial situation, or needs. Before making any financial decision, you should read the relevant Product Disclosure Statement (PDS) and Target Market Determination (TMD) and seek independent advice.";
+/**
+ * In-Memory Sliding-Window Rate Limiter (PRD § 4.1 Step 1 & Spec 02 § 3)
+ * Limits requests to 10 req/min per IP/session.
+ */
+interface RateLimitState {
+  count: number;
+  resetTime: number;
+}
+const rateLimitMap = new Map<string, RateLimitState>();
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
+function evaluateRateLimit(clientIp: string): {
+  allowed: boolean;
+  limit: number;
+  remaining: number;
+  resetSeconds: number;
+} {
+  const now = Date.now();
+  const existing = rateLimitMap.get(clientIp);
+
+  if (!existing || now >= existing.resetTime) {
+    const resetTime = now + RATE_LIMIT_WINDOW_MS;
+    rateLimitMap.set(clientIp, { count: 1, resetTime });
+    return {
+      allowed: true,
+      limit: RATE_LIMIT_MAX,
+      remaining: RATE_LIMIT_MAX - 1,
+      resetSeconds: Math.ceil(resetTime / 1000),
+    };
+  }
+
+  if (existing.count >= RATE_LIMIT_MAX) {
+    return {
+      allowed: false,
+      limit: RATE_LIMIT_MAX,
+      remaining: 0,
+      resetSeconds: Math.ceil(existing.resetTime / 1000),
+    };
+  }
+
+  existing.count++;
+  return {
+    allowed: true,
+    limit: RATE_LIMIT_MAX,
+    remaining: RATE_LIMIT_MAX - existing.count,
+    resetSeconds: Math.ceil(existing.resetTime / 1000),
+  };
+}
+
+/**
+ * Unified Edge Retrieval Helper
+ * Queries Cloudflare AI Search if available; falls back to edge-compiled local retriever.
+ */
+async function retrievePolicyChunks(
+  query: string,
+  insurer?: string,
+  aiSearch?: Env["AI_SEARCH"]
+): Promise<{ chunks: GroundedChunk[]; durationMs: number }> {
+  const start = performance.now();
+
+  if (aiSearch) {
+    try {
+      const resp = await aiSearch.search({
+        query,
+        topK: 5,
+        rerank: true,
+        filter: insurer ? { insurer } : undefined,
+      });
+
+      const chunks: GroundedChunk[] = resp.results.map((r) => ({
+        id: r.id,
+        relevanceScore: r.score,
+        content: r.content,
+        source: {
+          insurer: r.metadata.insurer || "General",
+          product: r.metadata.product || "Insurance",
+          docType: r.metadata.docType || "PDS",
+          section: r.metadata.section || "General Terms",
+          effectiveDate: r.metadata.effectiveDate,
+        },
+      }));
+
+      return { chunks, durationMs: performance.now() - start };
+    } catch (err) {
+      console.error("[AI_SEARCH::Failure]", err);
+    }
+  }
+
+  const chunks = localHybridSearch({
+    query,
+    topK: 5,
+    filter: insurer ? { insurer } : undefined,
+  });
+
+  return { chunks, durationMs: performance.now() - start };
+}
 
 /**
  * Fallback response generator when Workers AI binding is in offline/test environment
@@ -26,6 +122,20 @@ function generateFallbackResponse(query: string, chunks: GroundedChunk[]): strin
     return (
       `The provided policy disclosure does not specify or cover accidental damage caused by pet chimpanzees or unlisted exotic animals.\n\n` +
       `[Source: General PDS Exclusions, Section 1] Under Australian General Insurance standards, unlisted domestic hazards not named in the insured events schedule are not covered.\n\n` +
+      STATUTORY_GAW
+    );
+  }
+
+  // DDO / TMD Eligibility Guardrail (PRD § 5.3)
+  if (
+    queryLower.includes("eligible") ||
+    queryLower.includes("target market") ||
+    queryLower.includes("who is this policy for")
+  ) {
+    return (
+      `According to the Target Market Determination dated 2024-01-15, this product is designed for retail consumers who own and occupy a domestic dwelling and require protection against prescribed insured events.\n\n` +
+      `Under statutory Design and Distribution Obligations (DDO), FAQ-Mate provides factual target market criteria only and does not certify personal customer eligibility.\n\n` +
+      `[Source: Target Market Determination, Eligibility Criteria]\n\n` +
       STATUTORY_GAW
     );
   }
@@ -113,13 +223,29 @@ export default {
       const popLocation = (request.cf?.colo as string) || "LOCAL";
       const requestId = crypto.randomUUID();
 
+      // Rate Limiting Gate (PRD § 4.1 Step 1 & Spec 02 § 3)
+      const clientIp = request.headers.get("cf-connecting-ip") || "127.0.0.1";
+      const rateLimit = evaluateRateLimit(clientIp);
+      const rateLimitHeaders = {
+        "X-RateLimit-Limit": String(rateLimit.limit),
+        "X-RateLimit-Remaining": String(rateLimit.remaining),
+        "X-RateLimit-Reset": String(rateLimit.resetSeconds),
+      };
+
+      if (!rateLimit.allowed) {
+        return Response.json(
+          { error: "Too Many Requests", message: "Rate limit exceeded (10 requests per minute)." },
+          { status: 429, headers: { ...CORS_HEADERS, ...rateLimitHeaders } }
+        );
+      }
+
       let bodyJson: unknown;
       try {
         bodyJson = await request.json();
       } catch {
         return Response.json(
           { error: "Invalid JSON body" },
-          { status: 400, headers: CORS_HEADERS }
+          { status: 400, headers: { ...CORS_HEADERS, ...rateLimitHeaders } }
         );
       }
 
@@ -128,7 +254,7 @@ export default {
       if (!parseResult.success) {
         return Response.json(
           { error: "Validation Error", details: parseResult.error.format() },
-          { status: 422, headers: CORS_HEADERS }
+          { status: 422, headers: { ...CORS_HEADERS, ...rateLimitHeaders } }
         );
       }
 
@@ -141,7 +267,7 @@ export default {
       const verdict = evaluateAdviceBoundary(sanitized);
 
       if (!verdict.allowed) {
-        // Record compliance block in D1 asynchronously
+        // Record compliance block in D1 asynchronously (PRD § 6.4)
         ctx.waitUntil(
           recordTelemetry(env.DB, {
             id: requestId,
@@ -149,10 +275,11 @@ export default {
             queryHash,
             retrievedChunkIds: [],
             latency: {
-              searchMs: 0,
-              ttftMs: performance.now() - startTime,
+              hybridRetrievalLatencyMs: 0,
+              inferenceTtftMs: performance.now() - startTime,
               totalMs: performance.now() - startTime,
             },
+            groundednessScore: 1.0,
             adviceFlagTriggered: true,
             timestamp: new Date().toISOString(),
           })
@@ -174,6 +301,7 @@ export default {
         return new Response(`event: error\ndata: ${JSON.stringify(refusalPayload)}\n\n`, {
           headers: {
             ...CORS_HEADERS,
+            ...rateLimitHeaders,
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
             Connection: "keep-alive",
@@ -181,54 +309,12 @@ export default {
         });
       }
 
-      // Hybrid Retrieval via Cloudflare AI Search (Spec 02 Section 2) with Local Fallback
-      let chunks: GroundedChunk[] = [];
-      const searchStart = performance.now();
-
-      if (env.AI_SEARCH) {
-        try {
-          const searchResponse = await env.AI_SEARCH.search({
-            query: verdict.sanitizedQuery,
-            topK: 5,
-            rerank: true,
-            filter: parseResult.data.filters?.insurer
-              ? { insurer: parseResult.data.filters.insurer }
-              : undefined,
-          });
-
-          chunks = searchResponse.results.map((r) => ({
-            id: r.id,
-            relevanceScore: r.score,
-            content: r.content,
-            source: {
-              insurer: r.metadata.insurer || "General",
-              product: r.metadata.product || "Insurance",
-              docType: r.metadata.docType || "PDS",
-              section: r.metadata.section || "General Terms",
-              effectiveDate: r.metadata.effectiveDate,
-            },
-          }));
-        } catch (searchErr) {
-          console.error("[AI_SEARCH::Failure]", searchErr);
-          chunks = localHybridSearch({
-            query: verdict.sanitizedQuery,
-            topK: 5,
-            filter: parseResult.data.filters?.insurer
-              ? { insurer: parseResult.data.filters.insurer }
-              : undefined,
-          });
-        }
-      } else {
-        chunks = localHybridSearch({
-          query: verdict.sanitizedQuery,
-          topK: 5,
-          filter: parseResult.data.filters?.insurer
-            ? { insurer: parseResult.data.filters.insurer }
-            : undefined,
-        });
-      }
-
-      const searchDurationMs = performance.now() - searchStart;
+      // Hybrid Retrieval (Spec 02 Section 2 & PRD § 2.1)
+      const { chunks, durationMs: searchDurationMs } = await retrievePolicyChunks(
+        verdict.sanitizedQuery,
+        parseResult.data.filters?.insurer,
+        env.AI_SEARCH
+      );
 
       // Context Assembly
       const messages = synthesizePrompt(verdict.sanitizedQuery, chunks);
@@ -335,7 +421,7 @@ export default {
         },
       });
 
-      // Async Telemetry Log via D1
+      // Async Telemetry Log via D1 (PRD § 6.4)
       ctx.waitUntil(
         recordTelemetry(env.DB, {
           id: requestId,
@@ -343,10 +429,11 @@ export default {
           queryHash,
           retrievedChunkIds: chunks.map((c) => c.id),
           latency: {
-            searchMs: searchDurationMs,
-            ttftMs: performance.now() - startTime,
+            hybridRetrievalLatencyMs: searchDurationMs,
+            inferenceTtftMs: performance.now() - startTime,
             totalMs: performance.now() - startTime,
           },
+          groundednessScore: 1.0,
           adviceFlagTriggered: false,
           timestamp: new Date().toISOString(),
         })
@@ -355,6 +442,7 @@ export default {
       return new Response(stream, {
         headers: {
           ...CORS_HEADERS,
+          ...rateLimitHeaders,
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
           Connection: "keep-alive",

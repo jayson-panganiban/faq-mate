@@ -1,6 +1,6 @@
 /**
  * Deep Module: Edge PII Redaction & Anonymizer
- * Complies with Australian Privacy Principles (APPs 3, 6, 11) & Spec 03 Section 3.
+ * Complies with Australian Privacy Principles (APPs 3, 6, 11) & PRD § 5.4.
  */
 
 const TFN_PATTERN = /\b\d{3}\s?\d{3}\s?\d{3}\b/g;
@@ -20,7 +20,17 @@ export interface SanitizerResult {
   queryHash: string;
 }
 
-export async function sanitizePii(input: string): Promise<SanitizerResult> {
+/**
+ * Generates rotating daily salt for k-anonymity (PRD § 5.4).
+ * Rotates every UTC midnight to guarantee query unlinkability across days.
+ */
+export function getDailySalt(date?: Date): string {
+  const d = date ?? new Date();
+  const dateStr = d.toISOString().slice(0, 10);
+  return `faq-mate-daily-salt-${dateStr}`;
+}
+
+export async function sanitizePii(input: string, customSalt?: string): Promise<SanitizerResult> {
   let text = input;
   let wasRedacted = false;
 
@@ -49,9 +59,10 @@ export async function sanitizePii(input: string): Promise<SanitizerResult> {
     wasRedacted = true;
   }
 
-  // Generate SHA-256 hash using native Web Crypto for D1 k-anonymity logging
+  // Generate SHA-256 hash with rotating daily salt for PRD § 5.4 k-anonymity
+  const salt = customSalt ?? getDailySalt();
   const encoder = new TextEncoder();
-  const data = encoder.encode(text);
+  const data = encoder.encode(`${salt}:${text}`);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const queryHash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");

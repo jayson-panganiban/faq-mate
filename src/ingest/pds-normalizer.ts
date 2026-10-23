@@ -1,4 +1,5 @@
 import { serializeMarkdownTable, type TableData } from "./table-serializer";
+import { STATUTORY_GAW, AFCA_CONTACT } from "../constants/statutory";
 
 export interface PdsMetadata {
   insurer: string;
@@ -133,13 +134,13 @@ export function normalizePdsDocument(
     "## Statutory Notices & Regulatory Dispute Resolution",
     "",
     "### General Advice Warning (Corporations Act 2001 Section 949A)",
-    "⚠️ This document contains general financial product information only and does not take into account your personal objectives, financial situation, or needs. Before making any financial decision, you should read the relevant Product Disclosure Statement (PDS) and Target Market Determination (TMD) and seek independent advice.",
+    STATUTORY_GAW,
     "",
     "### Australian Financial Complaints Authority (AFCA)",
     "If you have an unresolved complaint about a claim or policy interpretation:",
-    "- **External Dispute Resolution:** Australian Financial Complaints Authority (AFCA)",
-    "- **Freecall:** 1800 931 678",
-    "- **Online:** https://www.afca.org.au",
+    `- **External Dispute Resolution:** ${AFCA_CONTACT.name}`,
+    `- **Freecall:** ${AFCA_CONTACT.phone}`,
+    `- **Online:** ${AFCA_CONTACT.website}`,
     ""
   );
 

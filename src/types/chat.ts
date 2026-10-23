@@ -25,6 +25,7 @@ export type GatekeeperVerdict =
       allowed: true;
       sanitizedQuery: string;
       detectedPeril?: string;
+      detectedIntent?: "FACTUAL_PRODUCT_INQUIRY" | "TMD_ELIGIBILITY_INQUIRY";
     }
   | {
       allowed: false;
@@ -51,7 +52,7 @@ export interface GroundedChunk {
 }
 
 /**
- * D1 Telemetry Audit Record Schema
+ * D1 Telemetry Audit Record Schema (PRD § 6.4)
  */
 export interface TelemetryRecord {
   id: string;
@@ -59,10 +60,13 @@ export interface TelemetryRecord {
   queryHash: string;
   retrievedChunkIds: string[];
   latency: {
-    searchMs: number;
-    ttftMs: number;
+    hybridRetrievalLatencyMs: number;
+    inferenceTtftMs: number;
     totalMs: number;
+    searchMs?: number;
+    ttftMs?: number;
   };
+  groundednessScore?: number;
   adviceFlagTriggered: boolean;
   timestamp: string;
 }

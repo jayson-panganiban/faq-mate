@@ -3,6 +3,7 @@ import type { TelemetryRecord } from "../types/chat";
 /**
  * Deep Module: Edge Telemetry & Compliance Auditor
  *
+ * Implements PRD § 6.4 and Spec 02:
  * Conceals D1 statement preparation, JSON serialization, and error recovery
  * behind a single non-blocking interface.
  */
@@ -16,12 +17,16 @@ export async function recordTelemetry(
     return;
   }
 
+  const searchMs = record.latency.hybridRetrievalLatencyMs ?? record.latency.searchMs ?? 0;
+  const ttftMs = record.latency.inferenceTtftMs ?? record.latency.ttftMs ?? 0;
+  const groundedness = record.groundednessScore ?? 1.0;
+
   try {
     await db
       .prepare(
         `INSERT INTO rag_telemetry_audit (
           id, pop_location, query_hash, retrieved_chunk_ids,
-          search_latency_ms, ttft_ms, total_duration_ms,
+          hybrid_retrieval_latency_ms, inference_ttft_ms, total_duration_ms,
           groundedness_score, advice_flag_triggered
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
@@ -30,10 +35,10 @@ export async function recordTelemetry(
         record.popLocation,
         record.queryHash,
         JSON.stringify(record.retrievedChunkIds),
-        record.latency.searchMs,
-        record.latency.ttftMs,
+        searchMs,
+        ttftMs,
         record.latency.totalMs,
-        1.0, // Baseline pass score
+        groundedness,
         record.adviceFlagTriggered ? 1 : 0
       )
       .run();

@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
+import { buildR2PathKey } from "../src/ingest/pds-normalizer";
 
 /**
  * CLI Script: Synchronize Normalized Insurance Corpus to Cloudflare R2
@@ -46,7 +47,15 @@ function scanCorpus(): CorpusItem[] {
     const effectiveDate = dateMatch ? dateMatch[1].trim() : "2024-01-01";
 
     const insurerCode = insurer.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const r2Key = `corpus/${insurerCode}/${productSlug}/${docType}_${effectiveDate}.md`;
+    const r2Key = buildR2PathKey({
+      insurer,
+      insurerCode,
+      product: productSlug,
+      productSlug,
+      docType: docType as "PDS" | "TMD" | "SPDS" | "FSG",
+      effectiveDate,
+      version: effectiveDate,
+    });
 
     items.push({
       localPath: fullPath,

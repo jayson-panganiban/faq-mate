@@ -69,7 +69,7 @@
 - [x] Enforce automated CI gate ($\ge 0.98$ groundedness, $0.00\%$ advice leakage, $100\%$ GAW, $100\%$ citation precision)
 - [x] All 13/13 eval tests passing in CI
 
-### Phase 6: Cloudflare Pages Frontend (Upcoming)
+### Phase 6: Cloudflare Pages Frontend ([`docs/specs/05-frontend-chat-interface.md`](specs/05-frontend-chat-interface.md))
 
 - [ ] Scaffold Vite + React 19 UI in `packages/ui` or `src/frontend/`
 - [ ] Citation preview modal & PDS page deep-links

@@ -4,7 +4,7 @@ Australian General Insurance FAQ Edge RAG system running on Cloudflare Workers, 
 
 ## Context Pointers
 - **Roadmap & Phase Tracker:** [`docs/ROADMAP.md`](docs/ROADMAP.md)
-- **Living Specifications:** [`docs/specs/`](docs/specs/) (01 Ingestion, 02 Edge Runtime, 03 Regulatory, 04 AFCA Evals)
+- **Living Specifications:** [`docs/specs/`](docs/specs/) (01 Ingestion, 02 Edge Runtime, 03 Regulatory, 04 AFCA Evals, 05 Frontend)
 - **Domain Invariants & Legal Terms:** [`GLOSSARY.md`](GLOSSARY.md)
 - **System Architecture & PRD:** [`docs/PRD.md`](docs/PRD.md)
 - **Coding Standards & Review Rules:** [`CODING_STANDARDS.md`](CODING_STANDARDS.md)

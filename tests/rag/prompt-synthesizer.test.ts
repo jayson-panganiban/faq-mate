@@ -41,16 +41,22 @@ describe("Product-Line Disambiguation & Prompt Synthesis (Ticket 04 & Spec 07)",
       },
     ];
 
-    const messages = synthesizePrompt("Does that include flood or rainwater run-off?", [dummyChunk], {
-      history,
-    });
+    const messages = synthesizePrompt(
+      "Does that include flood or rainwater run-off?",
+      [dummyChunk],
+      {
+        history,
+      }
+    );
 
     expect(messages.length).toBe(4);
     expect(messages[0].role).toBe("system");
     expect(messages[1].role).toBe("user");
     expect(messages[1].content).toBe("What does Suncorp cover for storm damage?");
     expect(messages[2].role).toBe("assistant");
-    expect(messages[2].content).toBe("Suncorp covers storm damage to your home building and contents.");
+    expect(messages[2].content).toBe(
+      "Suncorp covers storm damage to your home building and contents."
+    );
     expect(messages[3].role).toBe("user");
     expect(messages[3].content).toBe("Does that include flood or rainwater run-off?");
   });

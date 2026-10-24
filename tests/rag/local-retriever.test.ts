@@ -21,7 +21,8 @@ describe("Colloquial Retrieval via Local Hybrid Search (Spec 07)", () => {
 
     expect(chunks.length).toBeGreaterThan(0);
     const hasFoodSpoilage = chunks.some(
-      (c) => c.content.toLowerCase().includes("spoilage") || c.content.toLowerCase().includes("food")
+      (c) =>
+        c.content.toLowerCase().includes("spoilage") || c.content.toLowerCase().includes("food")
     );
     expect(hasFoodSpoilage).toBe(true);
   });

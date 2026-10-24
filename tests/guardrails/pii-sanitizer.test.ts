@@ -20,11 +20,13 @@ describe("PII Sanitizer & Multi-Turn History Scrubbing (Spec 07 & APP 3/11)", ()
       history: [
         {
           role: "user" as const,
-          content: "Hi, my name is John and my licence is NSW licence 12345678, medicare 21234567891",
+          content:
+            "Hi, my name is John and my licence is NSW licence 12345678, medicare 21234567891",
         },
         {
           role: "assistant" as const,
-          content: "Hello John, I can provide factual information on policy coverage. How can I help?",
+          content:
+            "Hello John, I can provide factual information on policy coverage. How can I help?",
         },
         {
           role: "user" as const,

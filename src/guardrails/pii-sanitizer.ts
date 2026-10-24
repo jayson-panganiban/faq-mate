@@ -83,10 +83,7 @@ async function computeQueryHash(text: string, customSalt?: string): Promise<stri
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export async function sanitizePii(
-  input: string,
-  customSalt?: string
-): Promise<SanitizerResult>;
+export async function sanitizePii(input: string, customSalt?: string): Promise<SanitizerResult>;
 export async function sanitizePii(
   input: MultiTurnSanitizerInput,
   customSalt?: string

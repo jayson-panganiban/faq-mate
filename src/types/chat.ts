@@ -25,10 +25,7 @@ export const ChatRequestSchema = z.object({
     .min(2, "Query must be at least 2 characters")
     .max(500, "Query exceeds 500 characters"),
   conversationId: z.string().uuid("Invalid conversation UUID"),
-  history: z
-    .array(ChatMessageHistorySchema)
-    .max(4, "History cannot exceed 4 messages")
-    .optional(),
+  history: z.array(ChatMessageHistorySchema).max(4, "History cannot exceed 4 messages").optional(),
   filters: z
     .object({
       insurer: z

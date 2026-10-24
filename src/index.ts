@@ -97,18 +97,27 @@ async function retrievePolicyChunks(
       });
 
       const rawItems = resp.chunks || resp.results || [];
-      const chunks: GroundedChunk[] = rawItems.map((r) => ({
-        id: r.id || `ai-${Math.random().toString(36).slice(2, 9)}`,
-        relevanceScore: typeof r.score === "number" ? r.score : 0.85,
-        content: r.content,
-        source: {
-          insurer: r.metadata?.insurer || insurer || "General",
-          product: r.metadata?.product || "Insurance",
-          docType: r.metadata?.docType || "PDS",
-          section: r.metadata?.section || r.metadata?.filename || "General Terms",
-          effectiveDate: r.metadata?.effectiveDate,
-        },
-      }));
+      const chunks: GroundedChunk[] = rawItems.map((r: any) => {
+        const itemKey = r.item?.key || r.metadata?.filename || "";
+        let parsedInsurer = r.metadata?.insurer;
+        if (!parsedInsurer && itemKey) {
+          const match = itemKey.match(/corpus\/(?:faqs|pds)\/([^/]+)/);
+          if (match) parsedInsurer = match[1];
+        }
+
+        return {
+          id: r.id || `ai-${Math.random().toString(36).slice(2, 9)}`,
+          relevanceScore: typeof r.score === "number" ? r.score : 0.85,
+          content: r.content || r.text || "",
+          source: {
+            insurer: parsedInsurer || insurer || "General",
+            product: r.metadata?.product || "Insurance",
+            docType: r.metadata?.docType || (itemKey.includes("faqs") ? "FAQ" : "PDS"),
+            section: r.metadata?.section || itemKey || "General Terms",
+            effectiveDate: r.metadata?.effectiveDate,
+          },
+        };
+      });
 
       if (chunks.length > 0) {
         return { chunks, durationMs: performance.now() - start };

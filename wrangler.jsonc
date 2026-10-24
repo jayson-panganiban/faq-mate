@@ -37,7 +37,12 @@
 
   // Cloudflare AI Search (Hybrid BM25 + Vector + Reranking)
   // Bound to faq-mate-corpus R2 bucket
-  // Binding name: AI_SEARCH
+  "ai_search": [
+    {
+      "binding": "AI_SEARCH",
+      "instance_name": "faq-mate-search"
+    }
+  ],
 
   // Observability & Distributed Tracing
   "observability": {

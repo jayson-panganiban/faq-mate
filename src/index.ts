@@ -84,25 +84,35 @@ async function retrievePolicyChunks(
     try {
       const resp = await aiSearch.search({
         query,
+        messages: [{ role: "user", content: query }],
         topK: 5,
         rerank: true,
         filter: insurer ? { insurer } : undefined,
+        ai_search_options: {
+          retrieval: {
+            max_num_results: 5,
+            filters: insurer ? { insurer } : undefined,
+          },
+        },
       });
 
-      const chunks: GroundedChunk[] = resp.results.map((r) => ({
-        id: r.id,
-        relevanceScore: r.score,
+      const rawItems = resp.chunks || resp.results || [];
+      const chunks: GroundedChunk[] = rawItems.map((r) => ({
+        id: r.id || `ai-${Math.random().toString(36).slice(2, 9)}`,
+        relevanceScore: typeof r.score === "number" ? r.score : 0.85,
         content: r.content,
         source: {
-          insurer: r.metadata.insurer || "General",
-          product: r.metadata.product || "Insurance",
-          docType: r.metadata.docType || "PDS",
-          section: r.metadata.section || "General Terms",
-          effectiveDate: r.metadata.effectiveDate,
+          insurer: r.metadata?.insurer || insurer || "General",
+          product: r.metadata?.product || "Insurance",
+          docType: r.metadata?.docType || "PDS",
+          section: r.metadata?.section || r.metadata?.filename || "General Terms",
+          effectiveDate: r.metadata?.effectiveDate,
         },
       }));
 
-      return { chunks, durationMs: performance.now() - start };
+      if (chunks.length > 0) {
+        return { chunks, durationMs: performance.now() - start };
+      }
     } catch (err) {
       console.error("[AI_SEARCH::Failure]", err);
     }

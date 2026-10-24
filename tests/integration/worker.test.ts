@@ -266,4 +266,46 @@ describe("Worker End-to-End Integration Suite (Spec 02 & Spec 03)", () => {
     // Chunks should come from local retriever fallback
     expect(text).toContain("suncorp");
   });
+
+  it("10. Supports modern Cloudflare AI Search response schema (chunks array)", async () => {
+    const searchMock = vi.fn().mockResolvedValue({
+      search_query: "What is flood?",
+      chunks: [
+        {
+          id: "chunk-modern-ai",
+          score: 0.98,
+          content: "Water defined under modern AI Search chunks format.",
+          metadata: {
+            insurer: "suncorp",
+            filename: "corpus/pds/suncorp/home/PDS.md",
+          },
+        },
+      ],
+    });
+
+    const envWithModernSearch: Env = {
+      ...mockEnv,
+      AI_SEARCH: {
+        search: searchMock,
+      },
+    };
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "cf-connecting-ip": "192.168.1.103" },
+      body: JSON.stringify({
+        query: "What is flood?",
+        conversationId: "550e8400-e29b-41d4-a716-446655440003",
+        filters: {
+          insurer: "suncorp",
+        },
+      }),
+    });
+
+    const res = await worker.fetch(req, envWithModernSearch, mockCtx);
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain("event: metadata");
+    expect(text).toContain("Water defined under modern AI Search chunks format.");
+  });
 });

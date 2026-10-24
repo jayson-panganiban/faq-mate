@@ -2,16 +2,23 @@ export interface Env {
   // Cloudflare AI Search (Hybrid BM25 + Vector + Reranking)
   AI_SEARCH?: {
     search(params: {
-      query: string;
+      query?: string;
+      messages?: Array<{ role: string; content: string }>;
       topK?: number;
       rerank?: boolean;
       filter?: Record<string, string>;
+      ai_search_options?: {
+        retrieval?: {
+          max_num_results?: number;
+          filters?: Record<string, string>;
+        };
+      };
     }): Promise<{
-      results: Array<{
+      results?: Array<{
         id: string;
         score: number;
         content: string;
-        metadata: {
+        metadata?: {
           insurer?: string;
           product?: string;
           docType?: string;
@@ -19,6 +26,22 @@ export interface Env {
           clauseId?: string;
           sourceUrl?: string;
           effectiveDate?: string;
+          filename?: string;
+        };
+      }>;
+      chunks?: Array<{
+        id: string;
+        score: number;
+        content: string;
+        metadata?: {
+          insurer?: string;
+          product?: string;
+          docType?: string;
+          section?: string;
+          clauseId?: string;
+          sourceUrl?: string;
+          effectiveDate?: string;
+          filename?: string;
         };
       }>;
     }>;

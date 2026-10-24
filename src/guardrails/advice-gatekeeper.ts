@@ -11,15 +11,39 @@ import type { GatekeeperVerdict } from "../types/chat";
  */
 const PERSONAL_ADVICE_PATTERNS = [
   /\b(can I afford|which.*can I afford|within my budget)\b/i,
-  /\b(should I (buy|switch|cancel|choose|pick|get))\b/i,
+  /\b(should I (buy|switch|cancel|choose|pick|get|go with))\b/i,
+  /\bwhich\s+(?:policy|insurer|insurance(?:\s+company)?|brand|cover)\s+is\s+(?:best|better|cheaper|preferable)\s+(?:for\s+)?(?:me|my\s+budget|my\s+situation)\b/i,
   /\b(which policy is (best|better) for me)\b/i,
   BRAND_COMPARISON_ADVICE_REGEX,
-  /\b(recommend (me|a policy|insurance for me))\b/i,
+  /\b(recommend (me|a policy|an insurer|insurance for me))\b/i,
   /\bi earn \$?\d+/i,
   /\bmy budget is\b/i,
   /\b(is \$?\d+ excess too (high|low) for me)\b/i,
   /\bwhich policy suits (me|my budget|my car|my situation)\b/i,
-  /\bwhich (policy|cover) should I (buy|take|choose)\b/i,
+  /\bwhich (policy|cover) should I (buy|take|choose|pick)\b/i,
+  /\b(is\s+it\s+better\s+for\s+me\s+to\s+(?:switch|buy|choose))\b/i,
+  /\b(help\s+me\s+choose\s+(?:a\s+policy|between))\b/i,
+];
+
+/**
+ * Patterns indicating conversational dilemmas (e.g. claim vs out-of-pocket, excess vs repair quote)
+ * Under ASIC RG 244, these are permitted but reframed into objective decision criteria.
+ */
+const CONVERSATIONAL_DILEMMA_PATTERNS = [
+  /\bshould I\s+(?:lodge\s+a\s+claim|make\s+a\s+claim|claim|file\s+a\s+claim)\s+or\s+(?:just\s+)?(?:pay\s+(?:out\s+of\s+pocket|myself|cash|for\s+it\s+myself|the\s+repairs\s+myself))\b/i,
+  /\b(?:is\s+it\s+worth\s+claiming|worth\s+(?:lodging|making)\s+a\s+claim)\s+(?:on\s+insurance\s+)?(?:or|instead of)\s+(?:should I\s+)?(?:pay\s+(?:myself|out\s+of\s+pocket)|pay\s+it\s+myself)\b/i,
+  /\b(?:is\s+it\s+worth\s+claiming|worth\s+(?:lodging|making)\s+a\s+claim)\b/i,
+  /\bclaim\s+vs\s+pay\s+(?:out\s+of\s+pocket|myself)\b/i,
+  /\b(?:should I|whether to)\s+(?:claim|lodge\s+a\s+claim)\s+(?:or|instead of)\b/i,
+  /\b(?:repair\s+quote|repair\s+cost|excess)\b.*\b(?:pay\s+(?:out\s+of\s+pocket|myself)|repair\s+quote|excess)\b.*\b(?:claim|should I)\b/i,
+  /\bshould I\s+(?:lodge\s+a\s+claim|make\s+a\s+claim|claim)\b.*\b(?:excess|repair\s+quote|out\s+of\s+pocket)\b/i,
+];
+
+/**
+ * TMD / Eligibility Inquiry Patterns (PRD § 5.3)
+ */
+const TMD_ELIGIBILITY_PATTERNS = [
+  /\b(who is this policy for|target market determination|tmd|am I eligible|eligibility criteria)\b/i,
 ];
 
 /**
@@ -32,7 +56,7 @@ const EMERGENCY_PATTERNS = [
 /**
  * Deep Module: ASIC RG 244 & COP Advice Boundary Evaluator
  *
- * Implements Spec 03 (Section 1 & 2):
+ * Implements Spec 03 (Section 1 & 2) & Spec 07 (Section 4):
  * Conceals regex heuristics, emergency escalation, and regulatory safe harbor copy.
  */
 export function evaluateAdviceBoundary(query: string): GatekeeperVerdict {
@@ -48,7 +72,18 @@ export function evaluateAdviceBoundary(query: string): GatekeeperVerdict {
     }
   }
 
-  // 2. ASIC RG 244 Personal Financial Advice Gate (Spec 03 Section 1)
+  // 2. Conversational Dilemma Gate (Spec 07 Section 4): Reframe to objective decision factors
+  for (const pattern of CONVERSATIONAL_DILEMMA_PATTERNS) {
+    if (pattern.test(query)) {
+      return {
+        allowed: true,
+        sanitizedQuery: query.trim(),
+        detectedIntent: "CONVERSATIONAL_DILEMMA",
+      };
+    }
+  }
+
+  // 3. ASIC RG 244 Personal Financial Advice Gate (Spec 03 Section 1)
   for (const pattern of PERSONAL_ADVICE_PATTERNS) {
     if (pattern.test(query)) {
       return {
@@ -59,9 +94,21 @@ export function evaluateAdviceBoundary(query: string): GatekeeperVerdict {
     }
   }
 
-  // 3. Permitted Factual Query
+  // 4. TMD / Eligibility Factual Inquiry (PRD § 5.3)
+  for (const pattern of TMD_ELIGIBILITY_PATTERNS) {
+    if (pattern.test(query)) {
+      return {
+        allowed: true,
+        sanitizedQuery: query.trim(),
+        detectedIntent: "TMD_ELIGIBILITY_INQUIRY",
+      };
+    }
+  }
+
+  // 5. Permitted Factual Query
   return {
     allowed: true,
     sanitizedQuery: query.trim(),
+    detectedIntent: "FACTUAL_PRODUCT_INQUIRY",
   };
 }

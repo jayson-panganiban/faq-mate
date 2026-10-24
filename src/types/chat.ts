@@ -54,7 +54,10 @@ export type GatekeeperVerdict =
       allowed: true;
       sanitizedQuery: string;
       detectedPeril?: string;
-      detectedIntent?: "FACTUAL_PRODUCT_INQUIRY" | "TMD_ELIGIBILITY_INQUIRY";
+      detectedIntent?:
+        | "FACTUAL_PRODUCT_INQUIRY"
+        | "TMD_ELIGIBILITY_INQUIRY"
+        | "CONVERSATIONAL_DILEMMA";
     }
   | {
       allowed: false;

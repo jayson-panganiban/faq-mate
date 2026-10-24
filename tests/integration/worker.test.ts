@@ -181,4 +181,89 @@ describe("Worker End-to-End Integration Suite (Spec 02 & Spec 03)", () => {
     const body = (await res11.json()) as { error: string };
     expect(body.error).toBe("Too Many Requests");
   });
+
+  it("8. Invokes env.AI_SEARCH when provided and forwards retrieved chunks in metadata SSE", async () => {
+    const searchMock = vi.fn().mockResolvedValue({
+      results: [
+        {
+          id: "chunk-ai-1",
+          score: 0.95,
+          content: "Cloudflare AI Search retrieved clause content for testing.",
+          metadata: {
+            insurer: "allianz",
+            product: "Home Insurance",
+            docType: "PDS",
+            section: "Flood Cover",
+            effectiveDate: "2024-03-01",
+          },
+        },
+      ],
+    });
+
+    const envWithAiSearch: Env = {
+      ...mockEnv,
+      AI_SEARCH: {
+        search: searchMock,
+      },
+    };
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "cf-connecting-ip": "192.168.1.101" },
+      body: JSON.stringify({
+        query: "What is the flood definition for Allianz?",
+        conversationId: "550e8400-e29b-41d4-a716-446655440001",
+        filters: {
+          insurer: "allianz",
+        },
+      }),
+    });
+
+    const res = await worker.fetch(req, envWithAiSearch, mockCtx);
+    expect(res.status).toBe(200);
+    expect(searchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: expect.any(String),
+        topK: 5,
+        rerank: true,
+        filter: { insurer: "allianz" },
+      })
+    );
+
+    const text = await res.text();
+    expect(text).toContain("event: metadata");
+    expect(text).toContain("Cloudflare AI Search retrieved clause content for testing.");
+  });
+
+  it("9. Seamlessly falls back to in-isolate localHybridSearch if env.AI_SEARCH throws", async () => {
+    const searchMock = vi.fn().mockRejectedValue(new Error("AI Search cluster unavailable"));
+
+    const envWithFaultySearch: Env = {
+      ...mockEnv,
+      AI_SEARCH: {
+        search: searchMock,
+      },
+    };
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "cf-connecting-ip": "192.168.1.102" },
+      body: JSON.stringify({
+        query: "Does Suncorp cover flood?",
+        conversationId: "550e8400-e29b-41d4-a716-446655440002",
+        filters: {
+          insurer: "suncorp",
+        },
+      }),
+    });
+
+    const res = await worker.fetch(req, envWithFaultySearch, mockCtx);
+    expect(res.status).toBe(200);
+    expect(searchMock).toHaveBeenCalled();
+
+    const text = await res.text();
+    expect(text).toContain("event: metadata");
+    // Chunks should come from local retriever fallback
+    expect(text).toContain("suncorp");
+  });
 });

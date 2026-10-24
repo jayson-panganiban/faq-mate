@@ -12,6 +12,7 @@ import type { GatekeeperVerdict } from "../types/chat";
 const PERSONAL_ADVICE_PATTERNS = [
   /\b(can I afford|which.*can I afford|within my budget)\b/i,
   /\b(should I (buy|switch|cancel|choose|pick|get|go with))\b/i,
+  /\bshould I\b.*\b(switch|cancel)\b/i,
   /\bwhich\s+(?:policy|insurer|insurance(?:\s+company)?|brand|cover)\s+is\s+(?:best|better|cheaper|preferable)\s+(?:for\s+)?(?:me|my\s+budget|my\s+situation)\b/i,
   /\b(which policy is (best|better) for me)\b/i,
   BRAND_COMPARISON_ADVICE_REGEX,
@@ -72,24 +73,25 @@ export function evaluateAdviceBoundary(query: string): GatekeeperVerdict {
     }
   }
 
-  // 2. Conversational Dilemma Gate (Spec 07 Section 4): Reframe to objective decision factors
-  for (const pattern of CONVERSATIONAL_DILEMMA_PATTERNS) {
-    if (pattern.test(query)) {
-      return {
-        allowed: true,
-        sanitizedQuery: query.trim(),
-        detectedIntent: "CONVERSATIONAL_DILEMMA",
-      };
-    }
-  }
-
-  // 3. ASIC RG 244 Personal Financial Advice Gate (Spec 03 Section 1)
+  // 2. ASIC RG 244 Personal Financial Advice Gate (Spec 03 Section 1 & Spec 07 Section 4)
+  // Evaluated before dilemma matching to prevent compound switching traps (e.g. "claim or switch to Allianz")
   for (const pattern of PERSONAL_ADVICE_PATTERNS) {
     if (pattern.test(query)) {
       return {
         allowed: false,
         reason: "PERSONAL_ADVICE_REQUESTED",
         refusalMessage: STATUTORY_SAFE_HARBOR_REFUSAL,
+      };
+    }
+  }
+
+  // 3. Conversational Dilemma Gate (Spec 07 Section 4): Reframe to objective decision factors
+  for (const pattern of CONVERSATIONAL_DILEMMA_PATTERNS) {
+    if (pattern.test(query)) {
+      return {
+        allowed: true,
+        sanitizedQuery: query.trim(),
+        detectedIntent: "CONVERSATIONAL_DILEMMA",
       };
     }
   }

@@ -8,7 +8,9 @@ describe("ASIC RG 244 & Conversational Dilemma Guardrail (Ticket 02 & Spec 07)",
       expect(verdict.allowed).toBe(false);
       if (!verdict.allowed) {
         expect(verdict.reason).toBe("PERSONAL_ADVICE_REQUESTED");
-        expect(verdict.refusalMessage).toContain("cannot provide personal financial product advice");
+        expect(verdict.refusalMessage).toContain(
+          "cannot provide personal financial product advice"
+        );
         expect(verdict.refusalMessage).toContain("General Advice Warning");
       }
     });
@@ -26,6 +28,17 @@ describe("ASIC RG 244 & Conversational Dilemma Guardrail (Ticket 02 & Spec 07)",
       expect(verdict.allowed).toBe(false);
       if (!verdict.allowed) {
         expect(verdict.reason).toBe("PERSONAL_ADVICE_REQUESTED");
+      }
+    });
+
+    it("refuses compound dilemma with switching trap 'Should I claim or switch to Allianz?'", () => {
+      const verdict = evaluateAdviceBoundary("Should I claim or switch to Allianz?");
+      expect(verdict.allowed).toBe(false);
+      if (!verdict.allowed) {
+        expect(verdict.reason).toBe("PERSONAL_ADVICE_REQUESTED");
+        expect(verdict.refusalMessage).toContain(
+          "cannot provide personal financial product advice"
+        );
       }
     });
   });

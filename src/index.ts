@@ -2,7 +2,11 @@ import { STATUTORY_GAW } from "./constants/statutory";
 import { evaluateAdviceBoundary } from "./guardrails/advice-gatekeeper";
 import { sanitizePii } from "./guardrails/pii-sanitizer";
 import { generateFollowUpSuggestions } from "./rag/follow-up-generator";
-import { normalizeIntent } from "./rag/intent-normalizer";
+import {
+  enrichRetrievalQuery,
+  extractInsurerFromQuery,
+  normalizeIntent,
+} from "./rag/intent-normalizer";
 import { localHybridSearch } from "./rag/local-retriever";
 import { synthesizePrompt } from "./rag/prompt-synthesizer";
 import { recordTelemetry } from "./telemetry/d1-logger";
@@ -417,13 +421,20 @@ export default {
         });
       }
 
-      // Normalize colloquial intent (Spec 07 Section 3)
+      // Normalize colloquial intent & strip voice transcription noise (Spec 07 Section 3)
       const normalized = normalizeIntent(verdict.sanitizedQuery);
+
+      // Context-aware follow-up query enrichment for retrieval (Spec 07 Problem 2)
+      const retrievalQuery = enrichRetrievalQuery(normalized.cleanedQuery, sanitizedHistory);
+
+      // Conversational bancassurance brand alias extraction (Spec 07 US-13)
+      const detectedInsurer =
+        parseResult.data.filters?.insurer || extractInsurerFromQuery(normalized.cleanedQuery);
 
       // Hybrid Retrieval (Spec 02 Section 2 & PRD § 2.1)
       const { chunks, durationMs: searchDurationMs } = await retrievePolicyChunks(
-        verdict.sanitizedQuery,
-        parseResult.data.filters?.insurer,
+        retrievalQuery,
+        detectedInsurer,
         env.AI_SEARCH
       );
 

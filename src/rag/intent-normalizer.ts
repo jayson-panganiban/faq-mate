@@ -7,12 +7,27 @@
  * authoritative statutory insurance terminology.
  */
 
+import { resolveInsurer } from "../constants/insurers";
+
+export type InsurancePeril =
+  | "ESCAPE_OF_LIQUID"
+  | "THEFT_FORCIBLE_ENTRY"
+  | "FOOD_SPOILAGE"
+  | "MOTORCYCLE_TRAVEL"
+  | "BOUNDARY_FENCE"
+  | "RAINWATER_RUNOFF"
+  | "ACTIONS_OF_THE_SEA"
+  | "JEWELRY_SUBLIMIT"
+  | "EMBARGO_72_HOUR"
+  | "UNLICENSED_DRIVER";
+
 export interface NormalizedIntent {
   rawQuery: string;
   cleanedQuery: string;
   canonicalTokens: string[];
   expandedTerms: string[];
-  detectedPerils: string[];
+  searchTokens: string[];
+  detectedPerils: InsurancePeril[];
   durationMs: number;
 }
 
@@ -21,7 +36,7 @@ interface ColloquialRule {
   pattern: RegExp;
   canonicalTokens: string[];
   expandedTerms: string[];
-  peril: string;
+  peril: InsurancePeril;
 }
 
 /**
@@ -80,11 +95,7 @@ const COLLOQUIAL_RULES: readonly ColloquialRule[] = [
     id: "motorcycle-travel",
     pattern:
       /\b(?:hired\s+scooter|scooter\s+hire|rental\s+(?:moped|scooter)|moped\s+crash|crash(?:ed)?\s+(?:a\s+)?(?:rental\s+)?(?:moped|scooter))\b/i,
-    canonicalTokens: [
-      "Motorcycle Endorsement",
-      "Engine Capacity Sub-limit",
-      "License Requirement",
-    ],
+    canonicalTokens: ["Motorcycle Endorsement", "Engine Capacity Sub-limit", "License Requirement"],
     expandedTerms: [
       "motorcycle endorsement",
       "engine capacity",
@@ -128,7 +139,12 @@ const COLLOQUIAL_RULES: readonly ColloquialRule[] = [
     pattern:
       /\b(?:lost|stolen|damaged)\s+(?:diamond\s+ring|ring|watch|jewelry|jewellery|necklace|earrings|engagement\s+ring)\b/i,
     canonicalTokens: ["Jewelry Sub-limit", "Accidental Loss", "Certificate Listing"],
-    expandedTerms: ["jewelry sub-limit", "$2,500 total", "$1,000 individual", "certificate listing"],
+    expandedTerms: [
+      "jewelry sub-limit",
+      "$2,500 total",
+      "$1,000 individual",
+      "certificate listing",
+    ],
     peril: "JEWELRY_SUBLIMIT",
   },
   {
@@ -136,7 +152,12 @@ const COLLOQUIAL_RULES: readonly ColloquialRule[] = [
     pattern:
       /\b(?:72[- ]?hour|embargo|second\s+day\s+after\s+buying|just\s+bought\s+policy|newly\s+purchased|waiting\s+period\s+for\s+bushfire)\b/i,
     canonicalTokens: ["72-Hour Catastrophe Embargo", "Inception Period", "Bushfire and Flood"],
-    expandedTerms: ["72-hour embargo", "commencement of insurance", "flood embargo", "bushfire embargo"],
+    expandedTerms: [
+      "72-hour embargo",
+      "commencement of insurance",
+      "flood embargo",
+      "bushfire embargo",
+    ],
     peril: "EMBARGO_72_HOUR",
   },
   {
@@ -160,11 +181,14 @@ export function normalizeIntent(rawQuery: string): NormalizedIntent {
   let cleaned = rawQuery.replace(VOICE_FILLER_PREFIX, "").trim();
 
   // 2. Strip mid-sentence conversational fillers
-  cleaned = cleaned.replace(VOICE_FILLER_MID, "").replace(/\s{2,}/g, " ").trim();
+  cleaned = cleaned
+    .replace(VOICE_FILLER_MID, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 
   const canonicalTokens = new Set<string>();
   const expandedTerms = new Set<string>();
-  const detectedPerils = new Set<string>();
+  const detectedPerils = new Set<InsurancePeril>();
 
   // 3. Match colloquial patterns across both raw and cleaned query
   for (const rule of COLLOQUIAL_RULES) {
@@ -175,6 +199,25 @@ export function normalizeIntent(rawQuery: string): NormalizedIntent {
     }
   }
 
+  // Pre-tokenize search tokens for retriever to prevent feature envy
+  const searchTokensSet = new Set<string>();
+  const cleanedTokens = cleaned
+    .toLowerCase()
+    .replace(/[^a-z0-9\s$]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 1);
+  for (const t of cleanedTokens) searchTokensSet.add(t);
+
+  for (const exp of expandedTerms) {
+    const expSplit = exp
+      .toLowerCase()
+      .replace(/[^a-z0-9\s$]/g, " ")
+      .split(/\s+/);
+    for (const term of expSplit) {
+      if (term.length > 2) searchTokensSet.add(term);
+    }
+  }
+
   const durationMs = performance.now() - start;
 
   return {
@@ -182,7 +225,71 @@ export function normalizeIntent(rawQuery: string): NormalizedIntent {
     cleanedQuery: cleaned,
     canonicalTokens: Array.from(canonicalTokens),
     expandedTerms: Array.from(expandedTerms),
+    searchTokens: Array.from(searchTokensSet),
     detectedPerils: Array.from(detectedPerils),
     durationMs,
   };
+}
+
+/**
+ * Extracts and resolves insurer brand / bancassurance alias directly from query text (Spec 07 US-13).
+ */
+export function extractInsurerFromQuery(query: string): string | undefined {
+  const words = query
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+
+  // 1. Single word match (e.g. "Coles", "Bingle", "Suncorp", "NRMA")
+  for (const word of words) {
+    const resolved = resolveInsurer(word);
+    if (resolved) {
+      return resolved.profile.name;
+    }
+  }
+
+  // 2. Bigram match (e.g. "Virgin Money", "Budget Direct")
+  for (let i = 0; i < words.length - 1; i++) {
+    const bigram = `${words[i]} ${words[i + 1]}`;
+    const resolved = resolveInsurer(bigram);
+    if (resolved) {
+      return resolved.profile.name;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Enriches follow-up turn queries with prior context to overcome context amnesia (Spec 07 Problem 2).
+ */
+export function enrichRetrievalQuery(
+  currentQuery: string,
+  history?: Array<{ role: "user" | "assistant"; content: string }>
+): string {
+  if (!history || history.length === 0) return currentQuery;
+
+  const currentLower = currentQuery.toLowerCase();
+  const isFollowUp =
+    /\b(what about|what if|how about|does that|does it|is that|is it|what if it|and if|second day|also)\b/i.test(
+      currentLower
+    ) || currentQuery.split(/\s+/).length <= 6;
+
+  if (!isFollowUp) return currentQuery;
+
+  // Retrieve previous user turn to extract topic/peril context
+  const previousUserTurn = [...history]
+    .reverse()
+    .find((turn) => turn.role === "user" && turn.content.trim().length > 0);
+
+  if (!previousUserTurn) return currentQuery;
+
+  const prevNormalized = normalizeIntent(previousUserTurn.content);
+  const contextTerms = [
+    ...prevNormalized.canonicalTokens,
+    ...prevNormalized.searchTokens.slice(0, 3),
+  ].join(" ");
+
+  return `${currentQuery} ${contextTerms}`.trim();
 }

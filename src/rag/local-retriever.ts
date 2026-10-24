@@ -1,7 +1,7 @@
 import { resolveInsurer } from "../constants/insurers";
 import type { GroundedChunk } from "../types/chat";
 import { type IndexedChunk, STATIC_CORPUS_CHUNKS } from "./corpus-data";
-import { normalizeIntent } from "./intent-normalizer";
+import { type InsurancePeril, normalizeIntent } from "./intent-normalizer";
 
 export interface SearchOptions {
   query: string;
@@ -13,6 +13,25 @@ export interface SearchOptions {
   };
 }
 
+interface PerilBoostConfig {
+  peril: InsurancePeril;
+  keywords: string[];
+  boost: number;
+}
+
+const PERIL_BOOSTS: readonly PerilBoostConfig[] = [
+  { peril: "ESCAPE_OF_LIQUID", keywords: ["escape of liquid", "fixed apparatus"], boost: 10.0 },
+  { peril: "THEFT_FORCIBLE_ENTRY", keywords: ["forcible and violent entry"], boost: 10.0 },
+  { peril: "FOOD_SPOILAGE", keywords: ["food spoilage", "refrigerated"], boost: 10.0 },
+  { peril: "MOTORCYCLE_TRAVEL", keywords: ["motorcycle", "moped"], boost: 10.0 },
+  { peril: "BOUNDARY_FENCE", keywords: ["fence", "fences"], boost: 10.0 },
+  { peril: "RAINWATER_RUNOFF", keywords: ["run-off", "rainwater"], boost: 10.0 },
+  { peril: "ACTIONS_OF_THE_SEA", keywords: ["actions of the sea"], boost: 10.0 },
+  { peril: "JEWELRY_SUBLIMIT", keywords: ["jewelry", "jewellery", "sub-limit"], boost: 10.0 },
+  { peril: "EMBARGO_72_HOUR", keywords: ["72-hour", "embargo"], boost: 10.0 },
+  { peril: "UNLICENSED_DRIVER", keywords: ["unlicensed driver", "licence"], boost: 10.0 },
+];
+
 /**
  * Deep Module: Edge-Compatible Hybrid Keyword & Semantic BM25-like Retriever
  *
@@ -23,25 +42,7 @@ export interface SearchOptions {
 export function localHybridSearch(options: SearchOptions): GroundedChunk[] {
   const topK = options.topK ?? 5;
   const normalized = normalizeIntent(options.query);
-
-  const rawTerms = options.query
-    .toLowerCase()
-    .replace(/[^a-z0-9\s$]/g, " ")
-    .split(/\s+/)
-    .filter((t) => t.length > 1);
-
-  // Augment with expanded terms from colloquial AST normalizer (Spec 07 Section 3)
-  for (const exp of normalized.expandedTerms) {
-    const split = exp
-      .toLowerCase()
-      .replace(/[^a-z0-9\s$]/g, " ")
-      .split(/\s+/);
-    for (const term of split) {
-      if (term.length > 2 && !rawTerms.includes(term)) {
-        rawTerms.push(term);
-      }
-    }
-  }
+  const rawTerms = normalized.searchTokens;
 
   if (rawTerms.length === 0) return [];
 
@@ -86,66 +87,13 @@ export function localHybridSearch(options: SearchOptions): GroundedChunk[] {
       }
     }
 
-    // Domain perceptual boosts for critical statutory terms
-    if (
-      normalized.detectedPerils.includes("ESCAPE_OF_LIQUID") &&
-      (contentLower.includes("escape of liquid") || contentLower.includes("fixed apparatus"))
-    ) {
-      score += 10.0;
-    }
-    if (
-      normalized.detectedPerils.includes("THEFT_FORCIBLE_ENTRY") &&
-      contentLower.includes("forcible and violent entry")
-    ) {
-      score += 10.0;
-    }
-    if (
-      normalized.detectedPerils.includes("FOOD_SPOILAGE") &&
-      (contentLower.includes("food spoilage") || contentLower.includes("refrigerated"))
-    ) {
-      score += 10.0;
-    }
-    if (
-      normalized.detectedPerils.includes("MOTORCYCLE_TRAVEL") &&
-      (contentLower.includes("motorcycle") || contentLower.includes("moped"))
-    ) {
-      score += 10.0;
-    }
-    if (
-      normalized.detectedPerils.includes("BOUNDARY_FENCE") &&
-      (contentLower.includes("fence") || contentLower.includes("fences"))
-    ) {
-      score += 10.0;
-    }
-    if (
-      normalized.detectedPerils.includes("RAINWATER_RUNOFF") &&
-      (contentLower.includes("run-off") || contentLower.includes("rainwater"))
-    ) {
-      score += 10.0;
-    }
-    if (
-      normalized.detectedPerils.includes("ACTIONS_OF_THE_SEA") &&
-      contentLower.includes("actions of the sea")
-    ) {
-      score += 10.0;
-    }
-    if (
-      normalized.detectedPerils.includes("JEWELRY_SUBLIMIT") &&
-      (contentLower.includes("jewelry") || contentLower.includes("jewellery") || contentLower.includes("sub-limit"))
-    ) {
-      score += 10.0;
-    }
-    if (
-      normalized.detectedPerils.includes("EMBARGO_72_HOUR") &&
-      (contentLower.includes("72-hour") || contentLower.includes("embargo"))
-    ) {
-      score += 10.0;
-    }
-    if (
-      normalized.detectedPerils.includes("UNLICENSED_DRIVER") &&
-      (contentLower.includes("unlicensed driver") || contentLower.includes("licence"))
-    ) {
-      score += 10.0;
+    // Table-driven statutory peril boosts
+    for (const pb of PERIL_BOOSTS) {
+      if (normalized.detectedPerils.includes(pb.peril)) {
+        if (pb.keywords.some((kw) => contentLower.includes(kw))) {
+          score += pb.boost;
+        }
+      }
     }
 
     if (options.query.toLowerCase().includes("flood") && contentLower.includes("flood")) {

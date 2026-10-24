@@ -1,8 +1,19 @@
 import type { GroundedChunk } from "../types/chat";
+import type { InsurancePeril } from "./intent-normalizer";
 
 interface SuggestionTopic {
-  condition: (queryLower: string, chunks: GroundedChunk[], perils: string[]) => boolean;
+  condition: (queryLower: string, chunks: GroundedChunk[], perils: InsurancePeril[]) => boolean;
   prompts: string[];
+}
+
+function isEligiblePrompt(prompt: string, queryLower: string, selected: string[]): boolean {
+  const pLower = prompt.toLowerCase();
+  return (
+    pLower !== queryLower &&
+    !selected.includes(prompt) &&
+    !pLower.includes(queryLower) &&
+    !queryLower.includes(pLower)
+  );
 }
 
 /**
@@ -16,8 +27,7 @@ const TOPIC_SUGGESTIONS: readonly SuggestionTopic[] = [
       q.includes("bushfire") ||
       chunks.some(
         (c) =>
-          c.content.toLowerCase().includes("72-hour") ||
-          c.content.toLowerCase().includes("embargo")
+          c.content.toLowerCase().includes("72-hour") || c.content.toLowerCase().includes("embargo")
       ),
     prompts: [
       "What is the 72-hour flood embargo?",
@@ -127,7 +137,7 @@ const DEFAULT_SUGGESTIONS: readonly string[] = [
 export function generateFollowUpSuggestions(
   query: string,
   chunks: GroundedChunk[],
-  detectedPerils: string[] = []
+  detectedPerils: InsurancePeril[] = []
 ): string[] {
   const queryLower = query.toLowerCase().trim();
   const selected: string[] = [];
@@ -135,12 +145,7 @@ export function generateFollowUpSuggestions(
   for (const topic of TOPIC_SUGGESTIONS) {
     if (topic.condition(queryLower, chunks, detectedPerils)) {
       for (const prompt of topic.prompts) {
-        if (
-          prompt.toLowerCase() !== queryLower &&
-          !selected.includes(prompt) &&
-          !prompt.toLowerCase().includes(queryLower) &&
-          !queryLower.includes(prompt.toLowerCase())
-        ) {
+        if (isEligiblePrompt(prompt, queryLower, selected)) {
           selected.push(prompt);
           if (selected.length === 3) break;
         }
@@ -152,12 +157,7 @@ export function generateFollowUpSuggestions(
   // Backfill with default statutory suggestions to ensure 2-3 suggestions
   for (const fallback of DEFAULT_SUGGESTIONS) {
     if (selected.length >= 3) break;
-    if (
-      fallback.toLowerCase() !== queryLower &&
-      !selected.includes(fallback) &&
-      !fallback.toLowerCase().includes(queryLower) &&
-      !queryLower.includes(fallback.toLowerCase())
-    ) {
+    if (isEligiblePrompt(fallback, queryLower, selected)) {
       selected.push(fallback);
     }
   }

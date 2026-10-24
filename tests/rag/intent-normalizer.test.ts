@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { normalizeIntent } from "../../src/rag/intent-normalizer";
+import {
+  enrichRetrievalQuery,
+  extractInsurerFromQuery,
+  normalizeIntent,
+} from "../../src/rag/intent-normalizer";
 
 describe("Sub-ms Voice & Colloquial Intent Normalizer (Ticket 03 & Spec 07)", () => {
   describe("Speech-to-Text Verbal Filler Stripping", () => {
@@ -30,7 +34,9 @@ describe("Sub-ms Voice & Colloquial Intent Normalizer (Ticket 03 & Spec 07)", ()
       expect(result.canonicalTokens).toContain("Escape of Liquid");
       expect(result.canonicalTokens).toContain("Fixed Apparatus");
       expect(result.detectedPerils).toContain("ESCAPE_OF_LIQUID");
-      expect(result.expandedTerms.some((t) => t.toLowerCase().includes("escape of liquid"))).toBe(true);
+      expect(result.expandedTerms.some((t) => t.toLowerCase().includes("escape of liquid"))).toBe(
+        true
+      );
     });
 
     it("maps driveway car theft to Violent and Forcible Entry & Common Property", () => {
@@ -77,11 +83,52 @@ describe("Sub-ms Voice & Colloquial Intent Normalizer (Ticket 03 & Spec 07)", ()
       expect(result.canonicalTokens).toContain("Riverine Flood Disambiguation");
       expect(result.detectedPerils).toContain("RAINWATER_RUNOFF");
     });
+
+    it("pre-tokenizes search tokens without feature envy", () => {
+      const input = "A pipe burst in my ensuite";
+      const result = normalizeIntent(input);
+
+      expect(result.searchTokens).toContain("pipe");
+      expect(result.searchTokens).toContain("burst");
+      expect(result.searchTokens.some((t) => t.includes("escape"))).toBe(true);
+    });
+  });
+
+  describe("Conversational Brand Alias Extraction (Spec 07 US-13)", () => {
+    it("extracts supermarket bancassurance brand Coles to underwriter CGU / IAG", () => {
+      const insurer = extractInsurerFromQuery("What does Coles cover for hail damage?");
+      expect(insurer).toBeDefined();
+      expect(insurer?.toLowerCase()).toContain("cgu");
+    });
+
+    it("extracts primary insurer Suncorp from natural text query", () => {
+      const insurer = extractInsurerFromQuery(
+        "Does Suncorp cover food spoilage during a blackout?"
+      );
+      expect(insurer).toBeDefined();
+      expect(insurer?.toLowerCase()).toContain("suncorp");
+    });
+  });
+
+  describe("Multi-Turn Context Retrieval Enrichment (Spec 07 Problem 2)", () => {
+    it("enriches short follow-up query with previous turn context", () => {
+      const history = [
+        {
+          role: "user" as const,
+          content: "What does Suncorp cover for riverine flood damage?",
+        },
+      ];
+      const enriched = enrichRetrievalQuery("What if it happened on the second day?", history);
+
+      expect(enriched).toContain("second day");
+      expect(enriched.toLowerCase()).toMatch(/flood|suncorp/i);
+    });
   });
 
   describe("Sub-Millisecond Edge Performance Invariant", () => {
     it("normalizes queries in well under 1 millisecond", () => {
-      const input = "Um so like a pipe burst in my ensuite and ruined the floorboards, what do I do?";
+      const input =
+        "Um so like a pipe burst in my ensuite and ruined the floorboards, what do I do?";
       const start = performance.now();
       const result = normalizeIntent(input);
       const elapsed = performance.now() - start;

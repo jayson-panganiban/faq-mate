@@ -1,0 +1,2 @@
+/api/* https://faq-mate-api.json-panganiban.workers.dev/api/:splat 200
+/health https://faq-mate-api.json-panganiban.workers.dev/health 200

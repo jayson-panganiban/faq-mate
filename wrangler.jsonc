@@ -15,7 +15,7 @@
     {
       "binding": "DB",
       "database_name": "faq-mate-telemetry",
-      "database_id": "local-dev-d1-placeholder"
+      "database_id": "aab9d3c5-edc4-456e-8937-6f085193139b"
     }
   ],
 
@@ -31,7 +31,7 @@
   "kv_namespaces": [
     {
       "binding": "CONFIG_KV",
-      "id": "local-dev-kv-placeholder"
+      "id": "42970dfe6e5d4088b0427e3bcd2063d3"
     }
   ],
 

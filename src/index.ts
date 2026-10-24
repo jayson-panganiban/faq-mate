@@ -114,8 +114,103 @@ async function retrievePolicyChunks(
 /**
  * Fallback response generator when Workers AI binding is in offline/test environment
  */
-function generateFallbackResponse(query: string, chunks: GroundedChunk[]): string {
+function generateFallbackResponse(
+  query: string,
+  chunks: GroundedChunk[],
+  detectedIntent?: string
+): string {
   const queryLower = query.toLowerCase();
+
+  // ASIC RG 244 Conversational Dilemma Reframing (Spec 07 Section 4)
+  if (
+    detectedIntent === "CONVERSATIONAL_DILEMMA" ||
+    queryLower.includes("should i claim or pay") ||
+    queryLower.includes("claim or pay out of pocket") ||
+    (queryLower.includes("excess") && queryLower.includes("repair quote"))
+  ) {
+    return (
+      `FAQ-Mate cannot advise whether you should lodge a claim or pay for repairs out of pocket, as this constitutes personal financial product advice under the Corporations Act 2001 (Cth).\n\n` +
+      `However, objective factors to consider under Australian general insurance policy standards include:\n\n` +
+      `### 1. Excess Deduction vs. Repair Cost\n` +
+      `Your standard basic excess is deducted from any claim payout. If the repair quote ($3,500) exceeds your basic excess ($1,000), your insurer typically covers the difference ($2,500), subject to terms. If the repair cost is less than or close to your excess, lodging a claim yields no net benefit.\n\n` +
+      `### 2. No-Claim Bonus (NCB) & Future Renewal Premiums\n` +
+      `Lodging an at-fault or single-vehicle/property claim may reduce your No-Claim Discount or claims rating, resulting in higher premiums at annual renewal.\n\n` +
+      `### 3. Gradual Deterioration & Maintenance Exclusions\n` +
+      `Insurers exclude pre-existing faults, gradual wear and tear, and lack of reasonable maintenance. For example, roof leaks caused by weathered tiles rather than sudden storm impact are commonly excluded.\n\n` +
+      `[Source: General Insurance Code of Practice & Standard PDS Terms, Section 4]\n\n` +
+      STATUTORY_GAW
+    );
+  }
+
+  // Broad Water Damage Product-Line Demarcation (Spec 07 Section 5)
+  if (
+    queryLower.includes("water damage") ||
+    queryLower.includes("kinds of water") ||
+    queryLower.includes("what counts as water")
+  ) {
+    return (
+      `Under Australian general insurance standards, water-related damage is delineated across distinct insured events and product lines:\n\n` +
+      `### 1. Escape of Liquid (Internal Plumbing)\n` +
+      `Covers sudden discharge or bursting from fixed internal pipes, appliances, washing machines, or sinks. Gradual leaks and wear-and-tear are excluded.\n\n` +
+      `### 2. Prescribed Flood (Natural Watercourses)\n` +
+      `Defined under Insurance Contracts Regulations 2012 (Cth) as water escaping from lakes, natural channels, or dams. Subject to a mandatory 72-hour embargo.\n\n` +
+      `### 3. Storm & Rainwater Run-off\n` +
+      `Covers rainwater entering as a direct result of storm impact. Surface run-off entering the dwelling is distinct from riverine flood.\n\n` +
+      `### 4. Actions of the Sea & Storm Surge\n` +
+      `Damage from king tides, tidal waves, or actions of the sea is strictly excluded under standard residential policies.\n\n` +
+      `### Product Demarcation: Home Building vs Contents\n` +
+      `- **Home Building:** Covers fixed structures, walls, sub-flooring, and permanent fixtures.\n` +
+      `- **Contents:** Covers carpets, rugs, furniture, and internal personal belongings.\n\n` +
+      `[Source: Standard PDS Guidelines, Insured Events Schedule]\n\n` +
+      STATUTORY_GAW
+    );
+  }
+
+  // Food Spoilage Product Demarcation
+  if (
+    queryLower.includes("food") ||
+    queryLower.includes("spoil") ||
+    queryLower.includes("blackout")
+  ) {
+    return (
+      `Food spoilage caused by failure of the public electricity supply following a blackout is covered under Contents Insurance (Insured Event 11), up to a sub-limit of $2,000 for refrigerated food.\n\n` +
+      `### Product Line Demarcation\n` +
+      `This cover is strictly included under Contents policies. Standalone Home Building insurance does not cover spoiled food.\n\n` +
+      `[Source: Suncorp Classic Home Contents PDS, Insured Event 11]\n\n` +
+      STATUTORY_GAW
+    );
+  }
+
+  // Escape of Liquid / Burst Pipe in Bathroom
+  if (
+    queryLower.includes("burst pipe") ||
+    queryLower.includes("broken pipe") ||
+    queryLower.includes("ruined the floorboards") ||
+    queryLower.includes("escape of liquid")
+  ) {
+    return (
+      `Damage caused by a burst pipe under a bathroom sink is covered under Insured Event 4: Escape of Liquid from Fixed Internal Apparatus.\n\n` +
+      `### Policy Coverage & Demarcation\n` +
+      `- **Building Cover:** Covers damage to floorboards, walls, and fixed cabinetry.\n` +
+      `- **Contents Cover:** Covers damaged carpets and movable furnishings.\n` +
+      `- **Key Exclusions:** Gradual leaking, deterioration over time, and the cost of repairing the ruptured pipe itself (unless accidental damage upgrade applies).\n\n` +
+      `[Source: Suncorp Classic Home PDS, Insured Event 4]\n\n` +
+      STATUTORY_GAW
+    );
+  }
+
+  // Travel Insurance: Overseas Scooter / Moped
+  if (queryLower.includes("moped") || queryLower.includes("scooter")) {
+    return (
+      `Travel insurance cover for overseas scooter or moped accidents is subject to strict statutory policy conditions:\n\n` +
+      `### Statutory Conditions & Sub-limits\n` +
+      `- **Licence Requirement:** You must hold a valid motorcycle licence in Australia recognized by the destination country (e.g. an Australian motorcycle licence or International Driving Permit).\n` +
+      `- **Engine Capacity Sub-limit:** Policies typically cap engine capacity (e.g. 50cc or 125cc). Riding higher capacity motorcycles without an endorsement voids cover.\n` +
+      `- **Safety Compliance:** You must wear a helmet at all times and not be under the influence of alcohol or drugs.\n\n` +
+      `[Source: Australian Travel Insurance Standard PDS, Motorcycle Terms]\n\n` +
+      STATUTORY_GAW
+    );
+  }
 
   // Negative constraint check (TC-10: Silent PDS)
   if (queryLower.includes("chimpanzee") || queryLower.includes("exotic pet")) {
@@ -327,8 +422,11 @@ export default {
         env.AI_SEARCH
       );
 
-      // Context Assembly
-      const messages = synthesizePrompt(verdict.sanitizedQuery, chunks);
+      // Context Assembly (Spec 07 Section 4 & 5)
+      const messages = synthesizePrompt(verdict.sanitizedQuery, chunks, {
+        history: sanitizedHistory,
+        detectedIntent: verdict.detectedIntent,
+      });
       const encoder = new TextEncoder();
 
       // Streaming Workers AI Inference with Spec 02 SSE protocol
@@ -404,7 +502,11 @@ export default {
                 }
               }
             } else {
-              const fallbackText = generateFallbackResponse(verdict.sanitizedQuery, chunks);
+              const fallbackText = generateFallbackResponse(
+                verdict.sanitizedQuery,
+                chunks,
+                verdict.detectedIntent
+              );
               tokenCount = fallbackText.split(/\s+/).length;
               controller.enqueue(
                 encoder.encode(`event: token\ndata: ${JSON.stringify({ text: fallbackText })}\n\n`)

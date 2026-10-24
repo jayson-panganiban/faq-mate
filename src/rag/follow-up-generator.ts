@@ -7,14 +7,53 @@ interface SuggestionTopic {
 }
 
 function isEligiblePrompt(prompt: string, queryLower: string, selected: string[]): boolean {
-  const pLower = prompt.toLowerCase();
-  return (
-    pLower !== queryLower &&
-    !selected.includes(prompt) &&
-    !pLower.includes(queryLower) &&
-    !queryLower.includes(pLower)
-  );
+  const pLower = prompt.toLowerCase().trim();
+  const qTrimmed = queryLower.trim();
+
+  // Do not suggest identical prompt or already selected
+  if (pLower === qTrimmed || selected.includes(prompt)) {
+    return false;
+  }
+
+  // Avoid echoing prompt when query is a full sentence containing or contained in prompt
+  if (qTrimmed.length > 20 && pLower.includes(qTrimmed)) {
+    return false;
+  }
+  if (pLower.length > 20 && qTrimmed.includes(pLower)) {
+    return false;
+  }
+
+  return true;
 }
+
+/**
+ * Canonical statutory follow-up prompt literals (Spec 07 Section 6)
+ */
+export const STATUTORY_PROMPTS = {
+  EMBARGO_72_HOUR: "What is the 72-hour flood embargo?",
+  EMBARGO_RENEWAL: "Does the 72-hour waiting period apply to policy renewals?",
+  ESCAPE_DIFF_RUNOFF: "How does escape of liquid differ from storm run-off?",
+  BURST_PIPE_REPAIR: "Does home insurance cover repairing the burst pipe itself?",
+  BUILDING_VS_CONTENTS_WATER: "What is the difference between building and contents water cover?",
+  JEWELRY_SUBLIMITS: "What sub-limits apply to jewelry and valuables?",
+  SPECIFY_VALUABLES: "How do I specify high-value items on my certificate of insurance?",
+  PORTABLE_CONTENTS: "Does accidental loss away from home require portable contents cover?",
+  THEFT_FORCIBLE_ENTRY: "What counts as violent and forcible entry for theft claims?",
+  THEFT_OPEN_DRIVEWAY: "Are items stolen from an open driveway or carport covered?",
+  THEFT_POLICE_REPORT: "What evidence is required when reporting a theft to police?",
+  FOOD_SPOILAGE_DEMARCATION: "Is food spoilage covered under home building or contents only?",
+  FOOD_SPOILAGE_SUBLIMIT: "What is the dollar sub-limit for refrigerated food spoilage?",
+  FOOD_SPOILAGE_EXCESS: "Do I have to pay an excess for a food spoilage claim?",
+  SCOOTER_CAPACITY_LIMITS: "What engine capacity limits apply to overseas scooter rentals?",
+  SCOOTER_LICENCE: "Do I need an Australian motorcycle licence to ride overseas?",
+  SCOOTER_MEDICAL: "Are medical expenses covered if I crash a rental moped?",
+  BASIC_VS_UNLISTED_EXCESS:
+    "What is the difference between basic excess and unlisted driver excess?",
+  UNLICENSED_DRIVER: "Does car insurance cover an unlicensed or suspended driver?",
+  NO_CLAIM_BONUS: "How does a no-claim bonus affect my annual renewal premium?",
+  BASIC_EXCESS_CLAIM: "How does basic excess work when lodging a claim?",
+  BUILDING_VS_CONTENTS: "What is the difference between building and contents insurance?",
+} as const;
 
 /**
  * Topic mapping rules for generating grounded statutory follow-up prompt chips (Spec 07 Section 6)
@@ -30,9 +69,9 @@ const TOPIC_SUGGESTIONS: readonly SuggestionTopic[] = [
           c.content.toLowerCase().includes("72-hour") || c.content.toLowerCase().includes("embargo")
       ),
     prompts: [
-      "What is the 72-hour flood embargo?",
-      "Does the 72-hour waiting period apply to policy renewals?",
-      "How does escape of liquid differ from storm run-off?",
+      STATUTORY_PROMPTS.EMBARGO_72_HOUR,
+      STATUTORY_PROMPTS.EMBARGO_RENEWAL,
+      STATUTORY_PROMPTS.ESCAPE_DIFF_RUNOFF,
     ],
   },
   {
@@ -43,9 +82,9 @@ const TOPIC_SUGGESTIONS: readonly SuggestionTopic[] = [
       q.includes("water damage") ||
       chunks.some((c) => c.content.toLowerCase().includes("escape of liquid")),
     prompts: [
-      "How does escape of liquid differ from storm run-off?",
-      "Does home insurance cover repairing the burst pipe itself?",
-      "What is the difference between building and contents water cover?",
+      STATUTORY_PROMPTS.ESCAPE_DIFF_RUNOFF,
+      STATUTORY_PROMPTS.BURST_PIPE_REPAIR,
+      STATUTORY_PROMPTS.BUILDING_VS_CONTENTS_WATER,
     ],
   },
   {
@@ -61,9 +100,9 @@ const TOPIC_SUGGESTIONS: readonly SuggestionTopic[] = [
           c.content.toLowerCase().includes("sub-limit")
       ),
     prompts: [
-      "What sub-limits apply to jewelry and valuables?",
-      "How do I specify high-value items on my certificate of insurance?",
-      "Does accidental loss away from home require portable contents cover?",
+      STATUTORY_PROMPTS.JEWELRY_SUBLIMITS,
+      STATUTORY_PROMPTS.SPECIFY_VALUABLES,
+      STATUTORY_PROMPTS.PORTABLE_CONTENTS,
     ],
   },
   {
@@ -74,9 +113,9 @@ const TOPIC_SUGGESTIONS: readonly SuggestionTopic[] = [
       q.includes("break in") ||
       chunks.some((c) => c.content.toLowerCase().includes("forcible")),
     prompts: [
-      "What counts as violent and forcible entry for theft claims?",
-      "Are items stolen from an open driveway or carport covered?",
-      "What evidence is required when reporting a theft to police?",
+      STATUTORY_PROMPTS.THEFT_FORCIBLE_ENTRY,
+      STATUTORY_PROMPTS.THEFT_OPEN_DRIVEWAY,
+      STATUTORY_PROMPTS.THEFT_POLICE_REPORT,
     ],
   },
   {
@@ -87,9 +126,9 @@ const TOPIC_SUGGESTIONS: readonly SuggestionTopic[] = [
       q.includes("fridge") ||
       chunks.some((c) => c.content.toLowerCase().includes("spoilage")),
     prompts: [
-      "Is food spoilage covered under home building or contents only?",
-      "What is the dollar sub-limit for refrigerated food spoilage?",
-      "Do I have to pay an excess for a food spoilage claim?",
+      STATUTORY_PROMPTS.FOOD_SPOILAGE_DEMARCATION,
+      STATUTORY_PROMPTS.FOOD_SPOILAGE_SUBLIMIT,
+      STATUTORY_PROMPTS.FOOD_SPOILAGE_EXCESS,
     ],
   },
   {
@@ -99,9 +138,9 @@ const TOPIC_SUGGESTIONS: readonly SuggestionTopic[] = [
       q.includes("moped") ||
       q.includes("travel insurance"),
     prompts: [
-      "What engine capacity limits apply to overseas scooter rentals?",
-      "Do I need an Australian motorcycle licence to ride overseas?",
-      "Are medical expenses covered if I crash a rental moped?",
+      STATUTORY_PROMPTS.SCOOTER_CAPACITY_LIMITS,
+      STATUTORY_PROMPTS.SCOOTER_LICENCE,
+      STATUTORY_PROMPTS.SCOOTER_MEDICAL,
     ],
   },
   {
@@ -112,19 +151,19 @@ const TOPIC_SUGGESTIONS: readonly SuggestionTopic[] = [
       q.includes("car insurance") ||
       q.includes("excess"),
     prompts: [
-      "What is the difference between basic excess and unlisted driver excess?",
-      "Does car insurance cover an unlicensed or suspended driver?",
-      "How does a no-claim bonus affect my annual renewal premium?",
+      STATUTORY_PROMPTS.BASIC_VS_UNLISTED_EXCESS,
+      STATUTORY_PROMPTS.UNLICENSED_DRIVER,
+      STATUTORY_PROMPTS.NO_CLAIM_BONUS,
     ],
   },
 ];
 
 const DEFAULT_SUGGESTIONS: readonly string[] = [
-  "What is the 72-hour flood embargo?",
-  "How does escape of liquid differ from storm run-off?",
-  "What sub-limits apply to jewelry and valuables?",
-  "How does basic excess work when lodging a claim?",
-  "What is the difference between building and contents insurance?",
+  STATUTORY_PROMPTS.EMBARGO_72_HOUR,
+  STATUTORY_PROMPTS.ESCAPE_DIFF_RUNOFF,
+  STATUTORY_PROMPTS.JEWELRY_SUBLIMITS,
+  STATUTORY_PROMPTS.BASIC_EXCESS_CLAIM,
+  STATUTORY_PROMPTS.BUILDING_VS_CONTENTS,
 ];
 
 /**

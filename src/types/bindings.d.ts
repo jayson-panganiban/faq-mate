@@ -1,3 +1,26 @@
+export interface AiSearchChunkItem {
+  id?: string;
+  score?: number;
+  content?: string;
+  text?: string;
+  item?: {
+    key?: string;
+    timestamp?: number;
+    metadata?: Record<string, unknown>;
+  };
+  metadata?: {
+    insurer?: string;
+    product?: string;
+    docType?: string;
+    section?: string;
+    clauseId?: string;
+    sourceUrl?: string;
+    effectiveDate?: string;
+    filename?: string;
+    [key: string]: unknown;
+  };
+}
+
 export interface Env {
   // Cloudflare AI Search (Hybrid BM25 + Vector + Reranking)
   AI_SEARCH?: {
@@ -14,36 +37,8 @@ export interface Env {
         };
       };
     }): Promise<{
-      results?: Array<{
-        id: string;
-        score: number;
-        content: string;
-        metadata?: {
-          insurer?: string;
-          product?: string;
-          docType?: string;
-          section?: string;
-          clauseId?: string;
-          sourceUrl?: string;
-          effectiveDate?: string;
-          filename?: string;
-        };
-      }>;
-      chunks?: Array<{
-        id: string;
-        score: number;
-        content: string;
-        metadata?: {
-          insurer?: string;
-          product?: string;
-          docType?: string;
-          section?: string;
-          clauseId?: string;
-          sourceUrl?: string;
-          effectiveDate?: string;
-          filename?: string;
-        };
-      }>;
+      results?: AiSearchChunkItem[];
+      chunks?: AiSearchChunkItem[];
     }>;
   };
 

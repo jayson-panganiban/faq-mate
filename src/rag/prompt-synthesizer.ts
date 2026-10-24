@@ -1,5 +1,6 @@
 import { STATUTORY_GAW } from "../constants/statutory";
 import type { GroundedChunk } from "../types/chat";
+import type { InsurancePeril } from "./intent-normalizer";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -9,7 +10,7 @@ export interface ChatMessage {
 export interface SynthesizePromptOptions {
   history?: Array<{ role: "user" | "assistant"; content: string }>;
   detectedIntent?: "FACTUAL_PRODUCT_INQUIRY" | "TMD_ELIGIBILITY_INQUIRY" | "CONVERSATIONAL_DILEMMA";
-  detectedPerils?: string[];
+  detectedPerils?: InsurancePeril[];
   canonicalTokens?: string[];
 }
 
@@ -58,6 +59,9 @@ export function synthesizePrompt(
   let systemPrompt = `${BASE_SYSTEM_INSTRUCTIONS}`;
   if (options?.detectedIntent === "CONVERSATIONAL_DILEMMA") {
     systemPrompt += CONVERSATIONAL_DILEMMA_INSTRUCTIONS;
+  }
+  if (options?.detectedPerils && options.detectedPerils.length > 0) {
+    systemPrompt += `\n\n8. DETECTED PERILS & POLICY EVENTS: The user inquiry specifically touches upon: ${options.detectedPerils.join(", ")}. Ensure coverage terms, exclusions, and sub-limits for these perils are clearly addressed.`;
   }
   systemPrompt += `\n\nRELEVANT POLICY DISCLOSURES:\n${contextBlock}`;
 

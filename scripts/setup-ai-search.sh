@@ -3,15 +3,12 @@ set -euo pipefail
 
 # ==============================================================================
 # FAQ-Mate: Cloudflare AI Search Provisioning & Deployment Wizard
-# Account: 25d14ba453130942a7bb71ee232254aa
 # Bucket:  faq-mate-corpus
 # ==============================================================================
 
-ACCOUNT_ID="25d14ba453130942a7bb71ee232254aa"
 BUCKET_NAME="faq-mate-corpus"
 INSTANCE_NAME="faq-mate-search"
 NAMESPACE="default"
-DASH_URL="https://dash.cloudflare.com/${ACCOUNT_ID}/ai/ai-search"
 
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
@@ -21,12 +18,20 @@ NC='\033[0m'
 
 echo -e "${BOLD}${CYAN}=== FAQ-Mate: Cloudflare AI Search Provisioning Wizard ===${NC}\n"
 
-# Step 1: Check CLI Authentication
-echo -e "${YELLOW}Stage 1/4: Checking Cloudflare CLI & R2 Status...${NC}"
+# Step 1: Check CLI Authentication & Account Resolution
+echo -e "${YELLOW}Stage 1/4: Checking Cloudflare CLI & Account Status...${NC}"
 if ! command -v cf &>/dev/null; then
   echo "Error: Cloudflare CLI 'cf' not found."
   exit 1
 fi
+
+ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-$(cf auth whoami 2>/dev/null | grep -A 2 '"accounts"' | grep '"id":' | head -n 1 | cut -d '"' -f 4 || echo "")}"
+if [ -z "$ACCOUNT_ID" ]; then
+  echo "Error: Could not resolve Cloudflare Account ID. Please run 'cf login' or set CLOUDFLARE_ACCOUNT_ID."
+  exit 1
+fi
+
+DASH_URL="https://dash.cloudflare.com/${ACCOUNT_ID}/ai/ai-search"
 
 echo -e "  ✓ Verified Account ID: ${GREEN}${ACCOUNT_ID}${NC}"
 echo -e "  ✓ Verified R2 Bucket:   ${GREEN}${BUCKET_NAME}${NC} (331 documents ready)\n"

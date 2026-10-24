@@ -43,6 +43,11 @@ export const ChatRequestSchema = z.object({
 
 export type ChatRequest = z.infer<typeof ChatRequestSchema>;
 
+export type GatekeeperIntent =
+  | "FACTUAL_PRODUCT_INQUIRY"
+  | "TMD_ELIGIBILITY_INQUIRY"
+  | "CONVERSATIONAL_DILEMMA";
+
 /**
  * Gatekeeper Verdict for ASIC RG 244 Compliance
  */
@@ -51,10 +56,7 @@ export type GatekeeperVerdict =
       allowed: true;
       sanitizedQuery: string;
       detectedPeril?: string;
-      detectedIntent?:
-        | "FACTUAL_PRODUCT_INQUIRY"
-        | "TMD_ELIGIBILITY_INQUIRY"
-        | "CONVERSATIONAL_DILEMMA";
+      detectedIntent?: GatekeeperIntent;
     }
   | {
       allowed: false;

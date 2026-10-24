@@ -5,13 +5,19 @@ import { generateFollowUpSuggestions } from "./rag/follow-up-generator";
 import {
   enrichRetrievalQuery,
   extractInsurerFromQuery,
+  type InsurancePeril,
   normalizeIntent,
 } from "./rag/intent-normalizer";
 import { localHybridSearch } from "./rag/local-retriever";
 import { synthesizePrompt } from "./rag/prompt-synthesizer";
 import { recordTelemetry } from "./telemetry/d1-logger";
-import type { Env } from "./types/bindings";
-import { ChatRequestSchema, type GroundedChunk } from "./types/chat";
+import type { AiSearchChunkItem, Env } from "./types/bindings";
+import {
+  ChatRequestSchema,
+  type GatekeeperIntent,
+  type GatekeeperVerdict,
+  type GroundedChunk,
+} from "./types/chat";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -97,7 +103,7 @@ async function retrievePolicyChunks(
       });
 
       const rawItems = resp.chunks || resp.results || [];
-      const chunks: GroundedChunk[] = rawItems.map((r: any) => {
+      const chunks: GroundedChunk[] = rawItems.map((r: AiSearchChunkItem) => {
         const itemKey = r.item?.key || r.metadata?.filename || "";
         let parsedInsurer = r.metadata?.insurer;
         if (!parsedInsurer && itemKey) {
@@ -142,7 +148,8 @@ async function retrievePolicyChunks(
 function generateFallbackResponse(
   query: string,
   chunks: GroundedChunk[],
-  detectedIntent?: string
+  detectedIntent?: GatekeeperIntent,
+  detectedPerils: InsurancePeril[] = []
 ): string {
   const queryLower = query.toLowerCase();
 
@@ -169,6 +176,8 @@ function generateFallbackResponse(
 
   // Broad Water Damage Product-Line Demarcation (Spec 07 Section 5)
   if (
+    detectedPerils.includes("RAINWATER_RUNOFF") ||
+    detectedPerils.includes("ACTIONS_OF_THE_SEA") ||
     queryLower.includes("water damage") ||
     queryLower.includes("kinds of water") ||
     queryLower.includes("what counts as water")
@@ -193,6 +202,7 @@ function generateFallbackResponse(
 
   // Food Spoilage Product Demarcation
   if (
+    detectedPerils.includes("FOOD_SPOILAGE") ||
     queryLower.includes("food") ||
     queryLower.includes("spoil") ||
     queryLower.includes("blackout")
@@ -208,6 +218,7 @@ function generateFallbackResponse(
 
   // Escape of Liquid / Burst Pipe in Bathroom
   if (
+    detectedPerils.includes("ESCAPE_OF_LIQUID") ||
     queryLower.includes("burst pipe") ||
     queryLower.includes("broken pipe") ||
     queryLower.includes("ruined the floorboards") ||
@@ -225,7 +236,11 @@ function generateFallbackResponse(
   }
 
   // Travel Insurance: Overseas Scooter / Moped
-  if (queryLower.includes("moped") || queryLower.includes("scooter")) {
+  if (
+    detectedPerils.includes("MOTORCYCLE_TRAVEL") ||
+    queryLower.includes("moped") ||
+    queryLower.includes("scooter")
+  ) {
     return (
       `Travel insurance cover for overseas scooter or moped accidents is subject to strict statutory policy conditions:\n\n` +
       `### Statutory Conditions & Sub-limits\n` +
@@ -551,7 +566,8 @@ export default {
               const fallbackText = generateFallbackResponse(
                 verdict.sanitizedQuery,
                 chunks,
-                verdict.detectedIntent
+                verdict.detectedIntent,
+                normalized.detectedPerils
               );
               tokenCount = fallbackText.split(/\s+/).length;
               controller.enqueue(

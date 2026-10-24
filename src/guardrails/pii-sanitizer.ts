@@ -26,6 +26,7 @@ export interface MultiTurnSanitizerInput {
 }
 
 export interface MultiTurnSanitizerResult {
+  sanitized: string;
   sanitizedQuery: string;
   sanitizedHistory: Array<{ role: "user" | "assistant"; content: string }>;
   wasRedacted: boolean;
@@ -122,6 +123,7 @@ export async function sanitizePii(
   const queryHash = await computeQueryHash(queryResult.text, customSalt);
 
   return {
+    sanitized: queryResult.text,
     sanitizedQuery: queryResult.text,
     sanitizedHistory,
     wasRedacted: overallRedacted,

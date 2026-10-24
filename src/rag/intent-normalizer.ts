@@ -46,7 +46,7 @@ const VOICE_FILLER_PREFIX =
   /^(?:\s*(?:um+|uh+|er|ah|so\s+basically|basically|actually|you\s+know|i\s+mean|so\s+like|like)\b[,\s]*)+/i;
 
 const VOICE_FILLER_MID =
-  /\b(?:um+|uh+|er|ah|so\s+basically|basically|actually|you\s+know|i\s+mean)\b[,\s]*/gi;
+  /\b(?:um+|uh+|er|ah|so\s+basically|basically|actually|you\s+know|i\s+mean|like)\b[,\s]*/gi;
 
 /**
  * Domain rules mapping Australian colloquial expressions to statutory insurance concepts
@@ -234,28 +234,78 @@ export function normalizeIntent(rawQuery: string): NormalizedIntent {
 /**
  * Extracts and resolves insurer brand / bancassurance alias directly from query text (Spec 07 US-13).
  */
+const INSURER_QUERY_STOPWORDS = new Set([
+  "cover",
+  "covers",
+  "covered",
+  "covering",
+  "coverage",
+  "insurance",
+  "policy",
+  "policies",
+  "claim",
+  "claims",
+  "quote",
+  "quotes",
+  "what",
+  "does",
+  "will",
+  "with",
+  "from",
+  "have",
+  "about",
+  "treat",
+  "treats",
+  "between",
+  "under",
+]);
+
+/**
+ * Extracts and resolves insurer brand / bancassurance alias directly from query text (Spec 07 US-13).
+ */
 export function extractInsurerFromQuery(query: string): string | undefined {
-  const words = query
+  const rawWords = query
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
     .filter((w) => w.length > 2);
 
-  // 1. Single word match (e.g. "Coles", "Bingle", "Suncorp", "NRMA")
-  for (const word of words) {
-    const resolved = resolveInsurer(word);
+  const matchedInsurers = new Set<string>();
+
+  // 1. Bigram match (e.g. "Virgin Money", "Budget Direct")
+  for (let i = 0; i < rawWords.length - 1; i++) {
+    const w1 = rawWords[i];
+    const w2 = rawWords[i + 1];
+    // Skip if both are common generic stopwords
+    if (INSURER_QUERY_STOPWORDS.has(w1) && INSURER_QUERY_STOPWORDS.has(w2)) {
+      continue;
+    }
+    const bigram = `${w1} ${w2}`;
+    const resolved = resolveInsurer(bigram);
     if (resolved) {
-      return resolved.profile.name;
+      matchedInsurers.add(resolved.profile.slug);
     }
   }
 
-  // 2. Bigram match (e.g. "Virgin Money", "Budget Direct")
-  for (let i = 0; i < words.length - 1; i++) {
-    const bigram = `${words[i]} ${words[i + 1]}`;
-    const resolved = resolveInsurer(bigram);
-    if (resolved) {
-      return resolved.profile.name;
+  // 2. Single word match (e.g. "Coles", "Bingle", "Suncorp", "NRMA")
+  for (const word of rawWords) {
+    if (INSURER_QUERY_STOPWORDS.has(word)) {
+      continue;
     }
+    const resolved = resolveInsurer(word);
+    if (resolved) {
+      matchedInsurers.add(resolved.profile.slug);
+    }
+  }
+
+  // If multiple distinct insurers are detected (e.g. "Suncorp vs Allianz"), this is a comparison query.
+  // Return undefined so retrieval is not restricted to a single insurer.
+  if (matchedInsurers.size > 1) {
+    return undefined;
+  }
+
+  if (matchedInsurers.size === 1) {
+    return Array.from(matchedInsurers)[0];
   }
 
   return undefined;
@@ -278,18 +328,31 @@ export function enrichRetrievalQuery(
 
   if (!isFollowUp) return currentQuery;
 
-  // Retrieve previous user turn to extract topic/peril context
-  const previousUserTurn = [...history]
-    .reverse()
-    .find((turn) => turn.role === "user" && turn.content.trim().length > 0);
+  const contextTokens: string[] = [];
 
-  if (!previousUserTurn) return currentQuery;
+  // Search recent history turns (most recent first, up to last 2 turns)
+  const recentTurns = [...history].reverse().slice(0, 2);
 
-  const prevNormalized = normalizeIntent(previousUserTurn.content);
-  const contextTerms = [
-    ...prevNormalized.canonicalTokens,
-    ...prevNormalized.searchTokens.slice(0, 3),
-  ].join(" ");
+  for (const turn of recentTurns) {
+    if (turn.content && turn.content.trim().length > 0) {
+      const priorInsurer = extractInsurerFromQuery(turn.content);
+      if (priorInsurer) {
+        contextTokens.push(priorInsurer);
+      }
 
-  return `${currentQuery} ${contextTerms}`.trim();
+      // Extract specific statutory insurance phrases if present in prior turn
+      const specificMatches = turn.content.match(
+        /\b(?:72-hour\s+embargo|72-hour\s+waiting\s+period|escape\s+of\s+liquid|storm\s+surge|action\s+of\s+the\s+sea|food\s+spoilage|unlicensed\s+driver|flood|riverine\s+flood|bushfire|storm|theft)\b/gi
+      );
+      if (specificMatches) {
+        contextTokens.push(...specificMatches);
+      }
+
+      const normalized = normalizeIntent(turn.content);
+      contextTokens.push(...normalized.canonicalTokens);
+    }
+  }
+
+  const uniqueTerms = Array.from(new Set(contextTokens)).slice(0, 6).join(" ");
+  return uniqueTerms ? `${currentQuery} ${uniqueTerms}`.trim() : currentQuery;
 }

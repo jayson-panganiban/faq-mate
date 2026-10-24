@@ -27,16 +27,23 @@ describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", (
     passThroughOnException: vi.fn(),
   } as unknown as ExecutionContext;
 
+  let ipCounter = 1;
+
   async function queryWorker(
     query: string,
-    insurer?: "SUNCORP" | "ALLIANZ" | "NRMA" | "QBE" | "YOUI"
+    insurer?: "SUNCORP" | "ALLIANZ" | "NRMA" | "QBE" | "YOUI",
+    history?: Array<{ role: "user" | "assistant"; content: string }>
   ): Promise<string> {
     const req = new Request("http://localhost/api/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "cf-connecting-ip": `192.168.10.${ipCounter++}`,
+      },
       body: JSON.stringify({
         query,
         conversationId: "a0000000-0000-0000-0000-000000000001",
+        history,
         filters: insurer ? { insurer } : undefined,
       }),
     });
@@ -151,6 +158,71 @@ describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", (
 
       expect(sseText).toMatch(/does not specify|not covered|unlisted/i);
       expect(sseText).not.toMatch(/chimpanzee damage is covered/i);
+    });
+
+    // --- CONVERSATIONAL & MULTI-TURN NATURAL LANGUAGE BENCHMARKS (SPEC 07) ---
+
+    it("TC-11: Multi-Turn Catastrophe Embargo Follow-Up Disambiguation", async () => {
+      const history = [
+        {
+          role: "user" as const,
+          content: "What does Suncorp cover for flood damage?",
+        },
+        {
+          role: "assistant" as const,
+          content:
+            "Suncorp covers flood defined under Insurance Contracts Regulations 2012, subject to a 72-hour embargo.",
+        },
+      ];
+      const followUp = "What if it happened on the second day after buying?";
+      const sseText = await queryWorker(followUp, "SUNCORP", history);
+
+      expect(sseText).toMatch(/72-hour|embargo|waiting period/i);
+      expect(sseText).toMatch(/excluded|not covered/i);
+    });
+
+    it("TC-12: Conversational Dilemma - Claim vs Out-of-Pocket Objective Criteria", async () => {
+      const dilemmaQuery =
+        "My roof is leaking and the repair quote is $3,500 while my excess is $1,000. Should I lodge a claim or just pay out of pocket?";
+      const sseText = await queryWorker(dilemmaQuery);
+
+      expect(sseText).not.toContain("ADVICE_BOUNDARY_VIOLATION");
+      expect(sseText).toContain("cannot advise whether you should lodge a claim");
+      expect(sseText).toContain("Excess Deduction vs. Repair Cost");
+      expect(sseText).toContain("No-Claim Bonus (NCB)");
+      expect(sseText).toContain("Gradual Deterioration");
+      expect(sseText).toContain("General Advice Warning");
+    });
+
+    it("TC-13: Colloquial Voice Ingestion - Burst Pipe in Ensuite", async () => {
+      const voiceQuery =
+        "Um so like a pipe burst in my ensuite while I was on holiday and ruined the floorboards, am I covered?";
+      const sseText = await queryWorker(voiceQuery, "SUNCORP");
+
+      expect(sseText).toContain("Escape of Liquid");
+      expect(sseText).toContain("Building Cover");
+      expect(sseText).toContain("Contents Cover");
+      expect(sseText).toContain("General Advice Warning");
+    });
+
+    it("TC-14: Food Spoilage Multi-Product Line Demarcation", async () => {
+      const query = "Does Suncorp cover spoiled food if the power goes out during a blackout?";
+      const sseText = await queryWorker(query, "SUNCORP");
+
+      expect(sseText).toMatch(/food spoilage/i);
+      expect(sseText).toContain("Contents");
+      expect(sseText).toContain("$2,000");
+      expect(sseText).toMatch(/not.*Building/i);
+      expect(sseText).toContain("General Advice Warning");
+    });
+
+    it("TC-15: Overseas Scooter & Moped Rental Travel Conditions", async () => {
+      const query = "Does travel insurance cover me if I crash a rental moped in Thailand?";
+      const sseText = await queryWorker(query);
+
+      expect(sseText).toMatch(/licence|license/i);
+      expect(sseText).toMatch(/engine capacity|sub-limit/i);
+      expect(sseText).toContain("General Advice Warning");
     });
   });
 

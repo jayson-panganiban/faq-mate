@@ -1,5 +1,5 @@
-import React from "react";
 import { AlertTriangle, UserCheck } from "lucide-react";
+import React from "react";
 import { STATUTORY_SAFE_HARBOR_REFUSAL } from "../../constants/statutory";
 import { StatutoryGaw } from "./StatutoryGaw";
 
@@ -54,11 +54,17 @@ export function RefusalCard({
 
           <div className="rounded-lg border border-amber-200 bg-white/80 p-3.5 text-xs leading-relaxed text-amber-950 dark:border-amber-800/60 dark:bg-amber-900/30 dark:text-amber-100">
             <p className="font-semibold mb-1 flex items-center gap-1.5 text-amber-900 dark:text-amber-200">
-              <UserCheck className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden="true" />
+              <UserCheck
+                className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300"
+                aria-hidden="true"
+              />
               Need Personal Advice?
             </p>
             <p>
-              Under ASIC RG 244 and the Corporations Act 2001, FAQ-Mate provides general factual policy information only. If you need advice tailored to your personal objectives, financial situation, or budget, please consult a qualified financial adviser or broker holding an Australian Financial Services Licence (AFSL).
+              Under ASIC RG 244 and the Corporations Act 2001, FAQ-Mate provides general factual
+              policy information only. If you need advice tailored to your personal objectives,
+              financial situation, or budget, please consult a qualified financial adviser or broker
+              holding an Australian Financial Services Licence (AFSL).
             </p>
           </div>
 

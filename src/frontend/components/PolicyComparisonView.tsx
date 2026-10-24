@@ -1,5 +1,12 @@
-import React, { useState, useMemo } from "react";
-import { Columns, Shield, BookOpen, ExternalLink, ArrowRight, CheckCircle2, Sparkles } from "lucide-react";
+import { ArrowRight, BookOpen, Columns, Shield, Sparkles } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import {
+  getGroupedInsurerOptions,
+  POLICY_COMPARISON_DIMENSIONS,
+  type PrimaryInsurerCode,
+  resolveInsurer,
+  resolvePolicyComparisonCell,
+} from "../../constants/insurers";
 import type { GroundedChunk } from "../types/chat-ui";
 import { formatProductDoc } from "../utils/citations";
 
@@ -26,53 +33,13 @@ export interface PolicyComparisonViewProps {
   className?: string;
 }
 
-interface BenchmarkComparisonRow {
-  category: string;
-  nrma: string;
-  suncorp: string;
-  allianz: string;
-  qbe: string;
-}
-
-const BENCHMARK_COMPARISONS: BenchmarkComparisonRow[] = [
-  {
-    category: "Flood Definition",
-    nrma: "Standard coverage for covering of normally dry land by water escaping from natural watercourses or lakes.",
-    suncorp: "Covers the covering of normally dry land by water escaping from a lake, river, creek, or natural watercourse.",
-    allianz: "Includes flood under insured events with option to exclude in high-risk zones.",
-    qbe: "Standard flood cover included subject to hydrologist assessment of watercourse overflow.",
-  },
-  {
-    category: "Jewellery & Watches Sub-limit",
-    nrma: "$2,000 per item / $10,000 per claim unless specified on certificate.",
-    suncorp: "$2,500 per item or set / $10,000 total collection limit.",
-    allianz: "$2,500 per item / $12,000 maximum total collection limit.",
-    qbe: "$2,000 per item / $8,000 total limit for unspecified jewellery.",
-  },
-  {
-    category: "Accidental Damage",
-    nrma: "Optional add-on for Classic Home; included standard on Comprehensive Plus.",
-    suncorp: "Included standard on Classic Advantage; optional upgrade on Classic.",
-    allianz: "Optional extension for accidental breakage and loss.",
-    qbe: "Optional cover with fixed excess applies per event.",
-  },
-  {
-    category: "Rainwater Run-off & Storm Surge",
-    nrma: "Excluded unless accompanied by continuous torrential rain within 24h.",
-    suncorp: "Rainwater run-off excluded unless entering within 24 hours of storm event.",
-    allianz: "Storm surge excluded unless directly caused by simultaneous cyclone.",
-    qbe: "Run-off from surface water excluded without preceding storm inundation.",
-  },
-];
-
-const INSURERS = ["SUNCORP", "NRMA", "ALLIANZ", "QBE", "YOUI"] as const;
-type InsurerKey = (typeof INSURERS)[number];
+const GROUPED_INSURER_OPTIONS = getGroupedInsurerOptions();
 
 /**
- * PolicyComparisonView Component (Spec 05 User Story 15)
+ * PolicyComparisonView Component (Spec 05 User Story 15 & Spec 06)
  *
- * Side-by-side policy disclosure and sub-limit comparison matrix.
- * Allows brokers and consumers to compare operative terms between Australian general insurers,
+ * Side-by-side policy disclosure and sub-limit comparison matrix across all 39 insurers.
+ * Allows brokers and consumers to compare operative terms between Australian insurers,
  * inspect retrieved GroundedChunks, and launch comparative queries.
  */
 export function PolicyComparisonView({
@@ -82,40 +49,29 @@ export function PolicyComparisonView({
   onClose,
   className = "",
 }: PolicyComparisonViewProps) {
-  const [insurerA, setInsurerA] = useState<InsurerKey>("SUNCORP");
-  const [insurerB, setInsurerB] = useState<InsurerKey>("NRMA");
+  const [insurerA, setInsurerA] = useState<PrimaryInsurerCode>("SUNCORP");
+  const [insurerB, setInsurerB] = useState<PrimaryInsurerCode>("NRMA");
 
-  // Partition retrieved chunks by insurer
+  // Partition retrieved chunks by canonical insurer code & uppercase name
   const chunksByInsurer = useMemo(() => {
     const map = new Map<string, GroundedChunk[]>();
     for (const c of chunks) {
-      const ins = c.source.insurer.toUpperCase();
-      const existing = map.get(ins) || [];
-      existing.push(c);
-      map.set(ins, existing);
+      const resolved = resolveInsurer(c.source.insurer);
+      const keys = new Set([
+        c.source.insurer.toUpperCase(),
+        ...(resolved ? [resolved.profile.code, resolved.profile.name.toUpperCase()] : []),
+      ]);
+      for (const k of keys) {
+        const existing = map.get(k) || [];
+        existing.push(c);
+        map.set(k, existing);
+      }
     }
     return map;
   }, [chunks]);
 
   const chunksA = chunksByInsurer.get(insurerA) || [];
   const chunksB = chunksByInsurer.get(insurerB) || [];
-
-  const getBenchmarkText = (row: BenchmarkComparisonRow, insurer: InsurerKey): string => {
-    switch (insurer) {
-      case "SUNCORP":
-        return row.suncorp;
-      case "NRMA":
-        return row.nrma;
-      case "ALLIANZ":
-        return row.allianz;
-      case "QBE":
-        return row.qbe;
-      case "YOUI":
-        return "Subject to policy schedule terms and individual risk assessment.";
-      default:
-        return "";
-    }
-  };
 
   return (
     <div
@@ -134,7 +90,8 @@ export function PolicyComparisonView({
             </h2>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Compare operative policy limits and definitions side-by-side pursuant to published PDS documents.
+            Compare operative policy limits and definitions side-by-side pursuant to published PDS
+            documents.
           </p>
         </div>
 
@@ -153,39 +110,53 @@ export function PolicyComparisonView({
       {/* Insurer Selector Controls */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
         <div>
-          <label htmlFor="insurer-a-select" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+          <label
+            htmlFor="insurer-a-select"
+            className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5"
+          >
             Primary Insurer
           </label>
           <select
             id="insurer-a-select"
             data-testid="insurer-a-select"
             value={insurerA}
-            onChange={(e) => setInsurerA(e.target.value as InsurerKey)}
+            onChange={(e) => setInsurerA(e.target.value as PrimaryInsurerCode)}
             className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500 cursor-pointer"
           >
-            {INSURERS.map((ins) => (
-              <option key={ins} value={ins} disabled={ins === insurerB}>
-                {ins}
-              </option>
+            {GROUPED_INSURER_OPTIONS.map((group) => (
+              <optgroup key={group.category} label={group.label}>
+                {group.options.map((opt) => (
+                  <option key={opt.value} value={opt.value} disabled={opt.value === insurerB}>
+                    {opt.label} ({opt.value})
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </div>
 
         <div>
-          <label htmlFor="insurer-b-select" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+          <label
+            htmlFor="insurer-b-select"
+            className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5"
+          >
             Comparison Insurer
           </label>
           <select
             id="insurer-b-select"
             data-testid="insurer-b-select"
             value={insurerB}
-            onChange={(e) => setInsurerB(e.target.value as InsurerKey)}
+            onChange={(e) => setInsurerB(e.target.value as PrimaryInsurerCode)}
             className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500 cursor-pointer"
           >
-            {INSURERS.map((ins) => (
-              <option key={ins} value={ins} disabled={ins === insurerA}>
-                {ins}
-              </option>
+            {GROUPED_INSURER_OPTIONS.map((group) => (
+              <optgroup key={group.category} label={group.label}>
+                {group.options.map((opt) => (
+                  <option key={opt.value} value={opt.value} disabled={opt.value === insurerA}>
+                    {opt.label} ({opt.value})
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </div>
@@ -290,28 +261,40 @@ export function PolicyComparisonView({
           <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-xs sm:text-sm">
             <thead className="bg-slate-50 dark:bg-slate-800/80">
               <tr>
-                <th scope="col" className="px-4 py-3 text-left font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider w-1/4">
+                <th
+                  scope="col"
+                  className="px-4 py-3 text-left font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider w-1/4"
+                >
                   Coverage Category
                 </th>
-                <th scope="col" className="px-4 py-3 text-left font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider w-3/8">
+                <th
+                  scope="col"
+                  className="px-4 py-3 text-left font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider w-3/8"
+                >
                   {insurerA} Policy Terms
                 </th>
-                <th scope="col" className="px-4 py-3 text-left font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider w-3/8">
+                <th
+                  scope="col"
+                  className="px-4 py-3 text-left font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider w-3/8"
+                >
                   {insurerB} Policy Terms
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
-              {BENCHMARK_COMPARISONS.map((row, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+              {POLICY_COMPARISON_DIMENSIONS.map((dim) => (
+                <tr
+                  key={dim.id}
+                  className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
+                >
                   <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100 align-top">
-                    {row.category}
+                    {dim.category}
                   </td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300 align-top leading-relaxed">
-                    {getBenchmarkText(row, insurerA)}
+                    {resolvePolicyComparisonCell(dim.id, insurerA, chunksA)}
                   </td>
                   <td className="px-4 py-3 text-slate-700 dark:text-slate-300 align-top leading-relaxed">
-                    {getBenchmarkText(row, insurerB)}
+                    {resolvePolicyComparisonCell(dim.id, insurerB, chunksB)}
                   </td>
                 </tr>
               ))}
@@ -329,7 +312,9 @@ export function PolicyComparisonView({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => onSelectQuery(`Compare flood definitions between ${insurerA} and ${insurerB}`)}
+              onClick={() =>
+                onSelectQuery(`Compare flood definitions between ${insurerA} and ${insurerB}`)
+              }
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition-colors cursor-pointer"
             >
               <ArrowRight className="w-3 h-3 text-blue-500" />
@@ -337,7 +322,9 @@ export function PolicyComparisonView({
             </button>
             <button
               type="button"
-              onClick={() => onSelectQuery(`What are jewellery sub-limits under ${insurerA} vs ${insurerB}?`)}
+              onClick={() =>
+                onSelectQuery(`What are jewellery sub-limits under ${insurerA} vs ${insurerB}?`)
+              }
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition-colors cursor-pointer"
             >
               <ArrowRight className="w-3 h-3 text-blue-500" />

@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { formatProductDoc, findMatchingChunk } from "../../src/frontend/utils/citations";
+import { describe, expect, it } from "vitest";
 import type { GroundedChunk } from "../../src/frontend/types/chat-ui";
+import { findMatchingChunk, formatProductDoc } from "../../src/frontend/utils/citations";
 
 describe("Citations Utility Functions", () => {
   describe("formatProductDoc", () => {

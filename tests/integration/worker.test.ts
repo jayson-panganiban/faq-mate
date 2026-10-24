@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { getDailySalt, sanitizePii } from "../../src/guardrails/pii-sanitizer";
 import worker from "../../src/index";
 import type { Env } from "../../src/types/bindings";
-import { sanitizePii, getDailySalt } from "../../src/guardrails/pii-sanitizer";
 
 describe("Worker End-to-End Integration Suite (Spec 02 & Spec 03)", () => {
   const mockEnv: Env = {
@@ -11,7 +11,9 @@ describe("Worker End-to-End Integration Suite (Spec 02 & Spec 03)", () => {
           new ReadableStream({
             start(controller) {
               controller.enqueue(
-                new TextEncoder().encode(`data: {"text": "According to the PDS, flood is defined..."}\n\n`)
+                new TextEncoder().encode(
+                  `data: {"text": "According to the PDS, flood is defined..."}\n\n`
+                )
               );
               controller.close();
             },

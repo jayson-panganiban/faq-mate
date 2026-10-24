@@ -27,7 +27,7 @@ export function findMatchingChunk(
   chunks?: GroundedChunk[]
 ): GroundedChunk | undefined {
   if (!chunks || chunks.length === 0) return undefined;
-  const clean = citationText.replace(/[\[\]]/g, "").trim().toLowerCase();
+  const clean = citationText.replace(/[[\]]/g, "").trim().toLowerCase();
 
   // 1. Direct Chunk ID match
   const byId = chunks.find(
@@ -40,8 +40,7 @@ export function findMatchingChunk(
     const prod = c.source.product.toLowerCase();
     const sec = c.source.section.toLowerCase();
     return (
-      (clean.includes(prod) || prod.includes(clean)) &&
-      (clean.includes(sec) || sec.includes(clean))
+      (clean.includes(prod) || prod.includes(clean)) && (clean.includes(sec) || sec.includes(clean))
     );
   });
   if (byBoth) return byBoth;
@@ -51,9 +50,7 @@ export function findMatchingChunk(
     const sec = c.source.section.toLowerCase();
     const secPrefix = sec.split(":")[0]?.trim();
     return (
-      clean.includes(sec) ||
-      sec.includes(clean) ||
-      (secPrefix ? clean.includes(secPrefix) : false)
+      clean.includes(sec) || sec.includes(clean) || (secPrefix ? clean.includes(secPrefix) : false)
     );
   });
   if (bySec) return bySec;

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { sanitizeClientPii } from "../../src/frontend/utils/client-pii-scrubber";
 
 describe("Client-Side PII Scrubber (Spec 05 US-13 / APP 3 & 11)", () => {
@@ -41,7 +41,8 @@ describe("Client-Side PII Scrubber (Spec 05 US-13 / APP 3 & 11)", () => {
   });
 
   it("redacts Australian Driver Licence numbers with common prefixes", () => {
-    const input = "My driver licence is NSW licence 12345678 and second is DL: 987654321 for identity verification.";
+    const input =
+      "My driver licence is NSW licence 12345678 and second is DL: 987654321 for identity verification.";
     const result = sanitizeClientPii(input);
 
     expect(result.wasRedacted).toBe(true);

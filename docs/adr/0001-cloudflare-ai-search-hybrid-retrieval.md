@@ -29,3 +29,7 @@ Cloudflare AI Search provides:
 ### Negative / Trade-Offs
 * Standard AI Search ingestion uses naive token-based chunking by default, which risks severing exclusions from base covers.
 * *Mitigation:* We mandate ADR-0002 (Pre-Normalized Markdown Ingestion into R2) to control chunk boundaries before AI Search indexes them.
+
+## Addendum (2026-10-24, v2.0)
+* AI Search remains the primary retriever, but the binding is now **optional** (`AI_SEARCH?` in `src/types/bindings.d.ts`). When it is unbound or throws, retrieval falls back to the compiled in-isolate corpus. See [ADR-0003](0003-static-ast-corpus-edge-fallback.md).
+* The `filter` sent to AI Search carries only `insurer` (validated through the canonical registry; see [ADR-0004](0004-canonical-insurer-registry-alias-resolution.md)). `docType` filtering is accepted by the request schema but not yet forwarded.

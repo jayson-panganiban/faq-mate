@@ -1,130 +1,162 @@
-# Specification: Phase 7 — Corpus Refinement, Multi-Insurer Expansion & Automated Edge Compiler
+# Specification: Phase 7 — Multi-Insurer Corpus Expansion & Edge AST Compiler
 
-**Module:** `packages/ingest` / `src/rag`  
+**Module:** `packages/ingest` / `src/rag` / `scripts`  
 **Status:** Living Specification  
-**Version:** 1.0.0  
-**Associated Specs:** [Spec 01 (Data Ingestion)](01-data-ingestion-chunking.md), [Spec 02 (Edge Runtime)](02-edge-rag-runtime.md), [Spec 04 (AFCA Evals)](04-afca-eval-benchmarks.md), [Spec 05 (Frontend)](05-frontend-chat-interface.md)  
-**Associated ADRs:** [ADR-0001](../adr/0001-cloudflare-ai-search-hybrid-retrieval.md), [ADR-0002](../adr/0002-pre-normalized-markdown-r2-ingestion.md)  
+**Version:** 2.0.0  
+**Associated Specs:** [Spec 01 (Data Ingestion & Pipeline)](01-data-ingestion-chunking.md), [Spec 02 (Edge Runtime)](02-edge-rag-runtime.md), [Spec 03 (Regulatory Compliance)](03-regulatory-compliance.md), [Spec 04 (AFCA Evals)](04-afca-eval-benchmarks.md), [Spec 05 (Frontend Chat Interface)](05-frontend-chat-interface.md)  
+**Associated ADRs:** [ADR-0001 (Cloudflare AI Search Hybrid Retrieval)](../adr/0001-cloudflare-ai-search-hybrid-retrieval.md), [ADR-0002 (Pre-Normalized Markdown in R2)](../adr/0002-pre-normalized-markdown-r2-ingestion.md), [ADR-0003 (Static AST Corpus Edge Fallback)](../adr/0003-static-ast-corpus-edge-fallback.md), [ADR-0004 (Canonical Insurer Registry & Brand Alias Resolution)](../adr/0004-canonical-insurer-registry-alias-resolution.md)  
 
 ---
 
-## Problem Statement
+## 1. Problem Statement
 
-Australian insurance policyholders and brokers comparing cover across major underwriters face a fragmented information landscape. While FAQ-Mate's edge runtime and frontend UI allow users to filter queries by five primary Australian insurers (NRMA, Suncorp, Allianz, QBE, and Youi), the underlying retrieval corpus suffers from severe data drift and structural gaps:
+Australian policyholders, brokers, and claimants comparing policies across underwriters face a heavily fragmented disclosure landscape. While FAQ-Mate's edge runtime and frontend UI support multi-insurer queries, scaling coverage across the Australian insurance ecosystem exposed key data and compiler challenges:
 
-1. **Incomplete Insurer Coverage**: Full Product Disclosure Statements (PDS) only exist for Suncorp Home and Allianz Motor. NRMA and QBE have minimal FAQ coverage without full underwriting terms, while Youi is entirely absent from the indexing corpus despite being selectable in the client interface.
-2. **Product Asymmetry**: Home Building & Contents and Comprehensive Motor are not uniformly available across all Tier-1 insurers, preventing cross-product and cross-underwriter coverage comparisons.
-3. **Manual Compilation Drift**: The edge static corpus lookup module is maintained through manual synchronization rather than an automated AST compiler. This creates a brittle seam where updates to raw or normalized Markdown are not deterministically reflected in edge chunks.
-4. **Missing Regulatory Product Determinations (TMDs)**: Target Market Determinations mandated under statutory Design and Distribution Obligations (DDO) are absent, leaving target market eligibility queries without primary policy source grounding.
-5. **Aggregator Contamination**: Third-party commercial aggregators (e.g. Compare the Market, iSelect) are mixed into the FAQ corpus without clear distinction from primary underwriter disclosures.
-
----
-
-## Solution
-
-Build an end-to-end automated corpus refinement pipeline that expands, normalizes, validates, and edge-compiles all primary Product Disclosure Statements and Target Market Determinations for the five major Australian general insurers.
-
-The system will:
-1. Ingest comprehensive, multi-module PDS and TMD policy documents for **NRMA, Suncorp, Allianz, QBE, and Youi** across Home & Contents and Comprehensive Motor.
-2. Enforce strict tabular serialization of sub-limits schedules (jewelry, watches, works of art, bicycles, tools of trade) and excess structures (basic, age, inexperienced driver, unoccupied dwelling).
-3. Co-locate peril definitions with statutory waiting periods (e.g. 72-hour bushfire/flood embargoes) and exclusion clauses (storm surge, forcible entry) under the Spec 01 invariant.
-4. Quarantine third-party aggregator FAQs from direct insurer disclosures.
-5. Provide a deterministic corpus compiler that transforms hierarchical Markdown documents into typed, edge-compatible static index chunks with BM25 keywords, relevance metadata, and breadcrumbs.
-6. Provide an automated corpus linter integrated into continuous verification gates.
+1. **Market Breadth & Underwriter Concentration**: The market is divided among conglomerate underwriters (Suncorp Group, IAG, Allianz, QBE), regional auto clubs (RACV, RACQ, RAA, RAC WA, RACT), challenger direct brands (Budget Direct, Youi), specialized travel underwriters, and life insurers. A narrow 5-insurer corpus fails to reflect real Australian consumer choice.
+2. **Bancassurance & White-Label Confusion**: Major retail banks (CommBank, Westpac, ANZ, NAB, HSBC, ING) and retail conglomerates (Coles, Woolworths Everyday) market insurance policies under consumer brand names, while the underlying underwriting risk and PDS disclosures belong to licensed general and life underwriters. Consumers querying bank-branded insurance require accurate underwriter resolution without advice leakage.
+3. **Manual Edge Compilation Drift**: In early versions, `src/rag/corpus-data.ts` required manual synchronization with raw Markdown sources, creating an unverified seam where normalized edits drifted from edge static chunks.
+4. **Empty Heading Chunks (AST Fragmentation)**: Naive heading-based splitters emitted heading-only chunks (`## Section: Exclusions` with no paragraphs or tables), polluting top-K retrieval results with zero-information passages.
+5. **Worker Bundle Budget Constraints**: An expanded corpus covering 39 insurers risks exceeding Cloudflare Workers V8 isolate limits (128MB isolate RAM and 10MB compressed script size) if static chunks are not strictly token-budgeted and optimized.
 
 ---
 
-## User Stories
+## 2. Solution: The v2.0 Multi-Insurer Expansion & AST Compiler
 
-1. As a policyholder insured with NRMA, I want to ask questions about my Home Plus policy sub-limits, so that I can know the exact maximum dollar payout for stolen jewelry without reading the entire document.
-2. As a driver insured with Youi, I want to query my Comprehensive Motor policy regarding unnamed driver excesses, so that I understand additional out-of-pocket costs before lending my vehicle.
-3. As an insurance broker comparing policies, I want to inspect flood and rainwater run-off coverage across NRMA, Suncorp, Allianz, QBE, and Youi side-by-side, so that I can advise clients on differing peril definitions.
-4. As a homeowner in a high-risk bushfire area, I want to verify whether a 72-hour embargo applies to my newly purchased policy, so that I know exactly when my fire cover takes effect.
-5. As a policyholder claiming for burglary, I want the system to clarify whether forcible and violent entry is required for contents cover, so that I am not misled about unforced theft exclusions.
-6. As a compliance auditor, I want every retrieved passage to include structured document breadcrumbs (insurer, product, document type, effective date, section, and sub-section), so that grounding provenance is traceable.
-7. As an insurance customer inquiring about eligibility, I want the system to ground answers in the product's Target Market Determination (TMD), so that I understand the target retail consumer criteria without receiving personal financial advice.
-8. As a developer adding a new PDS, I want an automated compilation script that parses Markdown headings and tables into edge chunks, so that I do not have to write manual static TypeScript data files.
-9. As a CI/CD pipeline operator, I want an automated corpus linter to fail the build if any policy document lacks mandatory frontmatter metadata or breaks table formatting, so that malformed documents never reach production.
-10. As a technical evaluator, I want all tabular sub-limits schedules to render as structured Markdown tables rather than flattened paragraphs, so that monetary figures and item caps are unambiguous.
-11. As a privacy-conscious user, I want third-party comparison aggregator commentary separated from underwriter policy terms, so that responses reflect legal underwriting guidelines rather than broker marketing copy.
-12. As an edge runtime engineer, I want compiled corpus chunks to execute strictly in pure V8 isolates without any Node.js filesystem calls, so that edge performance remains sub-40ms.
-13. As a mobile user querying accidental damage, I want glass breakage sub-limits and excess waiver conditions for windscreens to be clearly distinguished between motor and home policies, so that I receive product-accurate terms.
-14. As an insurer operations lead, I want historical PDS versions clearly stamped with effective dates, so that coverage questions accurately reflect policy wording active at the time of claim.
-15. As a motor vehicle owner, I want the corpus to document unlicensed driver exclusions across all five insurers, so that statutory exclusion rules under the Insurance Contracts Act 1984 are consistently grounded.
-16. As a tenant with contents insurance, I want to know specific limits for guest property and temporary accommodation, so that emergency living allowances are transparent.
-17. As an AFCA evaluator, I want the expanded corpus to maintain 100% precision on existing benchmark scenarios (TC-01 through TC-10), so that corpus updates never degrade regulatory compliance.
+Deliver a production-grade ingestion and edge compilation pipeline expanding the FAQ-Mate knowledge base across the Australian general and life insurance market:
 
----
-
-## Implementation Decisions
-
-### 1. Ingestion Scope & Insurer Roster
-- The refined corpus will contain primary documents for all five active insurers:
-  - **NRMA**: Home Plus Building & Contents PDS, Comprehensive Motor PDS.
-  - **Suncorp**: Classic Home Building & Contents PDS (expanded), Comprehensive Motor PDS.
-  - **Allianz**: Classic Home & Contents PDS, Comprehensive Motor PDS.
-  - **QBE**: Home & Contents PDS, Comprehensive Motor PDS.
-  - **Youi**: Comprehensive Home Building & Contents PDS, Comprehensive Motor PDS.
-  - **Target Market Determinations (TMD)**: Retail Home & Motor determinations for Tier-1 insurers.
-- Commercial aggregator FAQs (e.g. Compare the Market, iSelect) will be quarantined into an isolated aggregator category and excluded from primary underwriting retrieval.
-
-### 2. Tabular Normalization & Co-Location Standard
-- All monetary sub-limits schedules must be serialized into aligned Markdown tables containing:
-  - Item/peril category.
-  - Standard policy dollar limit or calculation formula.
-  - Conditions for optional higher cover.
-- In accordance with Spec 01 § 2.4, the following domain pairings must be co-located within the same chunk:
-  - Flood definition + storm surge / action of the sea exclusions.
-  - Bushfire, cyclone, and flood definitions + embargo waiting periods (48h or 72h).
-  - Theft / burglary + violent and forcible entry conditions.
-
-### 3. Automated Edge Compiler Architecture
-- A dedicated compiler utility will read all normalized Markdown documents in the corpus repository.
-- **Parsing**: Walks the Markdown document structure, extracting frontmatter metadata, major section headings (`##`), and defined peril/schedule sub-headings (`###`).
-- **Table Preservation**: Markdown tables are treated as atomic blocks and are never partitioned across multiple chunks.
-- **Keyword Generation**: Automatically extracts domain terms, synonym tokens, and statutory phrases while filtering standard stop words.
-- **Code Generation**: Emits a strongly typed, zero-dependency TypeScript module exporting the static indexed chunks array conforming to the edge runtime contract.
-
-### 4. Corpus Linter & Verification Gate
-- A static linter script will validate all Markdown files in the corpus before compilation:
-  - Checks for valid frontmatter blocks with required fields: `insurer`, `product`, `doc_type`, `effective_date`, `jurisdiction`.
-  - Validates Markdown table formatting and syntax.
-  - Enforces mandatory statutory disclaimers where applicable.
-  - Verifies peril-embargo co-location.
-- The linter will be integrated directly into the automated verification command (`npm run verify`).
+1. **Comprehensive 39-Insurer Roster across 5 Market Categories**:
+   - Ingest 1,277 Product Disclosure Statements and policy disclosure PDFs indexed in `data/raw/all_manifest.csv`.
+   - Ingest 5,416 Q&As across 39 primary insurer FAQ disclosure sets in `data/raw/FAQs/`.
+2. **Canonical Insurer & Bancassurance Registry**:
+   - Establish `src/constants/insurers.ts` as the single source of truth for the 39 primary insurers and their AFSL underwriter details.
+   - Resolve Bancassurance (CommBank, Westpac, ANZ, NAB, HSBC, ING, Bankwest) and white-label brands (Coles Insurance, ROLLiN', Everyday Insurance, Australian Seniors) to issuing underwriters.
+3. **Automated Corpus Linter (`src/ingest/corpus-linter.ts`)**:
+   - Enforce mandatory frontmatter validation, GFM table integrity, peril-embargo co-location, and statutory GAW injection via `npm run lint:corpus`.
+4. **Deterministic Edge AST Compiler (`scripts/compile-corpus.ts`)**:
+   - Walk Markdown AST structures to generate typed static chunks in `src/rag/corpus-data.ts`.
+   - Implement heading-only chunk elimination: fold empty headers into child sections or parent breadcrumbs.
+   - Extract dense BM25 keyword tokens and relevance scores for sub-40ms edge isolate retrieval.
+5. **Worker Isolate Bundle Budgeting**:
+   - Budget edge static chunk structures to guarantee total compiled footprint remains lightweight, pure V8 isolate compatible, and zero-filesystem dependent.
 
 ---
 
-## Testing Decisions
+## 3. Insurer Taxonomy & Brand Alias Matrix
 
-### What Makes a Good Test
-Tests must verify behavior at the public boundaries:
-1. **Compilation Seam**: The compiler takes Markdown source files and outputs a valid, typed chunk collection matching the expected schema, counts, and keyword density, without requiring runtime filesystem access.
-2. **Retrieval Seam**: Queries targeting any of the five insurers (NRMA, Suncorp, Allianz, QBE, Youi) or either product category (Home, Motor) must retrieve relevant policy chunks with high relevance confidence.
-3. **Regulatory Invariant Seam**: All 13 AFCA eval benchmark tests (TC-01 through TC-10) must continue to pass with $\ge 0.98$ groundedness, 0.00% advice leakage, and 100% GAW presence against the refined corpus.
+### 3.1 The 39 Primary Insurers across 5 Categories
 
-### Modules to Test
-1. **Corpus Compiler**: Test parsing of headings, tables, frontmatter breadcrumbs, and keyword extraction.
-2. **Corpus Linter**: Test detection of missing frontmatter, broken table markup, and un-colocated embargo clauses.
-3. **Local Hybrid Retriever**: Test multi-insurer queries across all five brands to confirm zero ungrounded gaps.
-4. **AFCA Evals Suite**: Regression test ensuring expanded corpus causes no advice leakage or hallucination regressions.
+| Category | Insurers Count | Primary Insurers Included |
+| :--- | :--- | :--- |
+| **Suncorp Group** | 6 | Suncorp, AAMI, GIO, APIA, Shannons, Bingle |
+| **Major Insurers** | 4 | Allianz, QBE, Vero, NRMA |
+| **Challengers & Auto Clubs** | 9 | Budget Direct, RAC WA, RAA, RACT, RACV, RACQ, CGU, Youi, TIO |
+| **Travel Specialists** | 8 | Go Insurance, 1Cover, InsureandGo, Fast Cover, Southern Cross Travel Insurance (SCTI), Zoom, Cover-More, Travel Insurance Direct (TID) |
+| **Life Insurers** | 12 | Zurich, AIA, NobleOak, NEOS, HCF Life, Acenda (formerly MLC Life), Challenger, ClearView, MetLife, TAL, PPS Mutual, Asteron Life |
 
-### Prior Art
-- `tests/ingest/pds-normalizer.test.ts`: Existing test harness for PDS normalization and R2 path key generation.
-- `tests/evals/afca-compliance.test.ts`: 10 synthetic AFCA trap scenarios validating regulatory groundedness.
+### 3.2 Bancassurance & White-Label Brand Alias Mappings
+
+All brand alias resolutions are maintained centrally in [`src/constants/insurers.ts`](file:///Users/jaysoncp/Developer/faq-mate/src/constants/insurers.ts):
+
+```typescript
+// Example Alias Mappings
+commbank     -> Target: "allianz"       (Allianz Australia / AIA Life)
+westpac      -> Target: "allianz"       (Allianz Australia / TAL Life)
+anz          -> Target: "qbe"           (QBE Insurance / Cover-More Travel)
+nab          -> Target: "allianz"       (Allianz Australia / Acenda Life)
+ing          -> Target: "budget-direct" (Auto & General / Hollard)
+"coles"      -> Target: "cgu"           (Insurance Australia Limited / IAG)
+"rollin"     -> Target: "cgu"           (Insurance Australia Limited / IAG)
+"everyday"   -> Target: "budget-direct" (Everyday Insurance / Hollard / Auto & General)
+```
 
 ---
 
-## Out of Scope
+## 4. AST Chunking & Heading-Only Elimination
 
-- Scraping or automated live crawling of dynamic insurer websites (all policy documents are source-verified, pre-downloaded public PDFs or official disclosures).
-- Commercial lines or business insurance PDSs (corpus remains strictly focused on retail personal lines: Home & Contents and Private Motor).
-- Optical Character Recognition (OCR) of scanned paper forms (input documents are digital-native PDFs with extractable text).
-- Premium calculation, underwriting algorithms, or quoting logic.
+### 4.1 The Heading-Only Chunk Problem
+When chunking hierarchically structured PDS documents, documents often contain intermediate structural headers:
+```markdown
+## Section 3: Exclusions
+### 3.1 General Policy Exclusions
+The following exclusions apply across all covers...
+```
+A naive heading chunker creates a chunk for `## Section 3: Exclusions` containing zero body text. In hybrid search, this chunk matches queries on "exclusions" with high keyword density but provides zero grounding content, displacing informative passages from top-K context.
+
+### 4.2 AST Elimination & Merging Algorithm
+The AST compiler (`scripts/compile-corpus.ts`) executes the following invariant rules:
+1. **Empty Header Elimination:** When an AST heading node (`##`, `###`) is encountered without immediate body paragraphs, tables, or list items before the next heading:
+   - The empty heading's title is appended to the hierarchical breadcrumb path (`section` -> `sub_section`).
+   - The empty heading is not emitted as an independent chunk.
+2. **Atomic Table Preservation:** Markdown tables (`| ... |`) are never split across chunks. The table and its preceding descriptive header are compiled into an atomic chunk with full sub-limit metadata.
+3. **Chunk Minimum Substance Bar:** Every emitted chunk must have at least one substantive sentence or table row ($\ge 30$ tokens of policy content).
 
 ---
 
-## Further Notes
+## 5. Worker Isolate Bundle Budgeting
 
-- The compiled static corpus must preserve the edge isolate invariant: zero Node.js filesystem dependencies in `src/`.
-- All newly ingested PDS documents must be synchronized to the Cloudflare R2 bucket (`faq-mate-corpus`) following the structured key format: `corpus/{insurer_code}/{product_slug}/{document_type}_{version_or_effective_date}.md`.
+To ensure zero latency regression and protect the Cloudflare Worker V8 isolate budget:
+
+1. **Zero Filesystem Invariant in `src/`:** The runtime reads static chunks solely from `src/rag/corpus-data.ts`. No `node:fs`, `node:path`, or `process.cwd()` is imported in `src/`.
+2. **Dense Static Representation:** Static chunks use condensed metadata keys and pre-extracted BM25 keyword arrays, preventing runtime tokenization overhead.
+3. **Bundle Size Ceiling:**
+   - Compiled `src/rag/corpus-data.ts` source size: $\le 1.5\text{MB}$ uncompressed.
+   - Total Worker bundle (including React frontend SSR/pages assets and edge logic): $\le 5\text{MB}$ compressed (well within the Cloudflare 10MB limit).
+   - Peak isolate heap memory at runtime: $\le 32\text{MB}$ (well within the Cloudflare Workers 128MB ceiling).
+
+---
+
+## 6. Automated Corpus Linter (`src/ingest/corpus-linter.ts`)
+
+The corpus linter runs as a prerequisite gate during `npm run compile:corpus` and in `npm run lint:corpus`. It validates:
+
+1. **Frontmatter Integrity:**
+   - Every file must start with `<!-- BREADCRUMB ... -->`.
+   - Mandatory keys: `insurer`, `insurer_code`, `category`, `product`, `doc_type`, `effective_date`, `jurisdiction`.
+   - `insurer_code` and `category` must match valid entries in `src/constants/insurers.ts`.
+2. **Table Syntax:**
+   - Markdown tables must have matching column counts in header and row lines.
+   - Tables must contain valid GFM delimiter rows (`| :--- | :--- |`).
+3. **Peril-Embargo Co-Location:**
+   - Verifies that occurrences of flood clauses contain co-located ocean/surge exclusions.
+   - Verifies that bushfire, flood, and cyclone operative sections contain statutory waiting period disclosures (48h or 72h).
+4. **General Advice Warning:**
+   - Verifies that every normalized document contains the unmodified `STATUTORY_GAW`.
+
+---
+
+## 7. User Stories
+
+1. **Suncorp Group Policyholder:** As an APIA or AAMI policyholder, I want to query my Home Contents policy regarding accidental damage sub-limits, so that I receive answers grounded in AAI Limited underwriting terms.
+2. **Bancassurance Customer:** As a CommBank customer with Home Insurance, I want my query about flood cover to resolve to Allianz Australia terms while clearly identifying CommBank as the distributor, so that I understand who underwrites my policy.
+3. **Auto Club Member:** As an RACV or RACQ member, I want to compare towing and emergency accommodation allowances with Budget Direct, so that I can see the exact schedule differences in GFM tables.
+4. **Travel Insurance Traveler:** As an overseas traveler comparing Fast Cover and Cover-More, I want to check existing medical condition exclusions and snow sports excess surcharges, so that I have clear underwriting rules before departure.
+5. **Life Insurance Claimant:** As a holder of TAL or AIA life insurance, I want to inspect TPD (Total & Permanent Disability) definition criteria (any occupation vs own occupation), so that I understand eligibility thresholds without financial advice bias.
+6. **Edge Platform Engineer:** As an edge runtime engineer, I want `src/rag/corpus-data.ts` to compile deterministically without heading-only chunks, so that Worker memory and TTFT latency remain sub-40ms on Cloudflare's Anycast edge.
+7. **Compliance Auditor:** As an AFCA compliance officer, I want every compiled passage to feature statutory GAW text and structured breadcrumbs, so that every generated edge response satisfies Section 949A.
+
+---
+
+## 8. Verification & Test Contracts
+
+### 8.1 Automated Verification Commands
+
+| Command | Action | Verification Gate |
+| :--- | :--- | :--- |
+| `npm run lint:corpus` | Runs `src/ingest/corpus-linter.ts` | 0 lint errors across all files in `data/corpus/` |
+| `npm run normalize` | Runs normalization pipeline | Current operative PDS/SPDS & 39 FAQ files generated |
+| `npm run compile:corpus` | Runs `scripts/compile-corpus.ts` | `src/rag/corpus-data.ts` compiled without empty heading chunks |
+| `npm run upload:r2` | Syncs normalized files to R2 | Canonical key audit against Cloudflare R2 |
+| `npm run verify` | Full CI verification gate | Typecheck + Unit Tests + AFCA Compliance Evals |
+
+### 8.2 Test Suite Parity
+- All 13 AFCA eval scenarios (TC-01 through TC-10) in [`tests/evals/afca-compliance.test.ts`](file:///Users/jaysoncp/Developer/faq-mate/tests/evals/afca-compliance.test.ts) must continue to pass with $\ge 0.98$ groundedness and $0.00\%$ personal advice leakage.
+- Insurer resolution tests must verify that queries specifying brand aliases (e.g., `commbank`, `coles`, `ing`) resolve to the proper underwriter without ungrounded hallucinations.
+
+---
+
+## 9. Known Gaps
+
+| # | Gap | Current Behaviour | Target Behaviour |
+| :--- | :--- | :--- | :--- |
+| G8 | Peril Co-Location Lint Rules | Peril co-location (flood + ocean surge, embargo waiting periods) is enforced via normalizer pipeline conventions and manual audits. | Add automated syntax checks in `lintMarkdownDocument()` verifying that occurrences of flood clauses contain co-located ocean surge exclusions. |
+| G10 | Worker Bundle & Isolate Memory CI Checks | Bundle size and heap memory are constrained by compiler chunk budgeting (~1.0 MB raw). | Add automated bundle size and isolate heap measurement assertions directly into `npm run verify`. |

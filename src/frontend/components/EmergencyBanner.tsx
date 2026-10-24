@@ -1,5 +1,5 @@
-import React from "react";
 import { AlertOctagon, PhoneCall } from "lucide-react";
+import React from "react";
 import { EMERGENCY_HOTLINES, EMERGENCY_REFUSAL_MESSAGE } from "../../constants/statutory";
 
 export interface EmergencyBannerProps {
@@ -72,9 +72,7 @@ export function EmergencyBanner({
             <span className="inline-flex items-center gap-1.5 rounded-md bg-red-800 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-red-100">
               Immediate Danger Interception
             </span>
-            <h3 className="text-lg font-bold text-white mt-1">
-              Immediate Life Safety Emergency
-            </h3>
+            <h3 className="text-lg font-bold text-white mt-1">Immediate Life Safety Emergency</h3>
           </div>
 
           <p className="text-sm leading-relaxed text-red-50 font-medium whitespace-pre-line">

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Gauge, Clock, AlertTriangle } from "lucide-react";
+import { AlertTriangle, Clock, Gauge } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import type { RateLimitInfo } from "../types/chat-ui";
 
 export interface RateLimitBadgeProps {
@@ -58,8 +58,7 @@ export function RateLimitBadge({
       "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800/80 dark:bg-emerald-950/40 dark:text-emerald-300",
     amber:
       "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800/80 dark:bg-amber-950/40 dark:text-amber-300",
-    red:
-      "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800/80 dark:bg-rose-950/40 dark:text-rose-300",
+    red: "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800/80 dark:bg-rose-950/40 dark:text-rose-300",
   }[statusColor];
 
   const dotStyles = {

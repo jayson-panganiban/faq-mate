@@ -1,11 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
-import { RateLimitBadge } from "../../src/frontend/components/RateLimitBadge";
-import { PiiAssuranceBadge } from "../../src/frontend/components/PiiAssuranceBadge";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { STATUTORY_GAW } from "../../src/constants/statutory";
 import { AppShell } from "../../src/frontend/components/AppShell";
 import { InputBar } from "../../src/frontend/components/InputBar";
-import { STATUTORY_GAW } from "../../src/constants/statutory";
+import { PiiAssuranceBadge } from "../../src/frontend/components/PiiAssuranceBadge";
+import { RateLimitBadge } from "../../src/frontend/components/RateLimitBadge";
 import type { RateLimitInfo, TelemetryInfo } from "../../src/frontend/types/chat-ui";
 
 describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
@@ -260,13 +260,7 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
 
   describe("InputBar Component", () => {
     it("renders insurer selector with All Insurers, NRMA, SUNCORP, ALLIANZ, QBE, YOUI options", () => {
-      render(
-        <InputBar
-          onSend={vi.fn()}
-          isLoading={false}
-          isThrottled={false}
-        />
-      );
+      render(<InputBar onSend={vi.fn()} isLoading={false} isThrottled={false} />);
 
       const select = screen.getByTestId("insurer-select") as unknown as HTMLSelectElement;
       expect(select).toBeInTheDocument();
@@ -281,13 +275,7 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
     });
 
     it("renders query textarea with accessible placeholder", () => {
-      render(
-        <InputBar
-          onSend={vi.fn()}
-          isLoading={false}
-          isThrottled={false}
-        />
-      );
+      render(<InputBar onSend={vi.fn()} isLoading={false} isThrottled={false} />);
 
       const textarea = screen.getByTestId("chat-input-textarea");
       expect(textarea).toBeInTheDocument();
@@ -295,13 +283,7 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
     });
 
     it("renders Cloudflare Turnstile protection widget or badge", () => {
-      render(
-        <InputBar
-          onSend={vi.fn()}
-          isLoading={false}
-          isThrottled={false}
-        />
-      );
+      render(<InputBar onSend={vi.fn()} isLoading={false} isThrottled={false} />);
 
       const turnstile = screen.getByTestId("turnstile-widget");
       expect(turnstile).toBeInTheDocument();
@@ -354,13 +336,7 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
     });
 
     it("disables send button when textarea is empty or whitespace only", () => {
-      render(
-        <InputBar
-          onSend={vi.fn()}
-          isLoading={false}
-          isThrottled={false}
-        />
-      );
+      render(<InputBar onSend={vi.fn()} isLoading={false} isThrottled={false} />);
 
       const sendButton = screen.getByTestId("send-button");
       expect(sendButton).toBeDisabled();
@@ -372,13 +348,7 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
 
     it("enables send button when text is entered and triggers onSend on submit", () => {
       const handleSend = vi.fn();
-      render(
-        <InputBar
-          onSend={handleSend}
-          isLoading={false}
-          isThrottled={false}
-        />
-      );
+      render(<InputBar onSend={handleSend} isLoading={false} isThrottled={false} />);
 
       const textarea = screen.getByTestId("chat-input-textarea") as unknown as HTMLTextAreaElement;
       const select = screen.getByTestId("insurer-select") as unknown as HTMLSelectElement;
@@ -403,13 +373,7 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
 
     it("submits query when Enter key is pressed without Shift", () => {
       const handleSend = vi.fn();
-      render(
-        <InputBar
-          onSend={handleSend}
-          isLoading={false}
-          isThrottled={false}
-        />
-      );
+      render(<InputBar onSend={handleSend} isLoading={false} isThrottled={false} />);
 
       const textarea = screen.getByTestId("chat-input-textarea");
       fireEvent.change(textarea, { target: { value: "What is NRMA accidental damage limit?" } });
@@ -424,13 +388,7 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
 
     it("does not submit query when Shift+Enter is pressed (inserts newline)", () => {
       const handleSend = vi.fn();
-      render(
-        <InputBar
-          onSend={handleSend}
-          isLoading={false}
-          isThrottled={false}
-        />
-      );
+      render(<InputBar onSend={handleSend} isLoading={false} isThrottled={false} />);
 
       const textarea = screen.getByTestId("chat-input-textarea");
       fireEvent.change(textarea, { target: { value: "Line 1" } });
@@ -441,13 +399,7 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
     });
 
     it("disables send button and input elements when isLoading is true", () => {
-      render(
-        <InputBar
-          onSend={vi.fn()}
-          isLoading={true}
-          isThrottled={false}
-        />
-      );
+      render(<InputBar onSend={vi.fn()} isLoading={true} isThrottled={false} />);
 
       const textarea = screen.getByTestId("chat-input-textarea");
       const sendButton = screen.getByTestId("send-button");
@@ -457,13 +409,7 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
     });
 
     it("disables send button when isThrottled is true", () => {
-      render(
-        <InputBar
-          onSend={vi.fn()}
-          isLoading={false}
-          isThrottled={true}
-        />
-      );
+      render(<InputBar onSend={vi.fn()} isLoading={false} isThrottled={true} />);
 
       const textarea = screen.getByTestId("chat-input-textarea");
       const sendButton = screen.getByTestId("send-button");

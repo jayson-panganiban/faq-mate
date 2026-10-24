@@ -1,16 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, within, act } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import React from "react";
-import { UserMessage } from "../../src/frontend/components/UserMessage";
-import { AssistantMessage } from "../../src/frontend/components/AssistantMessage";
-import type { GroundedChunk } from "../../src/types/chat";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { STATUTORY_GAW } from "../../src/constants/statutory";
+import { AssistantMessage } from "../../src/frontend/components/AssistantMessage";
+import { UserMessage } from "../../src/frontend/components/UserMessage";
+import type { GroundedChunk } from "../../src/types/chat";
 
 describe("UserMessage Component (Ticket 5)", () => {
   it("renders user query text accurately", () => {
-    render(
-      <UserMessage query="What is the sub-limit for jewellery under Suncorp Classic Home?" />
-    );
+    render(<UserMessage query="What is the sub-limit for jewellery under Suncorp Classic Home?" />);
 
     expect(
       screen.getByText("What is the sub-limit for jewellery under Suncorp Classic Home?")
@@ -18,20 +16,13 @@ describe("UserMessage Component (Ticket 5)", () => {
   });
 
   it("renders specific insurer badge when provided", () => {
-    render(
-      <UserMessage
-        query="Does NRMA cover flood damage?"
-        insurer="NRMA"
-      />
-    );
+    render(<UserMessage query="Does NRMA cover flood damage?" insurer="NRMA" />);
 
     expect(screen.getByText("NRMA")).toBeInTheDocument();
   });
 
   it("renders 'All Insurers' badge when insurer is undefined or empty", () => {
-    const { rerender } = render(
-      <UserMessage query="What is standard flood cover?" />
-    );
+    const { rerender } = render(<UserMessage query="What is standard flood cover?" />);
     expect(screen.getByText("All Insurers")).toBeInTheDocument();
 
     rerender(<UserMessage query="What is standard flood cover?" insurer="" />);
@@ -39,13 +30,7 @@ describe("UserMessage Component (Ticket 5)", () => {
   });
 
   it("renders timestamp when provided", () => {
-    render(
-      <UserMessage
-        query="Is storm surge covered?"
-        insurer="Suncorp"
-        timestamp="10:42 AM"
-      />
-    );
+    render(<UserMessage query="Is storm surge covered?" insurer="Suncorp" timestamp="10:42 AM" />);
 
     expect(screen.getByText("10:42 AM")).toBeInTheDocument();
   });
@@ -61,9 +46,7 @@ describe("UserMessage Component (Ticket 5)", () => {
   });
 
   it("sanitizes raw PII in user query and displays sanitized indicator badge", () => {
-    render(
-      <UserMessage query="My TFN is 123 456 789 and Medicare is 2345678901 1" />
-    );
+    render(<UserMessage query="My TFN is 123 456 789 and Medicare is 2345678901 1" />);
 
     expect(screen.getByTestId("pii-sanitized-badge")).toBeInTheDocument();
     expect(screen.getByText(/Sanitized/i)).toBeInTheDocument();
@@ -118,7 +101,8 @@ describe("AssistantMessage Component (Ticket 5)", () => {
 
   describe("Markdown Parsing & Formatting", () => {
     it("renders bold text and headers", () => {
-      const message = "### Coverage Details\n\nUnder this policy, **accidental damage** is optional.";
+      const message =
+        "### Coverage Details\n\nUnder this policy, **accidental damage** is optional.";
       render(<AssistantMessage message={message} isStreaming={false} />);
 
       // Header rendered
@@ -203,12 +187,15 @@ describe("AssistantMessage Component (Ticket 5)", () => {
       // Notice badge
       expect(within(notice).getByText(/silent pds notice/i)).toBeInTheDocument();
       expect(
-        within(notice).getByText(/does not specify or cover accidental damage caused by pet chimpanzees/i)
+        within(notice).getByText(
+          /does not specify or cover accidental damage caused by pet chimpanzees/i
+        )
       ).toBeInTheDocument();
     });
 
     it("does not render Silent PDS Notice when policy covers standard events", () => {
-      const message = "Suncorp Classic Home includes flood cover as standard up to the sum insured.";
+      const message =
+        "Suncorp Classic Home includes flood cover as standard up to the sum insured.";
       render(<AssistantMessage message={message} isStreaming={false} />);
 
       expect(screen.queryByTestId("silent-pds-notice")).not.toBeInTheDocument();
@@ -244,8 +231,7 @@ describe("AssistantMessage Component (Ticket 5)", () => {
 
     it("falls back to passing citation string to onSelectCitation if no chunk matches", () => {
       const onSelectCitation = vi.fn();
-      const message =
-        "General exclusions apply [Source: Unknown Policy PDS, Section 99].";
+      const message = "General exclusions apply [Source: Unknown Policy PDS, Section 99].";
 
       render(
         <AssistantMessage
@@ -260,20 +246,13 @@ describe("AssistantMessage Component (Ticket 5)", () => {
         name: /view citation source/i,
       });
       fireEvent.click(citationButton);
-      expect(onSelectCitation).toHaveBeenCalledWith(
-        "[Source: Unknown Policy PDS, Section 99]"
-      );
+      expect(onSelectCitation).toHaveBeenCalledWith("[Source: Unknown Policy PDS, Section 99]");
     });
   });
 
   describe("Streaming State & Blinking Cursor", () => {
     it("renders streaming cursor when isStreaming is true", () => {
-      render(
-        <AssistantMessage
-          message="Calculating sub-limits"
-          isStreaming={true}
-        />
-      );
+      render(<AssistantMessage message="Calculating sub-limits" isStreaming={true} />);
 
       const cursor = screen.getByTestId("streaming-cursor");
       expect(cursor).toBeInTheDocument();
@@ -284,12 +263,7 @@ describe("AssistantMessage Component (Ticket 5)", () => {
     });
 
     it("does not render streaming cursor when isStreaming is false", () => {
-      render(
-        <AssistantMessage
-          message="Finished response."
-          isStreaming={false}
-        />
-      );
+      render(<AssistantMessage message="Finished response." isStreaming={false} />);
 
       expect(screen.queryByTestId("streaming-cursor")).not.toBeInTheDocument();
     });
@@ -297,12 +271,7 @@ describe("AssistantMessage Component (Ticket 5)", () => {
 
   describe("Statutory Section 949A GAW Invariant", () => {
     it("renders StatutoryGaw banner at the bottom of completed assistant response", () => {
-      render(
-        <AssistantMessage
-          message="Flood cover is standard."
-          isStreaming={false}
-        />
-      );
+      render(<AssistantMessage message="Flood cover is standard." isStreaming={false} />);
 
       const gaw = screen.getByTestId("statutory-gaw");
       expect(gaw).toBeInTheDocument();
@@ -312,12 +281,7 @@ describe("AssistantMessage Component (Ticket 5)", () => {
 
     it("deduplicates raw statutory GAW copy from message body and renders cleanly via StatutoryGaw", () => {
       const message = `Flood cover is standard.\n\n${STATUTORY_GAW}`;
-      render(
-        <AssistantMessage
-          message={message}
-          isStreaming={false}
-        />
-      );
+      render(<AssistantMessage message={message} isStreaming={false} />);
 
       // Only one GAW component
       const gaws = screen.getAllByTestId("statutory-gaw");
@@ -335,13 +299,7 @@ describe("AssistantMessage Component (Ticket 5)", () => {
       const onCopy = vi.fn();
       const message = "Suncorp flood excess is $500.";
 
-      render(
-        <AssistantMessage
-          message={message}
-          isStreaming={false}
-          onCopy={onCopy}
-        />
-      );
+      render(<AssistantMessage message={message} isStreaming={false} onCopy={onCopy} />);
 
       const copyButton = screen.getByRole("button", { name: /copy answer/i });
       expect(copyButton).toBeInTheDocument();
@@ -367,7 +325,7 @@ describe("AssistantMessage Component (Ticket 5)", () => {
 
   describe("Fenced Code Block Support", () => {
     it("renders fenced code block with language badge, line numbers, and copy action", async () => {
-      const codeSnippet = '```typescript\nconst excess = 500;\nconst isCovered = true;\n```';
+      const codeSnippet = "```typescript\nconst excess = 500;\nconst isCovered = true;\n```";
       render(<AssistantMessage message={codeSnippet} isStreaming={false} />);
 
       const codeBlock = screen.getByTestId("code-block");

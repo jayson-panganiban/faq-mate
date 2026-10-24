@@ -1,113 +1,152 @@
 # Specification: Phase 6 — Cloudflare Pages Frontend Chat Interface
 
-**Module:** `packages/ui` / `src/frontend` (Cloudflare Pages)  
+**Module:** `src/frontend/` (Cloudflare Pages SPA)  
 **Status:** Living Specification  
-**Version:** 1.0.0  
-**Associated Specs:** [Spec 02 (Edge Runtime)](02-edge-rag-runtime.md), [Spec 03 (Regulatory Compliance)](03-regulatory-compliance.md), [Spec 04 (AFCA Evals)](04-afca-eval-benchmarks.md)  
-**Associated ADRs:** [ADR-0001](../adr/0001-cloudflare-ai-search-hybrid-retrieval.md), [ADR-0002](../adr/0002-pre-normalized-markdown-r2-ingestion.md)  
+**Version:** 2.0.0  
+**Associated Specs:** [Spec 02 (Edge Runtime)](02-edge-rag-runtime.md), [Spec 03 (Regulatory Compliance)](03-regulatory-compliance.md), [Spec 04 (AFCA Evals)](04-afca-eval-benchmarks.md), [Spec 06 (Corpus Refinement)](06-corpus-refinement-and-compilation.md)  
+**Associated ADRs:** [ADR-0001 (AI Search)](../adr/0001-cloudflare-ai-search-hybrid-retrieval.md), [ADR-0002 (Pre-Normalized R2)](../adr/0002-pre-normalized-markdown-r2-ingestion.md), [ADR-0003 (Static AST Corpus)](../adr/0003-static-ast-corpus-edge-fallback.md), [ADR-0004 (Canonical Insurers)](../adr/0004-canonical-insurer-registry-alias-resolution.md)  
+**Test Contracts:** [`tests/frontend/`](../../tests/frontend/) (11 suites, 84 tests)
 
 ---
 
-## Problem Statement
+## 1. Problem Statement
 
-Australian retail insurance consumers and brokers navigating dense Product Disclosure Statements (PDS) often face impenetrable policy wording (80–140 pages), split across complex sub-limit schedules and statutory definitions. 
+Australian retail insurance consumers and brokers navigating dense Product Disclosure Statements (PDS) face impenetrable legal text (80–140 pages), scattered sub-limit schedules, and fragmented disclosures across 39 competing insurers.
 
-Currently, our Edge RAG backend (`POST /api/chat`) provides high-fidelity, grounded streaming answers with strict ASIC RG 244 advice boundaries and sub-40ms retrieval. However, users currently have no visual interface to:
-1. Stream answers token-by-token with sub-350ms Time-to-First-Token (TTFT).
-2. Inspect and verify the exact PDS clauses, sub-limits tables, and insurer metadata from which answers were synthesized.
-3. Observe real-time edge performance metrics (retrieval latency, TTFT, and Cloudflare Anycast PoP location e.g., `SYD`, `MEL`).
-4. Experience clear, unmissable regulatory boundaries: persistent statutory Section 949A General Advice Warnings (GAW), deterministic advice refusal guidance, and urgent life-safety emergency hotline banners.
-
----
-
-## Solution
-
-Deploy a high-density, low-latency single-page chat application on **Cloudflare Pages** (built with React 19, Vite, and Tailwind CSS).
-
-The client consumes the Edge Worker's Server-Sent Events (`text/event-stream`) protocol, rendering:
-- **Streaming Markdown Canvas**: Incremental token rendering with code syntax highlighting, tabular sub-limits display, and inline clickable citation pills (`[Source: Suncorp Classic Home PDS, Section 7]`).
-- **Citation Drawer & Grounding Inspector**: An interactive slide-over drawer displaying retrieved chunks, similarity confidence scores, operative PDS section breadcrumbs, and raw source markdown.
-- **Edge Performance & Telemetry Header**: Live pills indicating edge retrieval latency (`hybrid_retrieval_latency_ms`), TTFT badge, and current Cloudflare edge data center (`SYD`, `MEL`, `BNE`, `PER`).
-- **Regulatory Safe Harbor & Emergency UI**: Non-dismissible Section 949A General Advice Warning banner, deterministic advice refusal cards with safe-harbor explanations, and high-visibility red emergency banners with one-touch dial buttons for Triple Zero (`000`), SES (`132 500`), and Disaster Welfare (`1800 018 444`).
-- **Abuse & Rate-Limit Shield**: Cloudflare Turnstile bot protection widget and live rate-limit counter derived from `X-RateLimit-*` response headers.
+While the Edge Worker (`POST /api/chat`) provides grounded streaming answers with strict ASIC RG 244 advice boundaries, users require a responsive, accessible interface that:
+1. Streams responses token-by-token with sub-350ms Time-to-First-Token (TTFT).
+2. Provides clickable, transparent citations linking directly to operative PDS clauses and sub-limits tables.
+3. Allows querying and comparing policies across all **39 primary insurers** and **24 bancassurance aliases**.
+4. Clearly enforces non-negotiable regulatory boundaries: persistent Section 949A GAW warnings, ASIC safe-harbor advice refusals, and urgent red emergency hotlines (000, 132 500, 1800 018 444).
+5. Assures user privacy via client-side PII scrubbing before network transmission under APPs 3 & 11.
 
 ---
 
-## User Stories
+## 2. Technical Architecture & Component Hierarchy
 
-1. As an insurance consumer, I want to type a natural language question about policy coverage (e.g., *"What is Suncorp's flood definition?"*), so that I can understand complex legal terms without reading a 120-page document.
-2. As an insurance consumer, I want to filter my query by a specific insurer (NRMA, Suncorp, Allianz, QBE, Youi), so that the answer is grounded exclusively in the relevant Product Disclosure Statement.
-3. As a user, I want the response to begin streaming within 350ms of hitting Enter, so that the interaction feels instantaneous and responsive.
-4. As a retail policyholder, I want to click on inline citation pills (e.g. `[Suncorp Classic Home PDS, Section 1]`), so that a citation drawer opens showing the exact operative policy clause retrieved from R2.
-5. As a compliance auditor, I want to view the retrieval relevance score and chunk ID for every citation in the drawer, so that I can audit why the passage was selected by Cloudflare AI Search.
-6. As a policyholder, I want markdown tables in the PDS (such as jewelry sub-limits or excess tiers) to render cleanly as formatted HTML tables, so that monetary figures are readable and unambiguous.
-7. As a retail consumer asking for personal advice (e.g., *"I have $500/month, which car insurance should I buy?"*), I want the system to clearly inform me that it cannot provide personal advice, so that I understand the statutory boundary under ASIC RG 244.
-8. As a consumer experiencing an emergency (e.g., *"My house is on fire right now"*), I want the chat to immediately freeze policy generation and display prominent red emergency hotline buttons (000, 132 500), so that I get immediate life-safety assistance.
-9. As a mobile phone user in a disaster area, I want one-tap `tel:000` and `tel:132500` call links, so that I can dial emergency services directly from the emergency banner.
-10. As a financial services compliance officer, I want the Section 949A General Advice Warning to persistently appear in the application footer and at the bottom of every generated answer, so that statutory compliance is maintained across every user view.
-11. As a technical evaluator, I want to see an Anycast PoP badge (e.g., `SYD` or `MEL`), retrieval latency (ms), and TTFT (ms), so that I can verify zero-origin edge compute performance.
-12. As a user, I want to see how many requests I have remaining in my current rate-limit window (10 req/min), so that I understand why requests are throttled if I submit queries too quickly.
-13. As a privacy-conscious user, I want client-side PII indicators to assure me that Tax File Numbers, Medicare numbers, and credit cards are scrubbed before storage, so that I feel secure entering claims questions.
-14. As a user on a mobile device, I want the chat input and citation drawer to adapt seamlessly to viewport widths down to 360px with touch-friendly tap targets, so that I can inspect policy terms on my phone.
-15. As a broker comparing policies, I want to toggle between multiple insurer answers side-by-side or inspect different section disclosures, so that I can compare coverage limits.
-16. As a user entering an ungrounded or silent peril (e.g., pet chimpanzee damage), I want the UI to clearly present a negative constraint banner stating the PDS is silent, so that I am not misled into believing cover exists.
-17. As an operator, I want Cloudflare Turnstile embedded invisibly or minimally on first submission, so that automated scrapers cannot exhaust edge inference tokens.
+The frontend is an unauthenticated Single Page Application (SPA) built with **React 19**, **TypeScript**, **Vite**, and **Tailwind CSS**, deployable to Cloudflare Pages (`wrangler pages deploy dist`).
 
----
-
-## Implementation Decisions
-
-### 1. Architecture & Seam Placement
-- **Frontend Stack:** React 19, TypeScript, Vite, Tailwind CSS, Lucide React icons.
-- **Single Core Testing Seam:** A dedicated custom hook `useChatStream` concealing SSE parsing, rate-limit header tracking, and citation state. Testing the entire interface requires only mocking the `fetch` response with a synthetic `ReadableStream` emitting `event: metadata`, `event: token`, `event: done`, and `event: error`.
-- **Runtime Environment:** Deployed on Cloudflare Pages, routing API requests to `/api/chat` via Pages Functions or native Worker proxy.
-
-### 2. State & Streaming Protocol
-- **SSE Stream State Machine:**
-  - `IDLE`: Input active, rate-limit pills ready.
-  - `CONNECTING`: Turnstile validated, `POST /api/chat` dispatched.
-  - `METADATA_RECEIVED`: Chunks stored in citation store, TTFT timer captured.
-  - `STREAMING`: Accumulating incoming tokens into message markdown.
-  - `COMPLETED`: Done event received, final token count and total latency recorded.
-  - `REFUSAL_BLOCKED`: Error event received with `ADVICE_BOUNDARY_VIOLATION` or `EMERGENCY_INTERCEPTION`.
-  - `THROTTLED`: HTTP 429 received, countdown timer active until `X-RateLimit-Reset`.
-
-### 3. Component Hierarchy
-- `AppShell`: Persistent top navigation (PoP indicator, latency meter) and statutory Section 949A GAW footer.
-- `ChatContainer`: Message list with auto-scroll and stream anchoring.
-  - `UserMessage`: Sanitized user query bubble with insurer filter badge.
-  - `AssistantMessage`: Markdown parser, tabular sub-limit renderer, inline citation chips, and copy action.
-  - `RefusalCard`: ASIC safe-harbor explanation card for personal advice rejections.
-  - `EmergencyBanner`: High-contrast red emergency interception card with call action buttons.
-- `CitationDrawer`: Slide-over sheet showing chunk details, full source excerpt, document breadcrumbs, and relevance score.
-- `InputBar`: Query textarea (auto-resizing), insurer selector dropdown (Allianz, Suncorp, NRMA, QBE, Youi), Turnstile widget, and submit button.
+```
+src/frontend/
+├── App.tsx                     # Top-level state orchestration & view switching
+├── main.tsx                    # React 19 root mount
+├── hooks/
+│   └── useChatStream.ts        # Core testing seam: SSE client & streaming state machine
+├── types/
+│   └── chat-ui.ts              # UI models, StreamState, and Telemetry contracts
+├── utils/
+│   ├── citations.ts            # Citation parsing & chunk matching heuristics
+│   └── client-pii-scrubber.ts  # Browser pre-ingress APP 3/11 PII redaction
+└── components/
+    ├── AppShell.tsx            # Navigation bar, telemetry meters, comparison toggle & GAW footer
+    ├── ChatContainer.tsx       # Message list, auto-scrolling, stream anchoring & starter prompts
+    ├── UserMessage.tsx         # User query bubble with insurer filter pill
+    ├── AssistantMessage.tsx    # Streaming Markdown canvas, tabular sub-limits, inline citations
+    ├── InputBar.tsx            # Query textarea, 39-insurer selector, Turnstile container
+    ├── CitationPill.tsx        # Clickable inline badge [Source: Insurer Product (Section)]
+    ├── CitationDrawer.tsx      # Slide-over sheet with breadcrumbs, underwriter & raw Markdown
+    ├── PolicyComparisonView.tsx# Side-by-side comparison matrix across 39 insurers
+    ├── RefusalCard.tsx         # ASIC RG 244 safe-harbor refusal explanation card
+    ├── EmergencyBanner.tsx     # High-contrast red COP emergency banner with one-touch dial
+    ├── RateLimitBadge.tsx      # Remaining request counter derived from X-RateLimit-*
+    ├── PiiAssuranceBadge.tsx   # Pre-ingress PII protection indicator
+    └── StatutoryGaw.tsx        # Canonical Corporations Act Section 949A disclaimer
+```
 
 ---
 
-## Testing Decisions
+## 3. Core Testing Seam: `useChatStream` State Machine
 
-### What Makes a Good Test
-- **External Behavior Over Implementation Details:** Tests must verify what the user sees (rendered markdown, open drawer, emergency banners, active countdown timer) when specific SSE event sequences are received, rather than testing React internal state or hook internals.
-- **Seam:** The `fetch` API response returning `text/event-stream`.
+The single testing seam for all streaming and regulatory interactions is the `useChatStream` hook ([`src/frontend/hooks/useChatStream.ts`](../../src/frontend/hooks/useChatStream.ts)).
 
-### Modules to Test
-1. `useChatStream` hook: Verified with synthetic SSE event streams (`metadata`, `token`, `done`, `error`).
-2. `CitationDrawer`: Verified opening on citation pill click and displaying matching chunk content.
-3. `RefusalCard` & `EmergencyBanner`: Verified rendering upon receiving `ADVICE_BOUNDARY_VIOLATION` and `EMERGENCY_INTERCEPTION` codes.
-4. `RateLimitBadge`: Verified updating from `X-RateLimit-*` headers and disabling submit when remaining reaches 0.
+### 3.1 State Transitions
+
+```mermaid
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> CONNECTING: sendMessage()
+    CONNECTING --> METADATA_RECEIVED: event: metadata
+    CONNECTING --> REFUSAL_BLOCKED: event: error (advice / emergency)
+    CONNECTING --> THROTTLED: HTTP 429
+    METADATA_RECEIVED --> STREAMING: event: token
+    STREAMING --> STREAMING: event: token
+    STREAMING --> COMPLETED: event: done
+    STREAMING --> ERROR: event: error (stream error)
+    COMPLETED --> IDLE: reset() / new query
+    REFUSAL_BLOCKED --> IDLE: reset() / new query
+    THROTTLED --> IDLE: reset() / timeout expiry
+```
+
+### 3.2 Protocol Robustness Invariants
+1. **Fragmented Packet Reassembly:** Assembles incoming SSE packets across arbitrary chunk boundaries using a persistent buffer.
+2. **Safe JSON Parsing:** Defensively parses `data:` payloads and gracefully handles unescaped token strings.
+3. **Session Storage Persistence:** Persists messages in browser `sessionStorage` (with defensive fallback if restricted).
+4. **Rate Limit Tracking:** Derives `limit`, `remaining`, and `resetSeconds` directly from `X-RateLimit-*` response headers.
 
 ---
 
-## Out of Scope
+## 4. Key UI Capabilities
 
-- User authentication / account management (system is public, anonymous, and unauthenticated).
-- Persisting chat history to an external database (chat history is retained in browser `sessionStorage` only).
-- Direct policy binding, quoting, or premium transactions (system is strictly general factual information).
-- Multi-lingual audio transcription or speech-to-text.
+### 4.1 39-Insurer Grouped Dropdown (`InputBar.tsx`)
+* Uses `getGroupedInsurerOptions()` ([`src/constants/insurers.ts`](../../src/constants/insurers.ts)) to render categorized `<optgroup>` options:
+  * **All Insurers (General Corpus)**
+  * **Suncorp Group (6):** Suncorp, AAMI, GIO, APIA, Shannons, Bingle
+  * **Major Insurers (4):** Allianz, QBE, Vero, NRMA
+  * **Challengers & Auto Clubs (9):** Budget Direct, RAC WA, RAA, RACT, RACV, RACQ, CGU, Youi, TIO
+  * **Travel Specialists (8):** Go Insurance, 1Cover, InsureandGo, Fast Cover, Southern Cross Travel Insurance, Zoom, Cover-More, Travel Insurance Direct
+  * **Life Insurers (12):** Zurich, AIA, NobleOak, NEOS, HCF Life, Acenda, Challenger, ClearView, MetLife, TAL, PPS Mutual, Asteron Life
+* Automatically resolves bancassurance queries (e.g. "CommBank") to their issuing underwriter ("Allianz").
+
+### 4.2 Interactive Citation Drawer (`CitationDrawer.tsx` & `CitationPill.tsx`)
+* Detects citation patterns formatted as `[Source: {insurer} {product} ({section})]` or `[Insurer Product, Section X]`.
+* Maps citation strings to retrieved chunks via `findMatchingChunk()` using a 4-tier match strategy:
+  1. Direct chunk ID match
+  2. Combined Product and Section match
+  3. Section match
+  4. Product name match
+* Slide-over drawer displays:
+  * Insurer brand & statutory underwriter (e.g. `AAI Limited (ABN 48 005 297 807, AFSL 230859)`)
+  * Document classification (`PDS`, `SPDS`, `TMD`, `FAQ`) and effective date
+  * Retrieval relevance score badge (e.g. `94% match`)
+  * Full operative section excerpt rendered as formatted Markdown with tables
+
+### 4.3 39-Insurer Policy Comparison Matrix (`PolicyComparisonView.tsx`)
+* Allows users to select two insurers from all 39 primary brands and compare policy terms across standard dimensions (`POLICY_COMPARISON_DIMENSIONS`):
+  * Building & Contents Coverage
+  * Accidental Damage
+  * Flood & Water Damage
+  * 72-Hour Embargo
+  * Jewelry & Watch Sub-Limits
+  * Standard Basic Excess
+  * Towing & Emergency Assistance
+* Displays category baseline conditions with insurer-specific schedule overrides via `resolvePolicyComparisonCell()`.
+* Overlays active retrieved chunks from the current chat session to ground comparative rows in real policy text.
+
+### 4.4 Regulatory & Life-Safety Cards
+* **ASIC RG 244 Safe-Harbor Card (`RefusalCard.tsx`):** Triggered when `ADVICE_BOUNDARY_VIOLATION` is received; renders safe-harbor advice refusal, explains the statutory boundary, and presents factual inquiry suggestions.
+* **COP Emergency Banner (`EmergencyBanner.tsx`):** Triggered when `EMERGENCY_INTERCEPTION` is received; renders high-contrast red banner with one-tap `tel:000`, `tel:132500`, and `tel:1800018444` buttons.
+* **Statutory GAW Footer (`StatutoryGaw.tsx`):** Persistent, non-dismissible Section 949A disclaimer in the application footer and at the end of every generated answer.
 
 ---
 
-## Further Notes
+## 5. Verification & Test Contracts
 
-- **Compliance Rule:** The General Advice Warning in the application footer must use the canonical text from `GLOSSARY.md § 2` without any alteration.
-- **Portability:** The Pages build must output static assets into `dist/` deployable via `wrangler pages deploy dist`.
+The frontend test suite (`tests/frontend/`) executes 11 test suites covering 84 discrete assertions:
+
+| Test Suite | File | Core Assertions |
+| :--- | :--- | :--- |
+| **Hook Lifecycle** | `useChatStream.test.tsx` | State transitions (`CONNECTING → METADATA → STREAMING → COMPLETED`), refusal handling, 429 throttling, packet reassembly. |
+| **App Integration** | `app-integration.test.tsx` | End-to-end rendering from starter prompt to streaming tokens, drawer opening, comparison view toggling. |
+| **Citation System** | `citation-drawer.test.tsx`, `citations-utils.test.ts` | Citation pill rendering, chunk matching heuristics, drawer slide-over and close interactions. |
+| **Regulatory Cards** | `regulatory-cards.test.tsx` | Refusal card rendering, emergency banner dial buttons, persistent GAW disclaimer. |
+| **Policy Comparison** | `policy-comparison.test.tsx` | 39-insurer selector updates, benchmark table rows, session disclosure overlay, quick launch prompts. |
+| **Header & Input** | `header-input.test.tsx` | Insurer selector options, rate-limit pills, textarea auto-resize, submit button disabling. |
+| **PII Scrubber** | `client-pii-scrubber.test.ts` | Pre-ingress scrubbing of TFNs, Medicare, Credit Cards, Phones, and Licences. |
+
+---
+
+## 6. Known Gaps
+
+| # | Gap | Current Behaviour | Target Behaviour |
+| :--- | :--- | :--- | :--- |
+| G6 | User Feedback Submission | Feedback score column exists in D1 schema; UI does not have thumbs up/down buttons. | Add feedback buttons on `AssistantMessage` that dispatch to `POST /api/feedback`. |

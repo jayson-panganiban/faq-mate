@@ -10,14 +10,25 @@
     "build:pages": "vite build",
     "preview": "vite preview",
     "deploy": "wrangler deploy",
-    "ingest": "tsx scripts/ingest-faqs.ts",
-    "normalize": "tsx scripts/normalize-pds.ts",
+    "ingest": "tsx scripts/normalize-corpus.ts && tsx scripts/compile-corpus.ts",
+    "normalize": "tsx scripts/normalize-corpus.ts",
+    "compile:corpus": "tsx scripts/compile-corpus.ts",
+    "lint:corpus": "tsx scripts/compile-corpus.ts --lint-only",
     "upload:r2": "tsx scripts/upload-to-r2.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:evals": "vitest run tests/evals",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run typecheck && npm test && npm run test:evals"
+    "lint": "biome check src scripts tests",
+    "lint:fix": "biome check --write src scripts tests",
+    "format": "biome format --write src scripts tests",
+    "format:check": "biome format src scripts tests",
+    "lint:py": "uvx ruff check scripts/collector && uvx ty check scripts/collector",
+    "lint:py:fix": "uvx ruff check --fix scripts/collector",
+    "format:py": "uvx ruff format scripts/collector",
+    "format:py:check": "uvx ruff format --check scripts/collector",
+    "typecheck:py": "uvx ty check scripts/collector",
+    "verify": "npm run typecheck && npm run lint && npm run lint:corpus && npm test && npm run test:evals"
   },
   "keywords": [
     "cloudflare-workers",
@@ -37,6 +48,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.6.2",
     "@cloudflare/vitest-pool-workers": "^0.7.4",
     "@cloudflare/workers-types": "^4.20250224.0",
     "@testing-library/jest-dom": "^7.0.1",

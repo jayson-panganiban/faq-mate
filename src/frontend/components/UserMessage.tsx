@@ -1,5 +1,5 @@
+import { Shield, ShieldCheck, User } from "lucide-react";
 import React from "react";
-import { User, Shield, ShieldCheck } from "lucide-react";
 import { sanitizeClientPii } from "../utils/client-pii-scrubber";
 
 export interface UserMessageProps {
@@ -29,12 +29,7 @@ export interface UserMessageProps {
  * user avatar icon, formatted timestamp, active insurer filter badge,
  * and client-side PII sanitization assurance indicator.
  */
-export function UserMessage({
-  query,
-  insurer,
-  timestamp,
-  className = "",
-}: UserMessageProps) {
+export function UserMessage({ query, insurer, timestamp, className = "" }: UserMessageProps) {
   const { sanitized, wasRedacted } = sanitizeClientPii(query);
   const displayInsurer = insurer && insurer.trim().length > 0 ? insurer.trim() : "All Insurers";
 
@@ -53,7 +48,10 @@ export function UserMessage({
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-teal-100 text-teal-800 dark:bg-teal-950/80 dark:text-teal-300 border border-teal-200 dark:border-teal-800"
               title="Protected under APP 3/11 client-side redaction"
             >
-              <ShieldCheck className="w-3 h-3 text-teal-600 dark:text-teal-400" aria-hidden="true" />
+              <ShieldCheck
+                className="w-3 h-3 text-teal-600 dark:text-teal-400"
+                aria-hidden="true"
+              />
               <span>Sanitized</span>
             </span>
           )}

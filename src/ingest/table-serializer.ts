@@ -45,11 +45,7 @@ export function serializeMarkdownTable(data: TableData): string {
 
   // 1. Header row
   const headerRow =
-    "| " +
-    data.columns
-      .map((col, i) => col.header.trim().padEnd(widths[i]))
-      .join(" | ") +
-    " |";
+    "| " + data.columns.map((col, i) => col.header.trim().padEnd(widths[i])).join(" | ") + " |";
 
   // 2. Alignment delimiter row
   const delimiterRow =
@@ -96,10 +92,7 @@ export function serializeMarkdownTable(data: TableData): string {
 /**
  * Serializes standard insurance sub-limit entries into compliant Markdown table.
  */
-export function serializeSubLimitsTable(
-  entries: SubLimitEntry[],
-  caption?: string
-): string {
+export function serializeSubLimitsTable(entries: SubLimitEntry[], caption?: string): string {
   const tableData: TableData = {
     caption,
     columns: [
@@ -110,11 +103,7 @@ export function serializeSubLimitsTable(
     rows: entries.map((entry) => [
       entry.category,
       entry.standardSubLimit,
-      entry.optionalIncreaseAvailable
-        ? entry.notes
-          ? `Yes, ${entry.notes}`
-          : "Yes"
-        : "No",
+      entry.optionalIncreaseAvailable ? (entry.notes ? `Yes, ${entry.notes}` : "Yes") : "No",
     ]),
   };
 
@@ -136,10 +125,10 @@ export function normalizeRawTextTable(rawText: string): string {
   const delimiter = lines[0].includes("\t")
     ? "\t"
     : lines[0].includes("|")
-    ? "|"
-    : lines[0].includes(",")
-    ? ","
-    : /\s{2,}/;
+      ? "|"
+      : lines[0].includes(",")
+        ? ","
+        : /\s{2,}/;
 
   const rawRows = lines.map((line) => {
     if (typeof delimiter === "string" && delimiter === "|") {
@@ -152,9 +141,7 @@ export function normalizeRawTextTable(rawText: string): string {
     return line.split(delimiter).map((c) => c.trim());
   });
 
-  const validRows = rawRows.filter(
-    (row) => !row.every((cell) => /^[-:| ]+$/.test(cell))
-  );
+  const validRows = rawRows.filter((row) => !row.every((cell) => /^[-:| ]+$/.test(cell)));
 
   if (validRows.length < 2) return rawText;
 
@@ -167,4 +154,74 @@ export function normalizeRawTextTable(rawText: string): string {
   }));
 
   return serializeMarkdownTable({ columns, rows: dataRows });
+}
+
+/**
+ * Repairs ragged or colspan-broken Markdown tables (e.g., from HTML colspan headers)
+ * so every row in a contiguous table block has symmetric column counts and a valid
+ * GFM delimiter row.
+ */
+export function repairMarkdownTables(markdown: string): string {
+  const lines = markdown.split(/\r?\n/);
+  const result: string[] = [];
+  let tableBlock: string[] = [];
+
+  const flushTable = () => {
+    if (tableBlock.length === 0) return;
+
+    const parsedRows = tableBlock.map((line) =>
+      line
+        .trim()
+        .slice(1, -1)
+        .split("|")
+        .map((c) => c.trim())
+    );
+
+    // Filter out empty or delimiter-only rows
+    const contentRows = parsedRows.filter((r) => !r.every((c) => c === "" || /^:?-+:?$/.test(c)));
+
+    if (contentRows.length === 0) {
+      tableBlock = [];
+      return;
+    }
+
+    const maxCols = Math.max(...contentRows.map((r) => r.length));
+
+    // Extract single-column title/caption rows at the start of a multi-column table
+    const captions: string[] = [];
+    while (contentRows.length > 1 && contentRows[0].length === 1 && maxCols > 1) {
+      const cap = contentRows.shift()![0];
+      if (cap) captions.push(`*${cap}*`);
+    }
+
+    if (captions.length > 0) {
+      result.push(...captions, "");
+    }
+
+    const normalizedRows = contentRows.map((row) => {
+      const padded = [...row];
+      while (padded.length < maxCols) padded.push("");
+      return "| " + padded.slice(0, maxCols).join(" | ") + " |";
+    });
+
+    if (normalizedRows.length >= 1) {
+      const delimiter = "| " + Array.from({ length: maxCols }, () => "---").join(" | ") + " |";
+      result.push(normalizedRows[0], delimiter, ...normalizedRows.slice(1));
+    }
+
+    tableBlock = [];
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.length >= 2) {
+      tableBlock.push(line);
+    } else {
+      flushTable();
+      result.push(line);
+    }
+  }
+  flushTable();
+
+  return result.join("\n");
 }

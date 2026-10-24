@@ -4,7 +4,17 @@ Australian General Insurance FAQ Edge RAG system running on Cloudflare Workers, 
 
 ## Context Pointers
 - **Roadmap & Phase Tracker:** [`docs/ROADMAP.md`](docs/ROADMAP.md)
-- **Living Specifications:** [`docs/specs/`](docs/specs/) (01 Ingestion, 02 Edge Runtime, 03 Regulatory, 04 AFCA Evals, 05 Frontend)
+- **Living Specifications:**
+  - [`docs/specs/01-data-ingestion-chunking.md`](docs/specs/01-data-ingestion-chunking.md) (4-Stage Ingestion, R2 Keys, Breadcrumbs)
+  - [`docs/specs/02-edge-rag-runtime.md`](docs/specs/02-edge-rag-runtime.md) (SSE Protocol, Rate Limiting, Hybrid Search)
+  - [`docs/specs/03-regulatory-compliance.md`](docs/specs/03-regulatory-compliance.md) (ASIC RG 244, COP Emergency, APP 3/11 PII)
+  - [`docs/specs/04-afca-eval-benchmarks.md`](docs/specs/04-afca-eval-benchmarks.md) (AFCA-10 Trap Scenarios & Groundedness Gate)
+  - [`docs/specs/05-frontend-chat-interface.md`](docs/specs/05-frontend-chat-interface.md) (React 19 UI, Citation Drawer, Comparison Matrix)
+  - [`docs/specs/06-corpus-refinement-and-compilation.md`](docs/specs/06-corpus-refinement-and-compilation.md) (39-Insurer Roster, Corpus Linter & AST Compiler)
+- **Canonical Registries & Codecs:**
+  - [`src/constants/insurers.ts`](src/constants/insurers.ts) (39 Primary Insurers, Bancassurance Aliases, Policy Comparison Catalog)
+  - [`src/constants/statutory.ts`](src/constants/statutory.ts) (`STATUTORY_GAW`, `STATUTORY_SAFE_HARBOR_REFUSAL`, `EMERGENCY_HOTLINES`)
+  - [`src/ingest/corpus-codec.ts`](src/ingest/corpus-codec.ts) (Breadcrumb Serializer/Parser, R2 Path Key Resolver, Statutory Footer)
 - **Domain Invariants & Legal Terms:** [`GLOSSARY.md`](GLOSSARY.md)
 - **System Architecture & PRD:** [`docs/PRD.md`](docs/PRD.md)
 - **Coding Standards & Review Rules:** [`CODING_STANDARDS.md`](CODING_STANDARDS.md)
@@ -46,17 +56,26 @@ Execute every task through this 5-stage loop:
    - Hash queries with rotating daily salt via `getDailySalt()` in [`src/guardrails/pii-sanitizer.ts`](src/guardrails/pii-sanitizer.ts).
 
 6. **Schema & Protocol Parity:**
-   - D1 schema must maintain exact column names: `hybrid_retrieval_latency_ms` and `inference_ttft_ms` ([`docs/PRD.md § 6.4`](docs/PRD.md#L269-L287)).
+   - D1 schema must maintain exact column names: `hybrid_retrieval_latency_ms` and `inference_ttft_ms` ([`docs/PRD.md § 6.4`](docs/PRD.md#L292-L312)).
    - Edge chat endpoint (`/api/chat`) must strictly emit SSE events: `event: metadata`, `event: token`, `event: done`, and `event: error`.
    - Every request must evaluate and emit `X-RateLimit-*` headers (10 req/min per IP).
+
+7. **Ingestion & Edge AST Compilation Invariants:**
+   - Raw collector scripts reside in `scripts/collector/` and output immutable archives to `data/raw/` (`all_manifest.csv` and `FAQs/`).
+   - Stage 2 (`npm run normalize`) normalizes the latest current PDS/SPDS policies and all 39 insurer FAQ files into `data/corpus/{pds,faqs}/` with `<!-- BREADCRUMB -->` frontmatter, GFM tables, peril-exclusion co-location, and `STATUTORY_GAW`.
+   - Stage 3 (`npm run compile:corpus`) lints `data/corpus/` and deterministically compiles `src/rag/corpus-data.ts`. Always generate `src/rag/corpus-data.ts` via the compiler; never edit it manually, and never emit heading-only chunks.
 
 ---
 
 ## Verification Commands
 
-- **Full Verification Gate:** `npm run verify` (runs `typecheck`, `test`, `test:evals`)
+- **Full Verification Gate:** `npm run verify` (runs `typecheck`, `lint`, `lint:corpus`, `test`, `test:evals`)
 - **Fast Typecheck:** `npm run typecheck`
+- **TypeScript Linter & Formatter (Biome):** `npm run lint` / `npm run lint:fix` / `npm run format`
+- **Python Quality Gate (Ruff & ty):** `npm run lint:py` / `npm run format:py` / `npm run typecheck:py`
 - **Unit & Integration Suite:** `npm test`
 - **AFCA Regulatory Evals:** `npm run test:evals`
-- **PDS Normalization Batch Check:** `npm run normalize`
-- **Corpus R2 Key Audit:** `npm run upload:r2`
+- **Corpus Normalization:** `npm run normalize`
+- **Corpus AST Edge Compilation:** `npm run compile:corpus`
+- **Corpus Linter:** `npm run lint:corpus`
+- **Corpus R2 Upload & Audit:** `npm run upload:r2`

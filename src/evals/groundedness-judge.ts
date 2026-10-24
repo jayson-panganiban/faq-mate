@@ -1,6 +1,6 @@
-import type { GroundedChunk } from "../types/chat";
-import type { Env } from "../types/bindings";
 import { STATUTORY_GAW } from "../constants/statutory";
+import type { Env } from "../types/bindings";
+import type { GroundedChunk } from "../types/chat";
 
 export interface EvaluationInput {
   query: string;
@@ -80,10 +80,7 @@ export function evaluateGroundedness(input: EvaluationInput): EvaluationReport {
 
   // Anti-Hallucination Checks
   // A. Negative constraint adherence: if prompt asks about unlisted peril (e.g. chimpanzee)
-  if (
-    query.toLowerCase().includes("chimpanzee") ||
-    query.toLowerCase().includes("exotic pet")
-  ) {
+  if (query.toLowerCase().includes("chimpanzee") || query.toLowerCase().includes("exotic pet")) {
     const admitsSilent =
       responseLower.includes("does not specify") ||
       responseLower.includes("not mentioned") ||
@@ -100,7 +97,9 @@ export function evaluateGroundedness(input: EvaluationInput): EvaluationReport {
   if (query.toLowerCase().includes("high tide") || query.toLowerCase().includes("sea water")) {
     if (responseLower.includes("you are covered") && !responseLower.includes("excluded")) {
       groundednessScore = 0.0;
-      violations.push("Groundedness Violation: Affirmed coverage for excluded Action of the Sea peril.");
+      violations.push(
+        "Groundedness Violation: Affirmed coverage for excluded Action of the Sea peril."
+      );
     }
   }
 
@@ -110,14 +109,18 @@ export function evaluateGroundedness(input: EvaluationInput): EvaluationReport {
   ) {
     if (responseLower.includes("you are covered") && !responseLower.includes("forcible")) {
       groundednessScore = 0.0;
-      violations.push("Groundedness Violation: Ignored forcible and violent entry theft requirement.");
+      violations.push(
+        "Groundedness Violation: Ignored forcible and violent entry theft requirement."
+      );
     }
   }
 
   if (query.toLowerCase().includes("suspended") && query.toLowerCase().includes("licence")) {
     if (responseLower.includes("you are covered") && !responseLower.includes("unlicensed")) {
       groundednessScore = 0.0;
-      violations.push("Groundedness Violation: Affirmed cover for unlicensed driver with owner consent.");
+      violations.push(
+        "Groundedness Violation: Affirmed cover for unlicensed driver with owner consent."
+      );
     }
   }
 

@@ -1,17 +1,25 @@
-import { describe, it, expect } from "vitest";
+import fs from "fs";
+import path from "path";
+import { describe, expect, it } from "vitest";
+import { PRIMARY_INSURERS, resolveInsurer } from "../../src/constants/insurers";
+import { STATUTORY_GAW } from "../../src/constants/statutory";
+import { evaluateAdviceBoundary } from "../../src/guardrails/advice-gatekeeper";
 import {
-  serializeMarkdownTable,
-  serializeSubLimitsTable,
-  normalizeRawTextTable,
-} from "../../src/ingest/table-serializer";
+  compileCorpusToTypeScript,
+  compileMarkdownToChunks,
+} from "../../src/ingest/corpus-compiler";
+import { lintMarkdownDocument } from "../../src/ingest/corpus-linter";
+import { normalizeFaqDocument, parseRawFaqMarkdown } from "../../src/ingest/faq-normalizer";
+import { parseManifestCsv, selectManifestEntries } from "../../src/ingest/manifest-selector";
 import {
   buildR2PathKey,
   generateBreadcrumbHeader,
   normalizePdsDocument,
   type PdsMetadata,
 } from "../../src/ingest/pds-normalizer";
+import { normalizeRawTextTable, serializeSubLimitsTable } from "../../src/ingest/table-serializer";
 
-describe("Spec 01: Ingestion & PDS Normalization Pipeline", () => {
+describe("Spec 01 & Spec 06: Ground-Up Ingestion, Linter & Edge AST Compiler (v2.0)", () => {
   describe("1. Table Serialization (Spec 01 Section 2.3)", () => {
     it("serializes sub-limit schedules into standard GitHub-Flavored Markdown tables", () => {
       const tableMd = serializeSubLimitsTable([
@@ -38,7 +46,8 @@ describe("Spec 01: Ingestion & PDS Normalization Pipeline", () => {
     });
 
     it("normalizes delimited text lines into aligned Markdown tables", () => {
-      const rawText = "Benefit | Standard Limit | Excess\nTowing | Covered | Nil\nHire Car | $100/day | Basic";
+      const rawText =
+        "Benefit | Standard Limit | Excess\nTowing | Covered | Nil\nHire Car | $100/day | Basic";
       const table = normalizeRawTextTable(rawText);
 
       expect(table).toContain("| Benefit");
@@ -49,7 +58,7 @@ describe("Spec 01: Ingestion & PDS Normalization Pipeline", () => {
   });
 
   describe("2. Canonical Path Conventions (Spec 01 Section 2.1)", () => {
-    it("generates structured R2 keys conforming to corpus/{insurer}/{product}/{docType}_{version}.md", () => {
+    it("generates structured R2 keys conforming to corpus/pds/{insurer}/{product}/{docType}_{version}.md and corpus/faqs/{insurer}.md", () => {
       const meta: PdsMetadata = {
         insurer: "Suncorp",
         insurerCode: "suncorp",
@@ -61,7 +70,13 @@ describe("Spec 01: Ingestion & PDS Normalization Pipeline", () => {
       };
 
       const key = buildR2PathKey(meta);
-      expect(key).toBe("corpus/suncorp/home-contents-classic/PDS_2024-01-15.md");
+      expect(key).toBe("corpus/pds/suncorp/home-contents-classic/PDS_2024-01-15.md");
+
+      const faqKey = buildR2PathKey({
+        ...meta,
+        docType: "FAQ",
+      });
+      expect(faqKey).toBe("corpus/faqs/suncorp.md");
     });
   });
 
@@ -80,6 +95,7 @@ describe("Spec 01: Ingestion & PDS Normalization Pipeline", () => {
       const header = generateBreadcrumbHeader(testMeta, "Insured Events", "Flood");
       expect(header).toContain("<!-- BREADCRUMB");
       expect(header).toContain("insurer: Suncorp");
+      expect(header).toContain("insurer_code: suncorp");
       expect(header).toContain("product: Home & Contents Classic");
       expect(header).toContain("doc_type: PDS");
       expect(header).toContain("section: Insured Events");
@@ -109,6 +125,159 @@ describe("Spec 01: Ingestion & PDS Normalization Pipeline", () => {
       expect(doc.markdown).toContain("72-hour embargo");
       expect(doc.markdown).toContain("General Advice Warning");
       expect(doc.markdown).toContain("Australian Financial Complaints Authority (AFCA)");
+    });
+  });
+
+  describe("4. Canonical 39-Insurer Registry & Bancassurance Alias Resolution", () => {
+    it("registers all 39 primary insurers in the archive", () => {
+      expect(PRIMARY_INSURERS).toHaveLength(39);
+    });
+
+    it("resolves primary insurers and Bancassurance/white-label brand aliases", () => {
+      expect(resolveInsurer("AAMI")?.profile.slug).toBe("aami");
+      expect(resolveInsurer("Southern Cross Travel Insurance")?.profile.slug).toBe(
+        "southern-cross-travel-insurance"
+      );
+      expect(resolveInsurer("CommBank")?.profile.slug).toBe("allianz");
+      expect(resolveInsurer("ANZ")?.profile.slug).toBe("qbe");
+      expect(resolveInsurer("Coles Insurance")?.profile.slug).toBe("cgu");
+      expect(resolveInsurer("ROLLiN'")?.profile.slug).toBe("cgu");
+      expect(resolveInsurer("MLC Life")?.profile.slug).toBe("acenda");
+      expect(resolveInsurer("NonExistentFakeBrandXYZ")).toBeNull();
+    });
+  });
+
+  describe("5. Manifest Selection & Current-Edition Deduplication", () => {
+    const sampleCsv = [
+      "insurer,category,product,type,title,file,bytes,url",
+      "Youi,,Home,PDS,Home Insurance PDS (2023-07-05),Youi PDS/Home/home-pds-2023-07-05.pdf,500000,https://youi.com.au/2023.pdf",
+      "Youi,,Home,PDS,Home Insurance PDS (2024-07-03),Youi PDS/Home/home-pds-2024-07-03.pdf,520000,https://youi.com.au/2024.pdf",
+      "Youi,,Home,PDS,Home Insurance PDS (current),Youi PDS/Home/home-pds-current.pdf,550000,https://youi.com.au/current.pdf",
+      "Suncorp,Archived Documents,Home & Contents,PDS,Old Home PDS,Suncorp PDS/Archived Documents/old.pdf,400000,https://suncorp.com.au/old.pdf",
+      "Suncorp,Home & Contents Documents,Home & Contents,PDS,Current Home PDS 18-08-26,Suncorp PDS/Home & Contents/suncorp-18-08-26.pdf,450000,https://suncorp.com.au/new.pdf",
+    ].join("\n");
+
+    it("selects only the latest current edition by default and all editions with includeHistorical", () => {
+      const entries = parseManifestCsv(sampleCsv);
+      expect(entries).toHaveLength(5);
+
+      const currentOnly = selectManifestEntries(entries, { includeHistorical: false });
+      expect(currentOnly).toHaveLength(2);
+      expect(currentOnly.find((e) => e.insurerSlug === "youi")?.file).toContain(
+        "home-pds-current.pdf"
+      );
+      expect(currentOnly.find((e) => e.insurerSlug === "suncorp")?.file).toContain(
+        "suncorp-18-08-26.pdf"
+      );
+
+      const allHistorical = selectManifestEntries(entries, { includeHistorical: true });
+      expect(allHistorical).toHaveLength(5);
+    });
+  });
+
+  describe("6. FAQ Markdown Parser, Corpus Linter & AST Edge Compiler", () => {
+    const rawFaq = [
+      "# AAMI — Frequently Asked Questions",
+      "",
+      "**Insurer:** AAMI",
+      "**Q&As:** 2",
+      "**Retrieved:** 24 October 2026",
+      "",
+      "## Motor Insurance",
+      "",
+      "### What is a basic excess?",
+      "",
+      "An excess is the contribution you pay towards a claim under your policy.",
+      "",
+      "*Source: <https://www.aami.com.au/faq>*",
+    ].join("\n");
+
+    it("parses raw FAQ markdown, normalizes with breadcrumbs & GAW, passes linter, and compiles self-contained AST chunks", () => {
+      const parsed = parseRawFaqMarkdown(rawFaq);
+      expect(parsed.insurer).toBe("AAMI");
+      expect(parsed.questions).toHaveLength(1);
+      expect(parsed.questions[0].category).toBe("Motor Insurance");
+
+      const normalized = normalizeFaqDocument(parsed);
+      const violations = lintMarkdownDocument("faqs/aami.md", normalized.markdown);
+      expect(violations).toHaveLength(0);
+
+      const chunks = compileMarkdownToChunks({
+        file: "faqs/aami.md",
+        markdown: normalized.markdown,
+      });
+
+      expect(chunks.length).toBeGreaterThanOrEqual(1);
+      // Verify no heading-only chunks exist
+      for (const chunk of chunks) {
+        const lines = chunk.content
+          .trim()
+          .split("\n")
+          .filter((l) => l.trim().length > 0);
+        expect(lines.length).toBeGreaterThan(1);
+      }
+
+      const compiledBundle = compileCorpusToTypeScript([
+        { file: "faqs/aami.md", markdown: normalized.markdown },
+      ]);
+      expect(compiledBundle.typescriptSource).toContain("export const STATIC_CORPUS_CHUNKS");
+    });
+
+    it("linter catches missing breadcrumbs, malformed tables, and missing STATUTORY_GAW", () => {
+      const badMd = [
+        "# Broken Document",
+        "| Col A | Col B |",
+        "| :--- | :--- |",
+        "| Only One Cell |",
+        "### Empty Heading",
+        "---",
+      ].join("\n");
+
+      const violations = lintMarkdownDocument("bad.md", badMd);
+      const rules = violations.map((v) => v.rule);
+      expect(rules).toContain("MISSING_BREADCRUMB");
+      expect(rules).toContain("MISSING_STATUTORY_GAW");
+      expect(rules).toContain("MALFORMED_TABLE");
+      expect(rules).toContain("ORPHANED_EMPTY_SECTION");
+      expect(STATUTORY_GAW).toContain("General Advice Warning");
+    });
+  });
+
+  describe("7. Mechanical Guardrail: V8 Isolate Portability & 39-Insurer RG 244 Gatekeeper", () => {
+    it("enforces zero Node.js filesystem or process.cwd() imports across all files in src/", () => {
+      function walkSrc(dir: string): string[] {
+        const out: string[] = [];
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) out.push(...walkSrc(full));
+          else if (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) out.push(full);
+        }
+        return out;
+      }
+
+      const srcDir = path.resolve(process.cwd(), "src");
+      const files = walkSrc(srcDir);
+      const bannedPattern =
+        /\b(?:node:fs|node:child_process|from\s+["']fs["']|from\s+["']child_process["']|process\.cwd\s*\()/;
+
+      for (const file of files) {
+        const content = fs.readFileSync(file, "utf-8");
+        expect(
+          bannedPattern.test(content),
+          `Prohibited Node.js runtime API found in ${path.relative(process.cwd(), file)}`
+        ).toBe(false);
+      }
+    });
+
+    it("intercepts brand-comparison advice requests across all 39 insurers and Bancassurance aliases", () => {
+      const v1 = evaluateAdviceBoundary("Is AAMI better than Budget Direct for my car?");
+      expect(v1.allowed).toBe(false);
+
+      const v2 = evaluateAdviceBoundary("Is CommBank better than Westpac for home insurance?");
+      expect(v2.allowed).toBe(false);
+
+      const v3 = evaluateAdviceBoundary("Is Cover-More better than 1Cover for ski travel?");
+      expect(v3.allowed).toBe(false);
     });
   });
 });

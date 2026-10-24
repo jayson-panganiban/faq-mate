@@ -1,14 +1,15 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, within, act } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import React, { useState } from "react";
-import { CitationPill } from "../../src/frontend/components/CitationPill";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CitationDrawer } from "../../src/frontend/components/CitationDrawer";
+import { CitationPill } from "../../src/frontend/components/CitationPill";
 import type { GroundedChunk } from "../../src/types/chat";
 
 const mockChunk1: GroundedChunk = {
   id: "chunk-suncorp-01",
   relevanceScore: 0.96,
-  content: "Flood cover is included as standard under Section 1 for loss or damage caused by flood.",
+  content:
+    "Flood cover is included as standard under Section 1 for loss or damage caused by flood.",
   source: {
     insurer: "SUNCORP",
     product: "Suncorp Classic Home",
@@ -22,7 +23,8 @@ const mockChunk1: GroundedChunk = {
 const mockChunk2: GroundedChunk = {
   id: "chunk-nrma-02",
   relevanceScore: 0.88,
-  content: "Accidental damage optional cover provides protection for unexpected damage caused by a sudden event.",
+  content:
+    "Accidental damage optional cover provides protection for unexpected damage caused by a sudden event.",
   source: {
     insurer: "NRMA",
     product: "NRMA Home Building",
@@ -47,17 +49,14 @@ const mockChunkWithoutOptional: GroundedChunk = {
 describe("CitationPill Component", () => {
   it("renders formatted pill text from a GroundedChunk", () => {
     render(<CitationPill chunk={mockChunk1} />);
-    
+
     // Expect text containing product, docType, and section
     expect(screen.getByText(/Suncorp Classic Home PDS, Section 1/i)).toBeInTheDocument();
   });
 
   it("renders custom label when provided", () => {
     render(
-      <CitationPill
-        label="[Source: Suncorp Classic Home PDS, Section 1]"
-        chunk={mockChunk1}
-      />
+      <CitationPill label="[Source: Suncorp Classic Home PDS, Section 1]" chunk={mockChunk1} />
     );
     expect(screen.getByText("[Source: Suncorp Classic Home PDS, Section 1]")).toBeInTheDocument();
   });
@@ -106,24 +105,12 @@ describe("CitationDrawer Component", () => {
   });
 
   it("does not render dialog content when isOpen is false", () => {
-    render(
-      <CitationDrawer
-        isOpen={false}
-        onClose={onClose}
-        chunks={[mockChunk1]}
-      />
-    );
+    render(<CitationDrawer isOpen={false} onClose={onClose} chunks={[mockChunk1]} />);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("renders dialog with accessible attributes when isOpen is true", () => {
-    render(
-      <CitationDrawer
-        isOpen={true}
-        onClose={onClose}
-        chunks={[mockChunk1]}
-      />
-    );
+    render(<CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunk1]} />);
 
     const dialog = screen.getByRole("dialog");
     expect(dialog).toBeInTheDocument();
@@ -136,13 +123,7 @@ describe("CitationDrawer Component", () => {
   });
 
   it("calls onClose when the close button is clicked", () => {
-    render(
-      <CitationDrawer
-        isOpen={true}
-        onClose={onClose}
-        chunks={[mockChunk1]}
-      />
-    );
+    render(<CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunk1]} />);
 
     const closeButton = screen.getByRole("button", { name: /close/i });
     fireEvent.click(closeButton);
@@ -150,13 +131,7 @@ describe("CitationDrawer Component", () => {
   });
 
   it("calls onClose when the backdrop overlay is clicked", () => {
-    render(
-      <CitationDrawer
-        isOpen={true}
-        onClose={onClose}
-        chunks={[mockChunk1]}
-      />
-    );
+    render(<CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunk1]} />);
 
     const backdrop = screen.getByTestId("citation-drawer-backdrop");
     fireEvent.click(backdrop);
@@ -164,26 +139,14 @@ describe("CitationDrawer Component", () => {
   });
 
   it("calls onClose when Escape key is pressed", () => {
-    render(
-      <CitationDrawer
-        isOpen={true}
-        onClose={onClose}
-        chunks={[mockChunk1]}
-      />
-    );
+    render(<CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunk1]} />);
 
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("renders operative section breadcrumb", () => {
-    render(
-      <CitationDrawer
-        isOpen={true}
-        onClose={onClose}
-        chunks={[mockChunk1]}
-      />
-    );
+    render(<CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunk1]} />);
 
     // Breadcrumb: product/docType > section inside the breadcrumb navigation
     const breadcrumbNav = screen.getByRole("navigation", { name: /operative section breadcrumb/i });
@@ -192,61 +155,35 @@ describe("CitationDrawer Component", () => {
   });
 
   it("renders relevance confidence score pill", () => {
-    render(
-      <CitationDrawer
-        isOpen={true}
-        onClose={onClose}
-        chunks={[mockChunk1]}
-      />
-    );
+    render(<CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunk1]} />);
 
     // 0.96 relevance score should show 96% Match or Score: 0.96
     expect(screen.getByText(/96% Match/i)).toBeInTheDocument();
   });
 
   it("renders chunk ID and docType badges", () => {
-    render(
-      <CitationDrawer
-        isOpen={true}
-        onClose={onClose}
-        chunks={[mockChunk1]}
-      />
-    );
+    render(<CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunk1]} />);
 
     expect(screen.getByText(/chunk-suncorp-01/i)).toBeInTheDocument();
     expect(screen.getByText("PDS")).toBeInTheDocument();
   });
 
   it("renders operative markdown/text excerpt viewer", () => {
-    render(
-      <CitationDrawer
-        isOpen={true}
-        onClose={onClose}
-        chunks={[mockChunk1]}
-      />
-    );
+    render(<CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunk1]} />);
 
     expect(screen.getByText(mockChunk1.content)).toBeInTheDocument();
   });
 
   it("renders effective date when present, and handles when absent", () => {
     const { rerender } = render(
-      <CitationDrawer
-        isOpen={true}
-        onClose={onClose}
-        chunks={[mockChunk1]}
-      />
+      <CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunk1]} />
     );
 
     expect(screen.getByText(/1 March 2024/i)).toBeInTheDocument();
 
     // Rerender with chunk without effectiveDate
     rerender(
-      <CitationDrawer
-        isOpen={true}
-        onClose={onClose}
-        chunks={[mockChunkWithoutOptional]}
-      />
+      <CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunkWithoutOptional]} />
     );
 
     expect(screen.queryByText(/1 March 2024/i)).not.toBeInTheDocument();
@@ -276,13 +213,7 @@ describe("CitationDrawer Component", () => {
   });
 
   it("displays empty state when chunks array is empty", () => {
-    render(
-      <CitationDrawer
-        isOpen={true}
-        onClose={onClose}
-        chunks={[]}
-      />
-    );
+    render(<CitationDrawer isOpen={true} onClose={onClose} chunks={[]} />);
 
     expect(screen.getByText(/no citations available/i)).toBeInTheDocument();
   });
@@ -297,13 +228,7 @@ describe("CitationDrawer Component", () => {
       configurable: true,
     });
 
-    render(
-      <CitationDrawer
-        isOpen={true}
-        onClose={onClose}
-        chunks={[mockChunk1]}
-      />
-    );
+    render(<CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunk1]} />);
 
     const copyBtn = screen.getByRole("button", { name: /copy/i });
     await act(async () => {

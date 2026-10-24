@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within, act, cleanup } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import React from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../../src/frontend/App";
 import type { GroundedChunk } from "../../src/types/chat";
 
@@ -32,7 +32,8 @@ const SAMPLE_CHUNK: GroundedChunk = {
 const SAMPLE_ALLIANZ_CHUNK: GroundedChunk = {
   id: "allianz-home-pds#sec-4",
   relevanceScore: 0.91,
-  content: "Jewelry sub-limits are capped at $2,500 per item unless specifically listed on your policy schedule.",
+  content:
+    "Jewelry sub-limits are capped at $2,500 per item unless specifically listed on your policy schedule.",
   source: {
     insurer: "Allianz",
     product: "Home and Contents",

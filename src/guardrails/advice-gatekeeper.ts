@@ -1,9 +1,10 @@
-import type { GatekeeperVerdict } from "../types/chat";
+import { BRAND_COMPARISON_ADVICE_REGEX } from "../constants/insurers";
 import {
-  STATUTORY_SAFE_HARBOR_REFUSAL,
-  EMERGENCY_REFUSAL_MESSAGE,
   EMERGENCY_HOTLINES,
+  EMERGENCY_REFUSAL_MESSAGE,
+  STATUTORY_SAFE_HARBOR_REFUSAL,
 } from "../constants/statutory";
+import type { GatekeeperVerdict } from "../types/chat";
 
 /**
  * Heuristics indicating personal financial advice requests under ASIC RG 244 & Corporations Act 2001
@@ -12,7 +13,7 @@ const PERSONAL_ADVICE_PATTERNS = [
   /\b(can I afford|which.*can I afford|within my budget)\b/i,
   /\b(should I (buy|switch|cancel|choose|pick|get))\b/i,
   /\b(which policy is (best|better) for me)\b/i,
-  /\b(is (suncorp|nrma|allianz|qbe|youi) (better|best) (than|for))\b/i,
+  BRAND_COMPARISON_ADVICE_REGEX,
   /\b(recommend (me|a policy|insurance for me))\b/i,
   /\bi earn \$?\d+/i,
   /\bmy budget is\b/i,

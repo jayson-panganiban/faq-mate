@@ -1,16 +1,16 @@
-import { useState, useRef, useCallback } from "react";
-import { sanitizeClientPii } from "../utils/client-pii-scrubber";
+import { useCallback, useRef, useState } from "react";
 import type {
-  UseChatStreamOptions,
-  UseChatStreamReturn,
-  StreamState,
-  RateLimitInfo,
-  TelemetryInfo,
-  RefusalPayload,
   ChatMessage,
   GroundedChunk,
+  RateLimitInfo,
+  RefusalPayload,
   SendMessageOptions,
+  StreamState,
+  TelemetryInfo,
+  UseChatStreamOptions,
+  UseChatStreamReturn,
 } from "../types/chat-ui";
+import { sanitizeClientPii } from "../utils/client-pii-scrubber";
 
 const DEFAULT_RATE_LIMIT: RateLimitInfo = {
   limit: 10,
@@ -210,13 +210,11 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
             }
             const tokenText =
               typeof parsedData === "object" && parsedData !== null
-                ? parsedData.text ?? ""
+                ? (parsedData.text ?? "")
                 : String(parsedData);
             setMessages((prev) =>
               prev.map((msg) =>
-                msg.id === assistantMessageId
-                  ? { ...msg, content: msg.content + tokenText }
-                  : msg
+                msg.id === assistantMessageId ? { ...msg, content: msg.content + tokenText } : msg
               )
             );
           } else if (eventType === "done") {

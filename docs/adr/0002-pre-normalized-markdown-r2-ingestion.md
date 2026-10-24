@@ -29,3 +29,11 @@ The normalization pipeline must enforce:
 ### Negative / Trade-Offs
 * Requires maintaining a dedicated parsing/normalization step instead of directly dumping raw PDFs into Cloudflare.
 * Extra build/sync step when new PDS/SPDS revisions are published.
+
+## Addendum (2026-10-24, v2.0)
+The decision stands; its implementation has been formalized:
+* **Header format:** The `# Insurer > ## Product > ...` header chain is now preceded by a machine-parsable `<!-- BREADCRUMB ... -->` block (`insurer`, `insurer_code`, `category`, `product`, `doc_type`, `effective_date`, `underwriter`, `jurisdiction`, optional `section`/`sub_section`). `generateBreadcrumbHeader()` serializes it and `parseBreadcrumb()` parses it, both in `src/ingest/corpus-codec.ts`.
+* **R2 keys:** `corpus/pds/{insurer_code}/{product_slug}/{doc_type}_{effective_date}.md` and `corpus/faqs/{insurer_code}.md`, produced only by `buildR2PathKey()`.
+* **Statutory footer:** Every document ends with `formatStatutoryFooter()` (verbatim `STATUTORY_GAW` + AFCA contacts).
+* **Enforcement:** `lintCorpusBatch()` blocks compilation and `npm run verify` on missing breadcrumbs, missing GAW, malformed tables, or orphaned empty sections.
+* **Scope:** The corpus now covers 39 insurers (292 current PDS/SPDS + 39 FAQ files). The same normalized files also feed the static fallback index ([ADR-0003](0003-static-ast-corpus-edge-fallback.md)).

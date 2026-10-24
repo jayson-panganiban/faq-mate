@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useChatStream } from "../../src/frontend/hooks/useChatStream";
 import type { GroundedChunk } from "../../src/frontend/types/chat-ui";
 
@@ -196,7 +196,11 @@ describe("useChatStream Hook (Spec 05 Section 1 & 2)", () => {
 
     expect(result.current.status).toBe("REFUSAL_BLOCKED");
     expect(result.current.activeRefusal).toEqual(emergencyPayload);
-    expect(result.current.activeRefusal?.emergencyHotline).toEqual(["000", "132 500", "1800 018 444"]);
+    expect(result.current.activeRefusal?.emergencyHotline).toEqual([
+      "000",
+      "132 500",
+      "1800 018 444",
+    ]);
   });
 
   it("transitions to THROTTLED when HTTP 429 response is received", async () => {
@@ -301,9 +305,7 @@ describe("useChatStream Hook (Spec 05 Section 1 & 2)", () => {
   });
 
   it("respects custom apiEndpoint and includes turnstileToken in request", async () => {
-    const mockSse = [
-      `event: done\ndata: ${JSON.stringify({ finish_reason: "stop" })}\n\n`,
-    ];
+    const mockSse = [`event: done\ndata: ${JSON.stringify({ finish_reason: "stop" })}\n\n`];
 
     global.fetch = vi.fn().mockResolvedValue(
       new Response(createSseStream(mockSse), {
@@ -312,9 +314,7 @@ describe("useChatStream Hook (Spec 05 Section 1 & 2)", () => {
       })
     );
 
-    const { result } = renderHook(() =>
-      useChatStream({ apiEndpoint: "/custom/edge/chat" })
-    );
+    const { result } = renderHook(() => useChatStream({ apiEndpoint: "/custom/edge/chat" }));
 
     await act(async () => {
       await result.current.sendMessage("Query with turnstile", {

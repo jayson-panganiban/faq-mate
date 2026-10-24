@@ -1,10 +1,10 @@
-import React, { useRef, useEffect, useState } from "react";
-import { ArrowDown, Bot, Sparkles, Shield, Compass, FileText, ChevronRight } from "lucide-react";
-import { UserMessage } from "./UserMessage";
+import { ArrowDown, Bot, ChevronRight, Compass, FileText, Shield, Sparkles } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import type { ChatMessage, GroundedChunk, StreamState } from "../types/chat-ui";
 import { AssistantMessage } from "./AssistantMessage";
-import { RefusalCard } from "./RefusalCard";
 import { EmergencyBanner } from "./EmergencyBanner";
-import type { ChatMessage, StreamState, GroundedChunk } from "../types/chat-ui";
+import { RefusalCard } from "./RefusalCard";
+import { UserMessage } from "./UserMessage";
 
 export interface StarterPrompt {
   query: string;
@@ -137,7 +137,9 @@ export function ChatContainer({
                 Explore Australian General Insurance Policies
               </h2>
               <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Ask specific questions about home, contents, and motor policies across NRMA, Suncorp, Allianz, QBE, and Youi. Answers are grounded in operative Product Disclosure Statements.
+                Ask specific questions about home, contents, and motor policies across NRMA,
+                Suncorp, Allianz, QBE, and Youi. Answers are grounded in operative Product
+                Disclosure Statements.
               </p>
             </div>
 
@@ -258,8 +260,7 @@ export function ChatContainer({
             }
 
             // Associate grounded chunks: from message metadata or active stream citations
-            const chunks =
-              msg.metadata?.retrievedChunks || (isLastMessage ? citations : undefined);
+            const chunks = msg.metadata?.retrievedChunks || (isLastMessage ? citations : undefined);
 
             const isStreaming = isLastMessage && status === "STREAMING";
 

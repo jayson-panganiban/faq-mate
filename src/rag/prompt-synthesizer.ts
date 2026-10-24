@@ -1,5 +1,5 @@
-import type { GroundedChunk } from "../types/chat";
 import { STATUTORY_GAW } from "../constants/statutory";
+import type { GroundedChunk } from "../types/chat";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -19,10 +19,7 @@ REGULATORY & COMPLIANCE RULES:
 /**
  * Deep Module: Context Augmentation & Prompt Synthesizer
  */
-export function synthesizePrompt(
-  sanitizedQuery: string,
-  chunks: GroundedChunk[]
-): ChatMessage[] {
+export function synthesizePrompt(sanitizedQuery: string, chunks: GroundedChunk[]): ChatMessage[] {
   let contextBlock = "";
 
   if (chunks.length > 0) {

@@ -1,9 +1,9 @@
+import { Activity, Columns, Radio, RotateCcw, Shield, Zap } from "lucide-react";
 import React from "react";
-import { Radio, Activity, Zap, RotateCcw, Shield, Columns } from "lucide-react";
-import { RateLimitBadge } from "./RateLimitBadge";
-import { PiiAssuranceBadge } from "./PiiAssuranceBadge";
-import { StatutoryGaw } from "./StatutoryGaw";
 import type { RateLimitInfo, TelemetryInfo } from "../types/chat-ui";
+import { PiiAssuranceBadge } from "./PiiAssuranceBadge";
+import { RateLimitBadge } from "./RateLimitBadge";
+import { StatutoryGaw } from "./StatutoryGaw";
 
 export interface AppShellProps {
   telemetry?: TelemetryInfo;
@@ -104,7 +104,9 @@ export function AppShell({
                 data-testid="comparison-toggle"
                 onClick={onToggleComparison}
                 aria-pressed={isComparisonMode}
-                aria-label={isComparisonMode ? "Switch to chat view" : "Switch to policy comparison view"}
+                aria-label={
+                  isComparisonMode ? "Switch to chat view" : "Switch to policy comparison view"
+                }
                 className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors border cursor-pointer shadow-2xs ${
                   isComparisonMode
                     ? "bg-blue-600 text-white border-blue-700 dark:bg-blue-500"
@@ -124,7 +126,10 @@ export function AppShell({
               aria-label="Start new chat"
               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"
             >
-              <RotateCcw className="w-3 h-3 text-slate-500 dark:text-slate-400" aria-hidden="true" />
+              <RotateCcw
+                className="w-3 h-3 text-slate-500 dark:text-slate-400"
+                aria-hidden="true"
+              />
               <span>New Chat</span>
             </button>
           </div>

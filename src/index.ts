@@ -1,11 +1,11 @@
-import { ChatRequestSchema, type GroundedChunk } from "./types/chat";
-import type { Env } from "./types/bindings";
-import { sanitizePii } from "./guardrails/pii-sanitizer";
-import { evaluateAdviceBoundary } from "./guardrails/advice-gatekeeper";
-import { synthesizePrompt } from "./rag/prompt-synthesizer";
-import { localHybridSearch } from "./rag/local-retriever";
-import { recordTelemetry } from "./telemetry/d1-logger";
 import { STATUTORY_GAW } from "./constants/statutory";
+import { evaluateAdviceBoundary } from "./guardrails/advice-gatekeeper";
+import { sanitizePii } from "./guardrails/pii-sanitizer";
+import { localHybridSearch } from "./rag/local-retriever";
+import { synthesizePrompt } from "./rag/prompt-synthesizer";
+import { recordTelemetry } from "./telemetry/d1-logger";
+import type { Env } from "./types/bindings";
+import { ChatRequestSchema, type GroundedChunk } from "./types/chat";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -163,7 +163,11 @@ function generateFallbackResponse(query: string, chunks: GroundedChunk[]): strin
       );
     }
 
-    if (queryLower.includes("ring") || queryLower.includes("jewelry") || queryLower.includes("jewellery")) {
+    if (
+      queryLower.includes("ring") ||
+      queryLower.includes("jewelry") ||
+      queryLower.includes("jewellery")
+    ) {
       return (
         `Under the sub-limits schedule, jewelry and watches are capped at $2,500 in total with a maximum of $1,000 per individual item, unless individually specified and valued on your certificate.\n\n` +
         `${sourceCite}\n\n` +
@@ -171,7 +175,11 @@ function generateFallbackResponse(query: string, chunks: GroundedChunk[]): strin
       );
     }
 
-    if (queryLower.includes("garage") || queryLower.includes("theft") || queryLower.includes("open")) {
+    if (
+      queryLower.includes("garage") ||
+      queryLower.includes("theft") ||
+      queryLower.includes("open")
+    ) {
       return (
         `Theft cover requires physical evidence of violent and forcible entry into the building premises. Theft from common areas or open carports without forcible entry is excluded.\n\n` +
         `${sourceCite}\n\n` +
@@ -375,14 +383,18 @@ export default {
                     if (tokenText) {
                       tokenCount++;
                       controller.enqueue(
-                        encoder.encode(`event: token\ndata: ${JSON.stringify({ text: tokenText })}\n\n`)
+                        encoder.encode(
+                          `event: token\ndata: ${JSON.stringify({ text: tokenText })}\n\n`
+                        )
                       );
                     }
                   } catch {
                     if (dataStr) {
                       tokenCount++;
                       controller.enqueue(
-                        encoder.encode(`event: token\ndata: ${JSON.stringify({ text: dataStr })}\n\n`)
+                        encoder.encode(
+                          `event: token\ndata: ${JSON.stringify({ text: dataStr })}\n\n`
+                        )
                       );
                     }
                   }

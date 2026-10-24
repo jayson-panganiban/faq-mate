@@ -1,5 +1,6 @@
+import { resolveInsurer } from "../constants/insurers";
 import type { GroundedChunk } from "../types/chat";
-import { STATIC_CORPUS_CHUNKS, type IndexedChunk } from "./corpus-data";
+import { type IndexedChunk, STATIC_CORPUS_CHUNKS } from "./corpus-data";
 
 export interface SearchOptions {
   query: string;
@@ -28,15 +29,25 @@ export function localHybridSearch(options: SearchOptions): GroundedChunk[] {
 
   if (rawTerms.length === 0) return [];
 
+  const resolvedFilterInsurer = options.filter?.insurer
+    ? (resolveInsurer(options.filter.insurer)?.profile.name ?? options.filter.insurer)
+    : undefined;
+
   const scored: Array<{ chunk: IndexedChunk; score: number }> = [];
 
   for (const chunk of STATIC_CORPUS_CHUNKS) {
-    // Insurer filter
+    // Insurer filter (resolves both 39 primary insurers and Bancassurance/white-label aliases)
     if (
-      options.filter?.insurer &&
-      !chunk.source.insurer
-        .toLowerCase()
-        .includes(options.filter.insurer.toLowerCase())
+      resolvedFilterInsurer &&
+      !chunk.source.insurer.toLowerCase().includes(resolvedFilterInsurer.toLowerCase())
+    ) {
+      continue;
+    }
+
+    // Optional product filter
+    if (
+      options.filter?.product &&
+      !chunk.source.product.toLowerCase().includes(options.filter.product.toLowerCase())
     ) {
       continue;
     }
@@ -64,7 +75,8 @@ export function localHybridSearch(options: SearchOptions): GroundedChunk[] {
       score += 5.0;
     }
     if (
-      (options.query.toLowerCase().includes("embargo") || options.query.toLowerCase().includes("bushfire")) &&
+      (options.query.toLowerCase().includes("embargo") ||
+        options.query.toLowerCase().includes("bushfire")) &&
       contentLower.includes("72-hour")
     ) {
       score += 8.0;
@@ -73,7 +85,8 @@ export function localHybridSearch(options: SearchOptions): GroundedChunk[] {
       score += 8.0;
     }
     if (
-      (options.query.toLowerCase().includes("unlicensed") || options.query.toLowerCase().includes("licence")) &&
+      (options.query.toLowerCase().includes("unlicensed") ||
+        options.query.toLowerCase().includes("licence")) &&
       contentLower.includes("unlicensed driver")
     ) {
       score += 8.0;

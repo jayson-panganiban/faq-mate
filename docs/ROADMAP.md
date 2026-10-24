@@ -17,6 +17,8 @@
 | **Phase 4** | **Cloudflare AI Search Binding**         | **DONE** | `AI_SEARCH` binding in `wrangler.jsonc`, hybrid search + local retriever fallback. |
 | **Phase 5** | **AFCA Evals & Groundedness Benchmarks** | **DONE** | Full AFCA-10 red-teaming test suite, LLM-as-a-Judge groundedness gate ($\ge 0.98$). |
 | **Phase 6** | **Frontend Chat Interface (Pages)**      | **DONE** | High-density UI, citation drawers, latency badges, Turnstile abuse shield, 154 tests. |
+| **Phase 7** | **Multi-Insurer Archive & Edge AST Compiler** | **DONE** | 39 insurers across 5 categories, 1,277 PDF archive, 5,416 FAQs, AST heading-clean compiler, corpus linter. |
+| **Phase 8** | **Runtime Hardening & Known Gaps**       | **PLANNED** | Server Turnstile verify, 8B secondary LLM fallback, true TTFT timing, feedback API, durable rate limit. |
 
 ---
 
@@ -28,7 +30,9 @@
 - [x] Establish legal terminology baseline ([`GLOSSARY.md`](file:///Users/jaysoncp/Developer/faq-mate/GLOSSARY.md))
 - [x] Record ADR-0001 (Cloudflare AI Search Hybrid Retrieval)
 - [x] Record ADR-0002 (Pre-Normalized Markdown in R2)
-- [x] Write modular living specifications (`docs/specs/01` through `04`)
+- [x] Record ADR-0003 (Static AST Corpus as In-Isolate Retrieval Fallback)
+- [x] Record ADR-0004 (Canonical Insurer Registry & Bancassurance Alias Resolution)
+- [x] Author & maintain living specifications (`docs/specs/01` through `06` all at v2.0.0)
 
 ### Phase 2: Core Edge Worker & Telemetry (Completed)
 
@@ -81,3 +85,54 @@
 - [x] Client-side APP 3/11 PII redaction and `RateLimitBadge`
 - [x] Cloudflare Turnstile bot protection support
 - [x] Complete frontend unit and E2E integration test suite (154/154 tests passing)
+
+### Phase 7: Ground-Up Multi-Insurer Ingestion & Edge AST Compiler ([`docs/specs/06-corpus-refinement-and-compilation.md`](specs/06-corpus-refinement-and-compilation.md))
+
+- [x] Canonical Insurer Registry ([`src/constants/insurers.ts`](file:///Users/jaysoncp/Developer/faq-mate/src/constants/insurers.ts)):
+  - [x] Model 39 primary insurers across 5 categories (Suncorp Group, Major Insurers, Challengers & Auto Clubs, Travel Specialists, Life Insurers)
+  - [x] Map Bancassurance (CommBank, Westpac, ANZ, NAB, HSBC, ING, Bankwest) and retail brand aliases (Coles, ROLLiN', Everyday Insurance, Australian Seniors) to issuing underwriters
+- [x] Raw Archive Ingestion & Manifesting:
+  - [x] Multi-insurer raw collector scripts in `scripts/collector/`
+  - [x] Index 1,277 policy disclosure PDFs in `data/raw/all_manifest.csv` with category, product, document type, and effective dates
+  - [x] Archive 5,416 Q&As in `data/raw/FAQs/` across all 39 primary insurers
+  - [x] Manifest selector contract supporting default current-edition filtering and `--all-historical` full archive ingestion
+- [x] Semantic Normalization Pipeline ([`docs/specs/01-data-ingestion-chunking.md`](specs/01-data-ingestion-chunking.md)):
+  - [x] Multi-insurer normalizer (`scripts/normalize-corpus.ts` / `npm run normalize`)
+  - [x] Structured frontmatter injection with `<!-- BREADCRUMB -->` schema (`insurer`, `insurer_code`, `category`, `product`, `doc_type`, `effective_date`, `jurisdiction`)
+  - [x] GFM table serialization for monetary sub-limits schedules and excess structures
+  - [x] Co-location of statutory peril definitions, flood water exclusions, 48h/72h embargoes, and violent/forcible entry clauses
+  - [x] Automated statutory General Advice Warning (`STATUTORY_GAW`) append
+- [x] Automated Corpus Linter:
+  - [x] Corpus validation utility (`src/ingest/corpus-linter.ts` / `npm run lint:corpus`)
+  - [x] Strict validation of breadcrumb schema, GFM table syntax, and peril-embargo co-location
+- [x] Deterministic Edge AST Compiler:
+  - [x] AST traversal compiler (`scripts/compile-corpus.ts` / `npm run compile:corpus`) generating typed `src/rag/corpus-data.ts`
+  - [x] Heading-only chunk elimination: fold intermediate headers without body paragraphs into hierarchical breadcrumbs
+  - [x] Pre-computed BM25 keyword tokens and relevance scores for sub-40ms edge retrieval
+  - [x] Worker isolate bundle budgeting ($\le 1.5\text{MB}$ uncompressed, pure V8 isolate portability, zero filesystem access)
+- [x] Cloudflare R2 Corpus Synchronization:
+  - [x] Upload utility (`scripts/upload-to-r2.ts` / `npm run upload:r2`) for R2 bucket `faq-mate-corpus`
+  - [x] Enforce canonical R2 key parity: `corpus/pds/{insurer_code}/{product_slug}/{doc_type}_{effective_date}.md` and `corpus/faqs/{insurer_code}.md`
+- [x] Verification, Living Specs & Agent Rules:
+  - [x] Updated `AGENTS.md` with Spec 06 context pointer, Ingestion & Compilation Invariants, and verification commands
+  - [x] Upgraded Spec 01 to v2.0.0 (`docs/specs/01-data-ingestion-chunking.md`)
+  - [x] Aligned Spec 06 to v2.0.0 (`docs/specs/06-corpus-refinement-and-compilation.md`)
+  - [x] Zero regressions against AFCA-10 benchmark evals and TypeScript verification gate (`npm run verify`)
+
+---
+
+### Phase 8: Runtime Hardening & Planned Improvements (Planned)
+
+Tracked across living specifications [02](specs/02-edge-rag-runtime.md#7-known-gaps), [03](specs/03-regulatory-compliance.md#6-known-gaps), [04](specs/04-afca-eval-benchmarks.md#6-known-gaps), and [06](specs/06-corpus-refinement-and-compilation.md#9-known-gaps):
+
+- [ ] **G1: Server-Side Turnstile Verification:** Validate `turnstileToken` with Cloudflare Siteverify API before routing to edge RAG; return 403 on failed token.
+- [ ] **G2: Secondary `@cf/meta/llama-3.1-8b-instruct` Fallback:** Try 8B model when 70B fails before falling back to deterministic synthesis.
+- [ ] **G3: True First-Token TTFT Measurement:** Measure time at first `token` SSE frame emit, then dispatch D1 telemetry asynchronously on stream close.
+- [ ] **G4: Real-Time Groundedness Scoring:** Execute `evaluateGroundedness()` in non-blocking `ctx.waitUntil()` to record authentic groundedness score in D1.
+- [ ] **G5: Real-Time Streaming Advice-Leakage Gate:** Abort SSE stream or fallback if LLM emits advice phrasing.
+- [ ] **G6: Feedback API Route & UI Buttons:** Implement `POST /api/feedback` to record thumbs up/down user ratings into `rag_telemetry_audit.user_feedback_score`.
+- [ ] **G7: Durable Global Rate Limiting:** Migrate in-memory rate limiting to Cloudflare Rate Limiting binding or Durable Object for cross-isolate / multi-PoP enforcement.
+- [ ] **G8: Automated Peril Co-Location Linter Check:** Add AST rules verifying flood clauses co-locate ocean surge exclusions and embargo clauses.
+- [ ] **G9: Enriched SSE Metadata:** Add `pop_location`, `ttft_ms`, and `groundedness_score` to SSE events without breaking consumers.
+- [ ] **G10: CI Bundle & Memory Budget Assertions:** Automated bundle size and memory budget assertions in `npm run verify`.
+- [ ] **G11: Query Filter Forwarding:** Forward `product` and `docType` from validated request schema into AI Search and local retriever.

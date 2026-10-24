@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import React from "react";
-import { StatutoryGaw } from "../../src/frontend/components/StatutoryGaw";
-import { RefusalCard } from "../../src/frontend/components/RefusalCard";
-import { EmergencyBanner } from "../../src/frontend/components/EmergencyBanner";
+import { describe, expect, it } from "vitest";
 import { STATUTORY_GAW, STATUTORY_SAFE_HARBOR_REFUSAL } from "../../src/constants/statutory";
+import { EmergencyBanner } from "../../src/frontend/components/EmergencyBanner";
+import { RefusalCard } from "../../src/frontend/components/RefusalCard";
+import { StatutoryGaw } from "../../src/frontend/components/StatutoryGaw";
 
 describe("Regulatory & Safety Guardrail Cards (Ticket 3)", () => {
   describe("StatutoryGaw Component", () => {

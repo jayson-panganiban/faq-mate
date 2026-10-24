@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from "react";
-import { ArrowUp, Loader2, ShieldCheck, ChevronDown } from "lucide-react";
+import { ArrowUp, ChevronDown, Loader2, ShieldCheck } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { getGroupedInsurerOptions } from "../../constants/insurers";
 
 export interface InputBarProps {
   onSend: (query: string, options?: { insurer?: string; turnstileToken?: string }) => void;
@@ -11,14 +12,7 @@ export interface InputBarProps {
   className?: string;
 }
 
-const INSURER_OPTIONS = [
-  { value: "", label: "All Insurers" },
-  { value: "NRMA", label: "NRMA" },
-  { value: "SUNCORP", label: "SUNCORP" },
-  { value: "ALLIANZ", label: "ALLIANZ" },
-  { value: "QBE", label: "QBE" },
-  { value: "YOUI", label: "YOUI" },
-] as const;
+const GROUPED_INSURER_OPTIONS = getGroupedInsurerOptions();
 
 /**
  * Chat Input Bar with Insurer Selector, Turnstile Protection & Auto-Resizing Textarea.
@@ -41,7 +35,9 @@ export function InputBar({
 
   const hasTurnstileApi =
     typeof window !== "undefined" &&
-    Boolean((window as unknown as { turnstile?: { render: Function; remove?: Function } }).turnstile);
+    Boolean(
+      (window as unknown as { turnstile?: { render: Function; remove?: Function } }).turnstile
+    );
   const useRealTurnstile = Boolean(turnstileSiteKey && hasTurnstileApi);
 
   useEffect(() => {
@@ -51,19 +47,21 @@ export function InputBar({
 
     let widgetId: string | undefined;
     try {
-      const turnstile = (window as unknown as {
-        turnstile: {
-          render: (
-            container: HTMLElement | string,
-            opts: {
-              sitekey: string;
-              callback: (token: string) => void;
-              "expired-callback"?: () => void;
-            }
-          ) => string;
-          remove?: (id: string) => void;
-        };
-      }).turnstile;
+      const turnstile = (
+        window as unknown as {
+          turnstile: {
+            render: (
+              container: HTMLElement | string,
+              opts: {
+                sitekey: string;
+                callback: (token: string) => void;
+                "expired-callback"?: () => void;
+              }
+            ) => string;
+            remove?: (id: string) => void;
+          };
+        }
+      ).turnstile;
 
       widgetId = turnstile.render("#cf-turnstile-container", {
         sitekey: turnstileSiteKey,
@@ -81,7 +79,9 @@ export function InputBar({
     return () => {
       if (widgetId) {
         try {
-          (window as unknown as { turnstile?: { remove?: (id: string) => void } }).turnstile?.remove?.(widgetId);
+          (
+            window as unknown as { turnstile?: { remove?: (id: string) => void } }
+          ).turnstile?.remove?.(widgetId);
         } catch {
           // ignore cleanup errors
         }
@@ -135,7 +135,10 @@ export function InputBar({
       {/* Top Filter & Protection Toolbar */}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 dark:border-slate-800/80">
         <div className="flex items-center gap-1.5">
-          <label htmlFor="insurer-select" className="text-xs font-medium text-slate-500 dark:text-slate-400">
+          <label
+            htmlFor="insurer-select"
+            className="text-xs font-medium text-slate-500 dark:text-slate-400"
+          >
             Insurer:
           </label>
           <div className="relative">
@@ -148,10 +151,15 @@ export function InputBar({
               disabled={isBlocked}
               className="appearance-none rounded-lg border border-slate-200 bg-slate-50 py-1 pl-2.5 pr-7 text-xs font-medium text-slate-700 shadow-2xs transition-colors hover:bg-slate-100 focus:border-blue-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-750 cursor-pointer"
             >
-              {INSURER_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
+              <option value="">All Insurers (39)</option>
+              {GROUPED_INSURER_OPTIONS.map((group) => (
+                <optgroup key={group.category} label={group.label}>
+                  {group.options.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
             <ChevronDown
@@ -175,7 +183,10 @@ export function InputBar({
             className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400"
             title="Protected against automated scrapers by Cloudflare Turnstile"
           >
-            <ShieldCheck className="h-3.5 w-3.5 text-amber-600 dark:text-amber-500 shrink-0" aria-hidden="true" />
+            <ShieldCheck
+              className="h-3.5 w-3.5 text-amber-600 dark:text-amber-500 shrink-0"
+              aria-hidden="true"
+            />
             <span>Cloudflare Turnstile Verified</span>
           </div>
         )}

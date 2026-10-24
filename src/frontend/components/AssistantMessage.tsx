@@ -1,10 +1,10 @@
+import { AlertCircle, Bot, Check, Copy } from "lucide-react";
 import React, { useState } from "react";
-import { Bot, Copy, Check, AlertCircle } from "lucide-react";
-import { CitationPill } from "./CitationPill";
-import { StatutoryGaw } from "./StatutoryGaw";
 import { STATUTORY_GAW } from "../../constants/statutory";
 import type { GroundedChunk } from "../../types/chat";
 import { findMatchingChunk } from "../utils/citations";
+import { CitationPill } from "./CitationPill";
+import { StatutoryGaw } from "./StatutoryGaw";
 
 export interface AssistantMessageProps {
   /**
@@ -176,7 +176,12 @@ function renderInlineText(
 
 type MarkdownBlock =
   | { type: "header"; level: number; text: string }
-  | { type: "table"; headers: string[]; alignments: ("left" | "center" | "right")[]; rows: string[][] }
+  | {
+      type: "table";
+      headers: string[];
+      alignments: ("left" | "center" | "right")[];
+      rows: string[][];
+    }
   | { type: "code"; language: string; code: string }
   | { type: "ul"; items: string[] }
   | { type: "ol"; items: string[] }
@@ -447,7 +452,10 @@ export function AssistantMessage({
           >
             {copied ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                <Check
+                  className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"
+                  aria-hidden="true"
+                />
                 <span className="text-emerald-600 dark:text-emerald-400 font-medium">Copied!</span>
               </>
             ) : (
@@ -497,8 +505,8 @@ export function AssistantMessage({
                               block.alignments[i] === "center"
                                 ? "text-center"
                                 : block.alignments[i] === "right"
-                                ? "text-right"
-                                : "text-left"
+                                  ? "text-right"
+                                  : "text-left"
                             }`}
                           >
                             {renderInlineText(h, chunks, onSelectCitation)}
@@ -519,8 +527,8 @@ export function AssistantMessage({
                                 block.alignments[cIdx] === "center"
                                   ? "text-center"
                                   : block.alignments[cIdx] === "right"
-                                  ? "text-right"
-                                  : "text-left"
+                                    ? "text-right"
+                                    : "text-left"
                               }`}
                             >
                               {renderInlineText(cell, chunks, onSelectCitation)}
@@ -535,13 +543,7 @@ export function AssistantMessage({
             }
 
             if (block.type === "code") {
-              return (
-                <CodeBlock
-                  key={bIdx}
-                  code={block.code}
-                  language={block.language}
-                />
-              );
+              return <CodeBlock key={bIdx} code={block.code} language={block.language} />;
             }
 
             if (block.type === "ul") {
@@ -596,9 +598,7 @@ export function AssistantMessage({
                       </div>
                       <div className="space-y-2 text-sm font-medium leading-relaxed">
                         {block.text.split("\n\n").map((para, pIdx) => (
-                          <p key={pIdx}>
-                            {renderInlineText(para, chunks, onSelectCitation)}
-                          </p>
+                          <p key={pIdx}>{renderInlineText(para, chunks, onSelectCitation)}</p>
                         ))}
                       </div>
                     </div>

@@ -58,3 +58,20 @@ This document governs coding standards and review criteria for the FAQ-Mate code
 2. **Tier 2: Model-Assisted LLM Judge (`evaluateWithLlmJudge`)**
    - Dispatches evaluation prompt to `@cf/meta/llama-3.3-70b-instruct` when `env.AI` binding is active.
    - Validates groundedness against retrieved context passages.
+
+---
+
+## 5. Tooling, Formatting & Static Analysis
+
+1. **TypeScript & Frontend Tooling (Biome):**
+   - **Linter & Formatter:** [Biome](https://biomejs.dev/) configured in [`biome.json`](biome.json).
+   - Formatter conventions: 2-space indentation, double quotes, trailing commas (`es5`), semicolons always, line width 100.
+   - Run linter and formatting checks with `npm run lint` or `npm run format:check`.
+   - Auto-fix issues with `npm run lint:fix` or `npm run format`.
+
+2. **Python Tooling (Astral Ruff & ty):**
+   - Configured centrally in [`pyproject.toml`](pyproject.toml).
+   - **Linter & Formatter:** [Ruff](https://docs.astral.sh/ruff/) (`[tool.ruff]`), target Python 3.11+. Line length 100, double quotes.
+   - **Type Checker:** [ty](https://docs.astral.sh/ty/) (`[tool.ty]`), Astral's fast Rust static type checker.
+   - Run Python quality gate with `npm run lint:py` or `npm run typecheck:py`.
+   - Auto-format Python scripts with `npm run format:py`.

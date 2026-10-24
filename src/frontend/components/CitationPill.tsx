@@ -1,5 +1,5 @@
-import React from "react";
 import { BookOpen } from "lucide-react";
+import React from "react";
 import type { GroundedChunk } from "../../types/chat";
 import { formatProductDoc } from "../utils/citations";
 
@@ -71,8 +71,7 @@ export function CitationPill({
   const productDoc = formatProductDoc(effectiveProduct, effectiveDocType);
 
   // Formatted display text
-  const displayText =
-    label ?? `[Source: ${productDoc}, ${effectiveSection}]`;
+  const displayText = label ?? `[Source: ${productDoc}, ${effectiveSection}]`;
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();

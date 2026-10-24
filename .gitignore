@@ -43,3 +43,13 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Raw Corpus & Large Scrape Dumps
+data/raw/*
+!data/raw/all_manifest.csv
+!data/raw/archive_summary.csv
+!data/raw/FAQs/
+!data/raw/FAQs/**
+data/raw/**/*.pdf
+data/raw/**/*.html
+*.log

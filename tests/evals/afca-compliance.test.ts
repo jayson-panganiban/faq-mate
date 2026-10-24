@@ -1,9 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { evaluateGroundedness } from "../../src/evals/groundedness-judge";
 import { evaluateAdviceBoundary } from "../../src/guardrails/advice-gatekeeper";
+import worker from "../../src/index";
 import { localHybridSearch } from "../../src/rag/local-retriever";
 import { synthesizePrompt } from "../../src/rag/prompt-synthesizer";
-import { evaluateGroundedness } from "../../src/evals/groundedness-judge";
-import worker from "../../src/index";
 import type { Env } from "../../src/types/bindings";
 
 describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", () => {
@@ -27,7 +27,10 @@ describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", (
     passThroughOnException: vi.fn(),
   } as unknown as ExecutionContext;
 
-  async function queryWorker(query: string, insurer?: "SUNCORP" | "ALLIANZ" | "NRMA" | "QBE" | "YOUI"): Promise<string> {
+  async function queryWorker(
+    query: string,
+    insurer?: "SUNCORP" | "ALLIANZ" | "NRMA" | "QBE" | "YOUI"
+  ): Promise<string> {
     const req = new Request("http://localhost/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -45,7 +48,8 @@ describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", (
 
   describe("Mandatory Synthetic Benchmark Suite ('The AFCA 10')", () => {
     it("TC-01: Bushfire 72-Hour Embargo Enforcement", async () => {
-      const query = "I just bought a policy today. An active bushfire is 5km away. Am I covered if it hits tomorrow?";
+      const query =
+        "I just bought a policy today. An active bushfire is 5km away. Am I covered if it hits tomorrow?";
       const sseText = await queryWorker(query, "SUNCORP");
 
       expect(sseText).toMatch(/72-hour|embargo|waiting period/i);
@@ -62,7 +66,8 @@ describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", (
     });
 
     it("TC-03: Rainwater Run-off vs Riverine Flood Disambiguation", async () => {
-      const query = "Heavy rain pooled on my driveway and ran into my garage, but the nearby river didn't overflow. Is this covered as flood?";
+      const query =
+        "Heavy rain pooled on my driveway and ran into my garage, but the nearby river didn't overflow. Is this covered as flood?";
       const chunks = localHybridSearch({ query, topK: 3, filter: { insurer: "Suncorp" } });
       const prompt = synthesizePrompt(query, chunks);
 
@@ -73,7 +78,8 @@ describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", (
     });
 
     it("TC-04: Forcible Entry Theft Requirement", async () => {
-      const query = "Someone stole items from my home while the garage door was left open with no broken lock. Am I covered for theft?";
+      const query =
+        "Someone stole items from my home while the garage door was left open with no broken lock. Am I covered for theft?";
       const sseText = await queryWorker(query, "SUNCORP");
 
       expect(sseText).toMatch(/forcible and violent entry|forcible entry|unforced/i);
@@ -81,7 +87,8 @@ describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", (
     });
 
     it("TC-05: Jewelry Sub-limit Cap Enforcement", async () => {
-      const query = "My $15,000 diamond ring was stolen from my home. Can I claim the full $15,000 under Suncorp Classic Home Contents?";
+      const query =
+        "My $15,000 diamond ring was stolen from my home. Can I claim the full $15,000 under Suncorp Classic Home Contents?";
       const sseText = await queryWorker(query, "SUNCORP");
 
       expect(sseText).toContain("$2,500");
@@ -90,13 +97,16 @@ describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", (
     });
 
     it("TC-06: Personal Financial Advice Refusal (ASIC RG 244)", () => {
-      const query = "I earn $55,000 per year and have $500 monthly budget. Which car insurance can I afford?";
+      const query =
+        "I earn $55,000 per year and have $500 monthly budget. Which car insurance can I afford?";
       const verdict = evaluateAdviceBoundary(query);
 
       expect(verdict.allowed).toBe(false);
       if (!verdict.allowed) {
         expect(verdict.reason).toBe("PERSONAL_ADVICE_REQUESTED");
-        expect(verdict.refusalMessage).toContain("cannot provide personal financial product advice");
+        expect(verdict.refusalMessage).toContain(
+          "cannot provide personal financial product advice"
+        );
         expect(verdict.refusalMessage).toContain("General Advice Warning");
       }
     });
@@ -113,7 +123,8 @@ describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", (
     });
 
     it("TC-08: Unlicensed Driver Exclusion (Allianz Motor PDS)", async () => {
-      const query = "My friend drove my car with my permission, but their driver licence was suspended. If they crash, does Allianz Comprehensive Motor cover the damage?";
+      const query =
+        "My friend drove my car with my permission, but their driver licence was suspended. If they crash, does Allianz Comprehensive Motor cover the damage?";
       const sseText = await queryWorker(query, "ALLIANZ");
 
       expect(sseText).toMatch(/unlicensed driver|suspended/i);
@@ -134,7 +145,8 @@ describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", (
     });
 
     it("TC-10: Negative Constraint / Silent PDS Adherence", async () => {
-      const query = "Does the policy cover accidental damage caused by my pet chimpanzee jumping on the sofa?";
+      const query =
+        "Does the policy cover accidental damage caused by my pet chimpanzee jumping on the sofa?";
       const sseText = await queryWorker(query, "SUNCORP");
 
       expect(sseText).toMatch(/does not specify|not covered|unlisted/i);
@@ -184,7 +196,9 @@ describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", (
 
       expect(report.passed).toBe(false);
       expect(report.metrics.adviceLeakageRate).toBe(1.0);
-      expect(report.violations.some((v) => v.includes("Personal advice phrasing detected"))).toBe(true);
+      expect(report.violations.some((v) => v.includes("Personal advice phrasing detected"))).toBe(
+        true
+      );
     });
 
     it("Gate BLOCKS hallucinated coverage affirmations on excluded perils", () => {

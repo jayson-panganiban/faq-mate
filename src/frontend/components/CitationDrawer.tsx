@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from "react";
 import {
-  X,
   BookOpen,
-  ChevronRight,
   Calendar,
-  ShieldCheck,
-  Copy,
   Check,
+  ChevronRight,
+  Copy,
   FileText,
   Layers,
+  ShieldCheck,
+  X,
 } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import type { GroundedChunk } from "../../types/chat";
 import { formatProductDoc } from "../utils/citations";
 
@@ -67,7 +67,10 @@ export function CitationDrawer({
   useEffect(() => {
     if (selectedChunkId) {
       setInternalSelectedId(selectedChunkId);
-    } else if (chunks.length > 0 && (!internalSelectedId || !chunks.some((c) => c.id === internalSelectedId))) {
+    } else if (
+      chunks.length > 0 &&
+      (!internalSelectedId || !chunks.some((c) => c.id === internalSelectedId))
+    ) {
       setInternalSelectedId(chunks[0].id);
     }
   }, [selectedChunkId, chunks, internalSelectedId]);
@@ -116,7 +119,11 @@ export function CitationDrawer({
 
   // Calculate percentage match
   const matchPercentage = currentChunk
-    ? Math.round(currentChunk.relevanceScore <= 1 ? currentChunk.relevanceScore * 100 : currentChunk.relevanceScore)
+    ? Math.round(
+        currentChunk.relevanceScore <= 1
+          ? currentChunk.relevanceScore * 100
+          : currentChunk.relevanceScore
+      )
     : 0;
 
   return (
@@ -150,9 +157,7 @@ export function CitationDrawer({
                 >
                   Grounding Inspector
                 </h2>
-                <p className="text-xs text-slate-500">
-                  Operative Insurance Policy Verification
-                </p>
+                <p className="text-xs text-slate-500">Operative Insurance Policy Verification</p>
               </div>
             </div>
 
@@ -193,15 +198,14 @@ export function CitationDrawer({
                         : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
                     }`}
                   >
-                    <Layers className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" aria-hidden="true" />
-                    <span className="truncate max-w-[140px] sm:max-w-[180px]">
-                      {tabTitle}
-                    </span>
+                    <Layers
+                      className="w-3.5 h-3.5 text-slate-400 flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                    <span className="truncate max-w-[140px] sm:max-w-[180px]">{tabTitle}</span>
                     <span
                       className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
-                        isSelected
-                          ? "bg-sky-100 text-sky-700"
-                          : "bg-slate-200 text-slate-600"
+                        isSelected ? "bg-sky-100 text-sky-700" : "bg-slate-200 text-slate-600"
                       }`}
                     >
                       #{idx + 1}
@@ -223,7 +227,12 @@ export function CitationDrawer({
                 </p>
               </div>
             ) : (
-              <div id={`panel-${currentChunk.id}`} role="tabpanel" aria-labelledby={`tab-${currentChunk.id}`} className="space-y-5">
+              <div
+                id={`panel-${currentChunk.id}`}
+                role="tabpanel"
+                aria-labelledby={`tab-${currentChunk.id}`}
+                className="space-y-5"
+              >
                 {/* Operative Section Breadcrumb */}
                 <div className="space-y-1.5">
                   <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
@@ -236,13 +245,24 @@ export function CitationDrawer({
                     <span className="text-slate-500 uppercase tracking-wide text-[11px] font-semibold">
                       {currentChunk.source.insurer}
                     </span>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" aria-hidden="true" />
+                    <ChevronRight
+                      className="w-3.5 h-3.5 text-slate-400 flex-shrink-0"
+                      aria-hidden="true"
+                    />
                     <span className="text-slate-900 font-bold">{productDoc}</span>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" aria-hidden="true" />
-                    <span className="text-sky-700 font-semibold">{currentChunk.source.section}</span>
+                    <ChevronRight
+                      className="w-3.5 h-3.5 text-slate-400 flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                    <span className="text-sky-700 font-semibold">
+                      {currentChunk.source.section}
+                    </span>
                     {currentChunk.source.clauseId && (
                       <>
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" aria-hidden="true" />
+                        <ChevronRight
+                          className="w-3.5 h-3.5 text-slate-400 flex-shrink-0"
+                          aria-hidden="true"
+                        />
                         <span className="text-slate-600 text-xs font-mono">
                           Clause {currentChunk.source.clauseId}
                         </span>
@@ -259,11 +279,14 @@ export function CitationDrawer({
                       matchPercentage >= 85
                         ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                         : matchPercentage >= 70
-                        ? "bg-amber-50 text-amber-800 border-amber-200"
-                        : "bg-slate-50 text-slate-700 border-slate-200"
+                          ? "bg-amber-50 text-amber-800 border-amber-200"
+                          : "bg-slate-50 text-slate-700 border-slate-200"
                     }`}
                   >
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" aria-hidden="true" />
+                    <ShieldCheck
+                      className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0"
+                      aria-hidden="true"
+                    />
                     <span>{matchPercentage}% Match</span>
                     <span className="text-[10px] opacity-75 font-mono">
                       (Score: {currentChunk.relevanceScore.toFixed(2)})
@@ -283,7 +306,10 @@ export function CitationDrawer({
                   {/* Effective Date if Present */}
                   {currentChunk.source.effectiveDate && (
                     <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-slate-600 bg-slate-100 border border-slate-200">
-                      <Calendar className="w-3 h-3 text-slate-500 flex-shrink-0" aria-hidden="true" />
+                      <Calendar
+                        className="w-3 h-3 text-slate-500 flex-shrink-0"
+                        aria-hidden="true"
+                      />
                       <span>Effective: {currentChunk.source.effectiveDate}</span>
                     </div>
                   )}
@@ -327,9 +353,9 @@ export function CitationDrawer({
                     <span>Verbatim Grounding Verification</span>
                   </div>
                   <p className="text-[11px] leading-relaxed text-sky-800/90">
-                    This excerpt was retrieved directly from the insurer&apos;s operative disclosure documents
-                    stored in R2 via Cloudflare AI Search hybrid retrieval. The generated answer reflects these
-                    terms pursuant to ASIC RG 244 factual advice standards.
+                    This excerpt was retrieved directly from the insurer&apos;s operative disclosure
+                    documents stored in R2 via Cloudflare AI Search hybrid retrieval. The generated
+                    answer reflects these terms pursuant to ASIC RG 244 factual advice standards.
                   </p>
                 </div>
               </div>

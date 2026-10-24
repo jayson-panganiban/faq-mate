@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "./components/AppShell";
 import { ChatContainer } from "./components/ChatContainer";
-import { InputBar } from "./components/InputBar";
 import { CitationDrawer } from "./components/CitationDrawer";
+import { InputBar } from "./components/InputBar";
 import { PolicyComparisonView } from "./components/PolicyComparisonView";
 import { useChatStream } from "./hooks/useChatStream";
 import type { ChatMessage, GroundedChunk } from "./types/chat-ui";

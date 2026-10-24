@@ -1,5 +1,5 @@
-import React from "react";
 import { Shield } from "lucide-react";
+import React from "react";
 import { STATUTORY_GAW } from "../../constants/statutory";
 
 export interface StatutoryGawProps {
@@ -41,9 +41,7 @@ export function StatutoryGaw({
           <p className="font-semibold text-slate-700 dark:text-slate-300">
             Corporations Act 2001 (Cth) s.949A
           </p>
-          <p className="text-slate-600 dark:text-slate-400">
-            {STATUTORY_GAW}
-          </p>
+          <p className="text-slate-600 dark:text-slate-400">{STATUTORY_GAW}</p>
         </div>
       </div>
     </aside>

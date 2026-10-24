@@ -2,15 +2,33 @@ import { z } from "zod";
 import { resolveInsurer } from "../constants/insurers";
 
 /**
- * Validated Inbound Chat Request Schema (Spec 02 Section 1.1)
+ * Multi-Turn Conversation History Item (Spec 07 Section 1)
+ */
+export const ChatMessageHistorySchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z
+    .string()
+    .trim()
+    .min(1, "Message content cannot be empty")
+    .max(1000, "Message content exceeds 1000 characters"),
+});
+
+export type ChatMessageHistory = z.infer<typeof ChatMessageHistorySchema>;
+
+/**
+ * Validated Inbound Chat Request Schema (Spec 02 Section 1.1 & Spec 07 Section 1)
  */
 export const ChatRequestSchema = z.object({
   query: z
     .string()
     .trim()
-    .min(3, "Query must be at least 3 characters")
+    .min(2, "Query must be at least 2 characters")
     .max(500, "Query exceeds 500 characters"),
   conversationId: z.string().uuid("Invalid conversation UUID"),
+  history: z
+    .array(ChatMessageHistorySchema)
+    .max(4, "History cannot exceed 4 messages")
+    .optional(),
   filters: z
     .object({
       insurer: z

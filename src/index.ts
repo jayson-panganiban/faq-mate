@@ -266,13 +266,16 @@ export default {
         );
       }
 
-      const { query } = parseResult.data;
+      const { query, history } = parseResult.data;
 
-      // Scrub PII under Australian Privacy Principles (APP 3/11 & Spec 03)
-      const { sanitized, queryHash } = await sanitizePii(query);
+      // Scrub PII under Australian Privacy Principles (APP 3/11, Spec 03 & Spec 07)
+      const { sanitizedQuery, sanitizedHistory, queryHash } = await sanitizePii({
+        query,
+        history,
+      });
 
       // ASIC RG 244 & COP Advice Gatekeeper (Spec 03)
-      const verdict = evaluateAdviceBoundary(sanitized);
+      const verdict = evaluateAdviceBoundary(sanitizedQuery);
 
       if (!verdict.allowed) {
         // Record compliance block in D1 asynchronously (PRD § 6.4)

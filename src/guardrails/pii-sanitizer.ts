@@ -20,6 +20,18 @@ export interface SanitizerResult {
   queryHash: string;
 }
 
+export interface MultiTurnSanitizerInput {
+  query: string;
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
+}
+
+export interface MultiTurnSanitizerResult {
+  sanitizedQuery: string;
+  sanitizedHistory: Array<{ role: "user" | "assistant"; content: string }>;
+  wasRedacted: boolean;
+  queryHash: string;
+}
+
 /**
  * Generates rotating daily salt for k-anonymity (PRD § 5.4).
  * Rotates every UTC midnight to guarantee query unlinkability across days.
@@ -30,8 +42,8 @@ export function getDailySalt(date?: Date): string {
   return `faq-mate-daily-salt-${dateStr}`;
 }
 
-export async function sanitizePii(input: string, customSalt?: string): Promise<SanitizerResult> {
-  let text = input;
+function redactText(raw: string): { text: string; wasRedacted: boolean } {
+  let text = raw;
   let wasRedacted = false;
 
   if (TFN_PATTERN.test(text)) {
@@ -59,17 +71,63 @@ export async function sanitizePii(input: string, customSalt?: string): Promise<S
     wasRedacted = true;
   }
 
-  // Generate SHA-256 hash with rotating daily salt for PRD § 5.4 k-anonymity
+  return { text, wasRedacted };
+}
+
+async function computeQueryHash(text: string, customSalt?: string): Promise<string> {
   const salt = customSalt ?? getDailySalt();
   const encoder = new TextEncoder();
   const data = encoder.encode(`${salt}:${text}`);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const queryHash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export async function sanitizePii(
+  input: string,
+  customSalt?: string
+): Promise<SanitizerResult>;
+export async function sanitizePii(
+  input: MultiTurnSanitizerInput,
+  customSalt?: string
+): Promise<MultiTurnSanitizerResult>;
+export async function sanitizePii(
+  input: string | MultiTurnSanitizerInput,
+  customSalt?: string
+): Promise<SanitizerResult | MultiTurnSanitizerResult> {
+  if (typeof input === "string") {
+    const { text, wasRedacted } = redactText(input);
+    const queryHash = await computeQueryHash(text, customSalt);
+    return {
+      sanitized: text,
+      wasRedacted,
+      queryHash,
+    };
+  }
+
+  const queryResult = redactText(input.query);
+  let overallRedacted = queryResult.wasRedacted;
+
+  const sanitizedHistory: Array<{ role: "user" | "assistant"; content: string }> = [];
+  if (input.history && input.history.length > 0) {
+    for (const msg of input.history) {
+      const msgResult = redactText(msg.content);
+      if (msgResult.wasRedacted) {
+        overallRedacted = true;
+      }
+      sanitizedHistory.push({
+        role: msg.role,
+        content: msgResult.text,
+      });
+    }
+  }
+
+  const queryHash = await computeQueryHash(queryResult.text, customSalt);
 
   return {
-    sanitized: text,
-    wasRedacted,
+    sanitizedQuery: queryResult.text,
+    sanitizedHistory,
+    wasRedacted: overallRedacted,
     queryHash,
   };
 }

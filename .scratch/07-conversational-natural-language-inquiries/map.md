@@ -27,3 +27,4 @@ graph TD
 ## Decisions So Far
 - Architecture and living spec authored at `spec.md`.
 - All 6 tickets triaged and marked `ready-for-agent`.
+- **Ticket 01 Resolved:** Extended `ChatRequestSchema` with `history` (max 4, max 1000 chars/message) and upgraded `sanitizePii()` for multi-turn history scrubbing while hashing only the latest query for k-anonymity ([`01-multi-turn-inbound-schema-pii-scrubber.md`](issues/01-multi-turn-inbound-schema-pii-scrubber.md)).

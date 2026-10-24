@@ -508,7 +508,7 @@ export default {
             let rawAiStream: ReadableStream<Uint8Array> | null = null;
 
             try {
-              const aiResponse = await env.AI.run("@cf/meta/llama-3.3-70b-instruct", {
+              const aiResponse = await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
                 messages,
                 stream: true,
                 max_tokens: 512,
@@ -517,7 +517,25 @@ export default {
                 rawAiStream = aiResponse as ReadableStream<Uint8Array>;
               }
             } catch (aiErr) {
-              console.error("[WorkersAI::Failure]", aiErr);
+              console.warn(
+                "[WorkersAI::70B_Warning]",
+                aiErr instanceof Error ? aiErr.message : String(aiErr)
+              );
+              try {
+                const fallbackAi = await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fp8", {
+                  messages,
+                  stream: true,
+                  max_tokens: 512,
+                });
+                if (fallbackAi && typeof (fallbackAi as ReadableStream).getReader === "function") {
+                  rawAiStream = fallbackAi as ReadableStream<Uint8Array>;
+                }
+              } catch (fallbackErr) {
+                console.error(
+                  "[WorkersAI::Failure]",
+                  fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)
+                );
+              }
             }
 
             if (rawAiStream) {

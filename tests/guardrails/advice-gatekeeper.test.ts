@@ -90,4 +90,17 @@ describe("ASIC RG 244 & Conversational Dilemma Guardrail (Ticket 02 & Spec 07)",
       }
     });
   });
+
+  describe("Code of Practice Life Safety Emergency Interception", () => {
+    it("intercepts active flood peril 'My house is flooding right now water is rising what should I do?'", () => {
+      const verdict = evaluateAdviceBoundary(
+        "My house is flooding right now water is rising what should I do?"
+      );
+      expect(verdict.allowed).toBe(false);
+      if (!verdict.allowed) {
+        expect(verdict.reason).toBe("EMERGENCY_LIFE_SAFETY");
+        expect(verdict.emergencyHotline).toContain("000");
+      }
+    });
+  });
 });

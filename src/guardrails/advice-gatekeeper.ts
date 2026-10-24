@@ -51,7 +51,7 @@ const TMD_ELIGIBILITY_PATTERNS = [
  * Patterns indicating active emergency / life safety threats under Code of Practice (COP)
  */
 const EMERGENCY_PATTERNS = [
-  /\b(house is (burning|on fire)|trapped in (flood|floodwater|water)|life threat|emergency help right now|emergency shelter|active bushfire at my house)\b/i,
+  /\b(house is (burning|on fire|flooding)|trapped in (flood|floodwater|water)|water is rising|life threat|emergency help right now|emergency shelter|active bushfire at my house)\b/i,
 ];
 
 /**

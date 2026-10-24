@@ -1,6 +1,7 @@
 import { resolveInsurer } from "../constants/insurers";
 import type { GroundedChunk } from "../types/chat";
 import { type IndexedChunk, STATIC_CORPUS_CHUNKS } from "./corpus-data";
+import { normalizeIntent } from "./intent-normalizer";
 
 export interface SearchOptions {
   query: string;
@@ -21,11 +22,26 @@ export interface SearchOptions {
  */
 export function localHybridSearch(options: SearchOptions): GroundedChunk[] {
   const topK = options.topK ?? 5;
+  const normalized = normalizeIntent(options.query);
+
   const rawTerms = options.query
     .toLowerCase()
     .replace(/[^a-z0-9\s$]/g, " ")
     .split(/\s+/)
     .filter((t) => t.length > 1);
+
+  // Augment with expanded terms from colloquial AST normalizer (Spec 07 Section 3)
+  for (const exp of normalized.expandedTerms) {
+    const split = exp
+      .toLowerCase()
+      .replace(/[^a-z0-9\s$]/g, " ")
+      .split(/\s+/);
+    for (const term of split) {
+      if (term.length > 2 && !rawTerms.includes(term)) {
+        rawTerms.push(term);
+      }
+    }
+  }
 
   if (rawTerms.length === 0) return [];
 
@@ -71,6 +87,67 @@ export function localHybridSearch(options: SearchOptions): GroundedChunk[] {
     }
 
     // Domain perceptual boosts for critical statutory terms
+    if (
+      normalized.detectedPerils.includes("ESCAPE_OF_LIQUID") &&
+      (contentLower.includes("escape of liquid") || contentLower.includes("fixed apparatus"))
+    ) {
+      score += 10.0;
+    }
+    if (
+      normalized.detectedPerils.includes("THEFT_FORCIBLE_ENTRY") &&
+      contentLower.includes("forcible and violent entry")
+    ) {
+      score += 10.0;
+    }
+    if (
+      normalized.detectedPerils.includes("FOOD_SPOILAGE") &&
+      (contentLower.includes("food spoilage") || contentLower.includes("refrigerated"))
+    ) {
+      score += 10.0;
+    }
+    if (
+      normalized.detectedPerils.includes("MOTORCYCLE_TRAVEL") &&
+      (contentLower.includes("motorcycle") || contentLower.includes("moped"))
+    ) {
+      score += 10.0;
+    }
+    if (
+      normalized.detectedPerils.includes("BOUNDARY_FENCE") &&
+      (contentLower.includes("fence") || contentLower.includes("fences"))
+    ) {
+      score += 10.0;
+    }
+    if (
+      normalized.detectedPerils.includes("RAINWATER_RUNOFF") &&
+      (contentLower.includes("run-off") || contentLower.includes("rainwater"))
+    ) {
+      score += 10.0;
+    }
+    if (
+      normalized.detectedPerils.includes("ACTIONS_OF_THE_SEA") &&
+      contentLower.includes("actions of the sea")
+    ) {
+      score += 10.0;
+    }
+    if (
+      normalized.detectedPerils.includes("JEWELRY_SUBLIMIT") &&
+      (contentLower.includes("jewelry") || contentLower.includes("jewellery") || contentLower.includes("sub-limit"))
+    ) {
+      score += 10.0;
+    }
+    if (
+      normalized.detectedPerils.includes("EMBARGO_72_HOUR") &&
+      (contentLower.includes("72-hour") || contentLower.includes("embargo"))
+    ) {
+      score += 10.0;
+    }
+    if (
+      normalized.detectedPerils.includes("UNLICENSED_DRIVER") &&
+      (contentLower.includes("unlicensed driver") || contentLower.includes("licence"))
+    ) {
+      score += 10.0;
+    }
+
     if (options.query.toLowerCase().includes("flood") && contentLower.includes("flood")) {
       score += 5.0;
     }

@@ -40,6 +40,7 @@ export interface ChatMessage {
     latencyMs?: number;
     retrievedChunks?: GroundedChunk[];
     popLocation?: string;
+    suggestedFollowUps?: string[];
   };
   refusal?: RefusalPayload | null;
 }

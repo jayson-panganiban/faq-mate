@@ -90,10 +90,23 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
         headers["X-Turnstile-Token"] = sendOptions.turnstileToken;
       }
 
+      // Ephemeral multi-turn context carry-over (up to 4 turns, Spec 07 Section 1)
+      const historyTurns = messages
+        .filter((m) => m.content.trim().length > 0 && !m.refusal)
+        .slice(-4)
+        .map((m) => ({
+          role: m.role,
+          content: m.content.slice(0, 1000),
+        }));
+
       const bodyPayload: Record<string, unknown> = {
         query: cleanQuery,
         conversationId: crypto.randomUUID(),
       };
+
+      if (historyTurns.length > 0) {
+        bodyPayload.history = historyTurns;
+      }
 
       if (sendOptions?.insurer && sendOptions.insurer.toLowerCase() !== "all") {
         bodyPayload.filters = {
@@ -179,6 +192,7 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
             setStatus("METADATA_RECEIVED");
             statusRef.current = "METADATA_RECEIVED";
             const retrievedChunks: GroundedChunk[] = parsedData.retrieved_chunks || [];
+            const suggestedFollowUps: string[] = parsedData.suggested_follow_ups || [];
             setCitations(retrievedChunks);
             setTelemetry((prev) => ({
               ...prev,
@@ -195,6 +209,7 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
                         latencyMs: parsedData.latency_ms,
                         retrievedChunks,
                         popLocation: popLocation || msg.metadata?.popLocation,
+                        suggestedFollowUps,
                       },
                     }
                   : msg
@@ -218,6 +233,26 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
               )
             );
           } else if (eventType === "done") {
+            const suggestedFollowUps: string[] = parsedData.suggested_follow_ups || [];
+            if (suggestedFollowUps.length > 0) {
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMessageId
+                    ? {
+                        ...msg,
+                        metadata: {
+                          ...msg.metadata,
+                          suggestedFollowUps:
+                            msg.metadata?.suggestedFollowUps &&
+                            msg.metadata.suggestedFollowUps.length > 0
+                              ? msg.metadata.suggestedFollowUps
+                              : suggestedFollowUps,
+                        },
+                      }
+                    : msg
+                )
+              );
+            }
             setStatus("COMPLETED");
             statusRef.current = "COMPLETED";
           } else if (eventType === "error") {

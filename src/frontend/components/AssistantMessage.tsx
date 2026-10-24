@@ -28,6 +28,14 @@ export interface AssistantMessageProps {
    */
   onCopy?: () => void;
   /**
+   * Suggested follow-up prompt chips (Spec 07 Section 6).
+   */
+  suggestedFollowUps?: string[];
+  /**
+   * Callback fired when a follow-up chip is selected.
+   */
+  onSelectFollowUp?: (prompt: string) => void;
+  /**
    * Optional custom styling classes.
    */
   className?: string;
@@ -284,6 +292,8 @@ export function AssistantMessage({
   chunks,
   onSelectCitation,
   onCopy,
+  suggestedFollowUps,
+  onSelectFollowUp,
   className = "",
 }: AssistantMessageProps) {
   const [copied, setCopied] = useState(false);
@@ -624,6 +634,30 @@ export function AssistantMessage({
             />
           )}
         </div>
+
+        {/* Dynamic Follow-Up Prompt Suggestions (Spec 07 Section 6) */}
+        {!isStreaming && suggestedFollowUps && suggestedFollowUps.length > 0 && (
+          <div
+            className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800"
+            data-testid="suggested-follow-ups"
+          >
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">
+              Related Statutory Inquiries
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {suggestedFollowUps.map((prompt, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => onSelectFollowUp?.(prompt)}
+                  className="inline-flex items-center text-xs font-medium px-3 py-1.5 rounded-full bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60 border border-sky-200 dark:border-sky-800/80 transition-colors focus:outline-hidden focus:ring-2 focus:ring-sky-500 text-left"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Statutory Section 949A GAW banner rendered at bottom of completed assistant response */}
         {!isStreaming && message.trim().length > 0 && (

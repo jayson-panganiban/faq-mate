@@ -270,6 +270,8 @@ export function ChatContainer({
                 message={msg.content}
                 isStreaming={isStreaming}
                 chunks={chunks}
+                suggestedFollowUps={msg.metadata?.suggestedFollowUps}
+                onSelectFollowUp={onSelectStarterQuery}
                 onSelectCitation={onSelectCitation}
               />
             );

@@ -177,7 +177,7 @@ sequenceDiagram
 ```
 
 ### 4.1 Step-by-Step Execution Path
-1. **Edge Interception & Rate Limiting:** An incoming HTTP/3 POST arrives at the nearest Cloudflare Anycast point-of-presence (PoP). Worker evaluates and emits `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers (10 req/min per IP via `cf-connecting-ip`). The frontend renders a Cloudflare Turnstile widget when a site key is configured; server-side Turnstile token verification is a **planned** requirement (see [Spec 02 § 7](specs/02-edge-rag-runtime.md#7-known-gaps)).
+1. **Edge Interception & Rate Limiting:** An incoming HTTP/3 POST arrives at the nearest Cloudflare Anycast point-of-presence (PoP). Worker evaluates and emits `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers (10 req/min per IP via `cf-connecting-ip`). The frontend renders a Cloudflare Turnstile widget when a site key is configured; server-side Turnstile token verification is a **planned** requirement (see [Spec 02 § 7](../.scratch/02-edge-rag-runtime/spec.md#7-known-gaps)).
 2. **Dual-Layer PII Scrubbing:** Client-side pre-ingress scrubbing (`sanitizeClientPii()` in `src/frontend/utils/client-pii-scrubber.ts`) and edge sanitization (`sanitizePii()` in `src/guardrails/pii-sanitizer.ts`) strip Australian PII: Tax File Numbers, Medicare numbers, credit cards, Australian phone numbers, and prefixed driver licence numbers.
 3. **Life-Safety Emergency & ASIC RG 244 Gatekeeper (`evaluateAdviceBoundary()` in `src/guardrails/advice-gatekeeper.ts`):** A single deep module evaluates two ordered gates:
    * **Emergency Interception (evaluated first):** Active peril or distress queries short-circuit with `code: "EMERGENCY_INTERCEPTION"` and `EMERGENCY_REFUSAL_MESSAGE`, listing Triple Zero (`000`), State Emergency Service (`132 500`), and Disaster Welfare (`1800 018 444`).
@@ -335,7 +335,7 @@ CREATE INDEX idx_telemetry_pop ON rag_telemetry_audit(pop_location);
 7. **Phase 7: Ground-Up 39-Insurer Corpus Ingestion, Linter & AST Compiler (`✅ Complete`)**
    * Consolidate the 39-insurer archive (`1,277` validated PDFs + `5,416` Q&As in `data/raw/`), canonical insurer & Bancassurance alias registry (`src/constants/insurers.ts`), unified Corpus Document Codec (`src/ingest/corpus-codec.ts`), Corpus Linter (`src/ingest/corpus-linter.ts`), and AST Edge Compiler (`src/ingest/corpus-compiler.ts`) generating **331 normalized Markdown documents** and **480 compiled AST chunks** in `src/rag/corpus-data.ts`.
 8. **Phase 8: Runtime Hardening (`🟡 Planned`)**
-   * Close the gaps tracked in each spec's **Known Gaps** section ([02](specs/02-edge-rag-runtime.md#7-known-gaps), [03](specs/03-regulatory-compliance.md#6-known-gaps), [04](specs/04-afca-eval-benchmarks.md#6-known-gaps), [06](specs/06-corpus-refinement-and-compilation.md#9-known-gaps)): server-side Turnstile verification, `@cf/meta/llama-3.1-8b-instruct` secondary fallback, true first-token `inference_ttft_ms` measurement, runtime groundedness scoring, `POST /api/feedback`, durable (cross-isolate) rate limiting, and linter-enforced peril co-location.
+   * Close the gaps tracked in each spec's **Known Gaps** section ([02](../.scratch/02-edge-rag-runtime/spec.md#7-known-gaps), [03](../.scratch/03-regulatory-compliance/spec.md#6-known-gaps), [04](../.scratch/04-afca-eval-benchmarks/spec.md#6-known-gaps), [06](../.scratch/06-corpus-refinement-and-compilation/spec.md#9-known-gaps)): server-side Turnstile verification, `@cf/meta/llama-3.1-8b-instruct` secondary fallback, true first-token `inference_ttft_ms` measurement, runtime groundedness scoring, `POST /api/feedback`, durable (cross-isolate) rate limiting, and linter-enforced peril co-location.
 
 ---
 
@@ -346,4 +346,4 @@ CREATE INDEX idx_telemetry_pop ON rag_telemetry_audit(pop_location);
   * [ADR-0002](adr/0002-pre-normalized-markdown-r2-ingestion.md) — Pre-normalized Markdown into R2
   * [ADR-0003](adr/0003-static-ast-corpus-edge-fallback.md) — Compiled static AST corpus as in-isolate retrieval fallback
   * [ADR-0004](adr/0004-canonical-insurer-registry-alias-resolution.md) — Canonical 39-insurer registry & bancassurance alias resolution
-* **Living Specifications:** [`docs/specs/`](specs/) — Specs 01–06 (v2.0.0), each ending with a **Known Gaps** section.
+* **Living Specifications:** [`.scratch/`](../.scratch/) — Specs 01–07, each ending with a **Known Gaps** section.

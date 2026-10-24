@@ -30,5 +30,5 @@ We compile the normalized corpus into a **static TypeScript module** that ships 
 ### Negative / Trade-Offs
 * The fallback is lexical keyword scoring only: no dense vectors, no reranker. Recall on paraphrased queries is lower than AI Search.
 * The static index covers a **budgeted subset** (480 chunks), not all 331 documents in full. Long-tail clauses are only reachable through AI Search.
-* Bundle size grows with the corpus; the budget must be re-checked whenever the roster or edition policy changes (bundle-size CI check is a known gap; see [Spec 06](../specs/06-corpus-refinement-and-compilation.md#9-known-gaps)).
+* Bundle size grows with the corpus; the budget must be re-checked whenever the roster or edition policy changes (bundle-size CI check is a known gap; see [Spec 06](../../.scratch/06-corpus-refinement-and-compilation/spec.md#9-known-gaps)).
 * Two retrieval paths can rank differently for the same query, so AFCA evals pin behaviour to the local path.

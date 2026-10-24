@@ -1,6 +1,6 @@
 -- Cloudflare D1 Telemetry & Compliance Audit Schema
 -- Migration: 0001_init_telemetry.sql
--- Specification: PRD.md § 6.4 & docs/specs/02-edge-rag-runtime.md
+-- Specification: PRD.md § 6.4 & .scratch/02-edge-rag-runtime/spec.md
 
 CREATE TABLE IF NOT EXISTS rag_telemetry_audit (
     id TEXT PRIMARY KEY,

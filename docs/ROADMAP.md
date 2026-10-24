@@ -32,7 +32,7 @@
 - [x] Record ADR-0002 (Pre-Normalized Markdown in R2)
 - [x] Record ADR-0003 (Static AST Corpus as In-Isolate Retrieval Fallback)
 - [x] Record ADR-0004 (Canonical Insurer Registry & Bancassurance Alias Resolution)
-- [x] Author & maintain living specifications (`docs/specs/01` through `06` all at v2.0.0)
+- [x] Author & maintain living specifications (`.scratch/01` through `06` all at v2.0.0)
 
 ### Phase 2: Core Edge Worker & Telemetry (Completed)
 
@@ -73,7 +73,7 @@
 - [x] Enforce automated CI gate ($\ge 0.98$ groundedness, $0.00\%$ advice leakage, $100\%$ GAW, $100\%$ citation precision)
 - [x] All 13/13 eval tests passing in CI
 
-### Phase 6: Cloudflare Pages Frontend ([`docs/specs/05-frontend-chat-interface.md`](specs/05-frontend-chat-interface.md))
+### Phase 6: Cloudflare Pages Frontend ([`.scratch/05-frontend-chat-interface/spec.md`](../.scratch/05-frontend-chat-interface/spec.md))
 
 - [x] Scaffold Vite + React 19 UI in `src/frontend/` with Tailwind CSS & Lucide React
 - [x] Stream state machine & custom `useChatStream` hook with full SSE protocol
@@ -86,7 +86,7 @@
 - [x] Cloudflare Turnstile bot protection support
 - [x] Complete frontend unit and E2E integration test suite (154/154 tests passing)
 
-### Phase 7: Ground-Up Multi-Insurer Ingestion & Edge AST Compiler ([`docs/specs/06-corpus-refinement-and-compilation.md`](specs/06-corpus-refinement-and-compilation.md))
+### Phase 7: Ground-Up Multi-Insurer Ingestion & Edge AST Compiler ([`.scratch/06-corpus-refinement-and-compilation/spec.md`](../.scratch/06-corpus-refinement-and-compilation/spec.md))
 
 - [x] Canonical Insurer Registry ([`src/constants/insurers.ts`](file:///Users/jaysoncp/Developer/faq-mate/src/constants/insurers.ts)):
   - [x] Model 39 primary insurers across 5 categories (Suncorp Group, Major Insurers, Challengers & Auto Clubs, Travel Specialists, Life Insurers)
@@ -96,7 +96,7 @@
   - [x] Index 1,277 policy disclosure PDFs in `data/raw/all_manifest.csv` with category, product, document type, and effective dates
   - [x] Archive 5,416 Q&As in `data/raw/FAQs/` across all 39 primary insurers
   - [x] Manifest selector contract supporting default current-edition filtering and `--all-historical` full archive ingestion
-- [x] Semantic Normalization Pipeline ([`docs/specs/01-data-ingestion-chunking.md`](specs/01-data-ingestion-chunking.md)):
+- [x] Semantic Normalization Pipeline ([`.scratch/01-data-ingestion-chunking/spec.md`](../.scratch/01-data-ingestion-chunking/spec.md)):
   - [x] Multi-insurer normalizer (`scripts/normalize-corpus.ts` / `npm run normalize`)
   - [x] Structured frontmatter injection with `<!-- BREADCRUMB -->` schema (`insurer`, `insurer_code`, `category`, `product`, `doc_type`, `effective_date`, `jurisdiction`)
   - [x] GFM table serialization for monetary sub-limits schedules and excess structures
@@ -115,15 +115,15 @@
   - [x] Enforce canonical R2 key parity: `corpus/pds/{insurer_code}/{product_slug}/{doc_type}_{effective_date}.md` and `corpus/faqs/{insurer_code}.md`
 - [x] Verification, Living Specs & Agent Rules:
   - [x] Updated `AGENTS.md` with Spec 06 context pointer, Ingestion & Compilation Invariants, and verification commands
-  - [x] Upgraded Spec 01 to v2.0.0 (`docs/specs/01-data-ingestion-chunking.md`)
-  - [x] Aligned Spec 06 to v2.0.0 (`docs/specs/06-corpus-refinement-and-compilation.md`)
+  - [x] Upgraded Spec 01 to v2.0.0 (`.scratch/01-data-ingestion-chunking/spec.md`)
+  - [x] Aligned Spec 06 to v2.0.0 (`.scratch/06-corpus-refinement-and-compilation/spec.md`)
   - [x] Zero regressions against AFCA-10 benchmark evals and TypeScript verification gate (`npm run verify`)
 
 ---
 
 ### Phase 8: Runtime Hardening & Planned Improvements (Planned)
 
-Tracked across living specifications [02](specs/02-edge-rag-runtime.md#7-known-gaps), [03](specs/03-regulatory-compliance.md#6-known-gaps), [04](specs/04-afca-eval-benchmarks.md#6-known-gaps), and [06](specs/06-corpus-refinement-and-compilation.md#9-known-gaps):
+Tracked across living specifications [02](../.scratch/02-edge-rag-runtime/spec.md#7-known-gaps), [03](../.scratch/03-regulatory-compliance/spec.md#6-known-gaps), [04](../.scratch/04-afca-eval-benchmarks/spec.md#6-known-gaps), and [06](../.scratch/06-corpus-refinement-and-compilation/spec.md#9-known-gaps):
 
 - [ ] **G1: Server-Side Turnstile Verification:** Validate `turnstileToken` with Cloudflare Siteverify API before routing to edge RAG; return 403 on failed token.
 - [ ] **G2: Secondary `@cf/meta/llama-3.1-8b-instruct` Fallback:** Try 8B model when 70B fails before falling back to deterministic synthesis.
@@ -136,3 +136,4 @@ Tracked across living specifications [02](specs/02-edge-rag-runtime.md#7-known-g
 - [ ] **G9: Enriched SSE Metadata:** Add `pop_location`, `ttft_ms`, and `groundedness_score` to SSE events without breaking consumers.
 - [ ] **G10: CI Bundle & Memory Budget Assertions:** Automated bundle size and memory budget assertions in `npm run verify`.
 - [ ] **G11: Query Filter Forwarding:** Forward `product` and `docType` from validated request schema into AI Search and local retriever.
+- [ ] **Phase 8.1 / Spec 07: Conversational Natural Language & Semantic Intent Expansion:** ([`.scratch/07-conversational-natural-language-inquiries/spec.md`](../.scratch/07-conversational-natural-language-inquiries/spec.md)) Colloquial peril-to-statutory intent mapper, dual-tier semantic retrieval, factual breadth disambiguation, and Plain-English synthesis.

@@ -5,27 +5,30 @@ Australian General Insurance FAQ Edge RAG system running on Cloudflare Workers, 
 ## Context Pointers
 - **Roadmap & Phase Tracker:** [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - **Living Specifications:**
-  - [`docs/specs/01-data-ingestion-chunking.md`](docs/specs/01-data-ingestion-chunking.md) (4-Stage Ingestion, R2 Keys, Breadcrumbs)
-  - [`docs/specs/02-edge-rag-runtime.md`](docs/specs/02-edge-rag-runtime.md) (SSE Protocol, Rate Limiting, Hybrid Search)
-  - [`docs/specs/03-regulatory-compliance.md`](docs/specs/03-regulatory-compliance.md) (ASIC RG 244, COP Emergency, APP 3/11 PII)
-  - [`docs/specs/04-afca-eval-benchmarks.md`](docs/specs/04-afca-eval-benchmarks.md) (AFCA-10 Trap Scenarios & Groundedness Gate)
-  - [`docs/specs/05-frontend-chat-interface.md`](docs/specs/05-frontend-chat-interface.md) (React 19 UI, Citation Drawer, Comparison Matrix)
-  - [`docs/specs/06-corpus-refinement-and-compilation.md`](docs/specs/06-corpus-refinement-and-compilation.md) (39-Insurer Roster, Corpus Linter & AST Compiler)
+  - [`01-data-ingestion-chunking`](.scratch/01-data-ingestion-chunking/spec.md) (4-Stage Ingestion, R2 Keys, Breadcrumbs)
+  - [`02-edge-rag-runtime`](.scratch/02-edge-rag-runtime/spec.md) (SSE Protocol, Rate Limiting, Hybrid Search)
+  - [`03-regulatory-compliance`](.scratch/03-regulatory-compliance/spec.md) (ASIC RG 244, COP Emergency, APP 3/11 PII)
+  - [`04-afca-eval-benchmarks`](.scratch/04-afca-eval-benchmarks/spec.md) (AFCA-10 Trap Scenarios & Groundedness Gate)
+  - [`05-frontend-chat-interface`](.scratch/05-frontend-chat-interface/spec.md) (React 19 UI, Citation Drawer, Comparison Matrix)
+  - [`06-corpus-refinement-and-compilation`](.scratch/06-corpus-refinement-and-compilation/spec.md) (39-Insurer Roster, Corpus Linter & AST Compiler)
+  - [`07-conversational-natural-language-inquiries`](.scratch/07-conversational-natural-language-inquiries/spec.md) (Colloquial Intent, Multi-Turn, Decision Factors)
 - **Canonical Registries & Codecs:**
   - [`src/constants/insurers.ts`](src/constants/insurers.ts) (39 Primary Insurers, Bancassurance Aliases, Policy Comparison Catalog)
   - [`src/constants/statutory.ts`](src/constants/statutory.ts) (`STATUTORY_GAW`, `STATUTORY_SAFE_HARBOR_REFUSAL`, `EMERGENCY_HOTLINES`)
   - [`src/ingest/corpus-codec.ts`](src/ingest/corpus-codec.ts) (Breadcrumb Serializer/Parser, R2 Path Key Resolver, Statutory Footer)
 - **Domain Invariants & Legal Terms:** [`GLOSSARY.md`](GLOSSARY.md)
+- **Architecture Decision Records:** [`docs/adr/`](docs/adr/)
+- **Agent Skills Configuration:** [`docs/agents/`](docs/agents/) ([`issue-tracker.md`](docs/agents/issue-tracker.md), [`triage-labels.md`](docs/agents/triage-labels.md), [`domain.md`](docs/agents/domain.md))
 - **System Architecture & PRD:** [`docs/PRD.md`](docs/PRD.md)
 - **Coding Standards & Review Rules:** [`CODING_STANDARDS.md`](CODING_STANDARDS.md)
 
 ---
 
-## Antigravity Operating Loop
+## Operating Loop
 
 Execute every task through this 5-stage loop:
 
-1. **Locate & Align:** Read the relevant specification in [`docs/specs/`](docs/specs/) and related tests before modifying code.
+1. **Locate & Align:** Read the relevant specification in [`.scratch/<feature>/spec.md`](.scratch/) and related tests before modifying code.
 2. **Spec-First Verification:** Write or update the test contract in [`tests/`](tests/) before or alongside changes.
 3. **Surgical Implementation:** Make minimal, deep-module changes. Preserve existing docstrings, legal citations, and comments.
 4. **Fast Verify Gate:** Run `npm run verify` (typecheck + vitest + AFCA evals). Never consider a turn complete on failing tests.
@@ -79,3 +82,20 @@ Execute every task through this 5-stage loop:
 - **Corpus AST Edge Compilation:** `npm run compile:corpus`
 - **Corpus Linter:** `npm run lint:corpus`
 - **Corpus R2 Upload & Audit:** `npm run upload:r2`
+
+---
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked as local markdown files under `.scratch/`. See [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md).
+
+### Triage labels
+
+Canonical five-role triage vocabulary. See [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md).
+
+### Domain docs
+
+Single-context ([`GLOSSARY.md`](GLOSSARY.md) + [`docs/adr/`](docs/adr/) at repo root). See [`docs/agents/domain.md`](docs/agents/domain.md).
+

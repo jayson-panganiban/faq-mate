@@ -49,6 +49,7 @@ exclude = [
 ]
 
 [tool.ty.rules]
+unresolved-import = "ignore"
 invalid-method-override = "ignore"
 unresolved-attribute = "ignore"
 unsupported-operator = "ignore"

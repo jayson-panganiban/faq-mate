@@ -1,7 +1,7 @@
 # Wayfinding Map: Conversational Natural Language Inquiries (Spec 07)
 
 **Spec Reference:** [`spec.md`](spec.md)  
-**Triage Role:** `ready-for-agent`  
+**Triage Role:** `resolved`  
 **Integration Branch:** `feat/spec-07-conversational-rag`
 
 ## Notes & Decisions
@@ -33,3 +33,4 @@ graph TD
 - **Ticket 04 Resolved:** Enhanced `synthesizePrompt()` in `src/rag/prompt-synthesizer.ts` and `generateFallbackResponse()` in `src/index.ts` with multi-turn history injection, product-line demarcation headings, and conversational dilemma decision matrices ([`04-product-line-disambiguation-prompt-synthesis.md`](issues/04-product-line-disambiguation-prompt-synthesis.md)).
 - **Ticket 05 Resolved:** Implemented `generateFollowUpSuggestions()` in `src/rag/follow-up-generator.ts`, emitted `suggested_follow_ups` in edge SSE stream, and wired interactive chips to `AssistantMessage.tsx` ([`05-dynamic-follow-up-prompt-suggestions-generator.md`](issues/05-dynamic-follow-up-prompt-suggestions-generator.md)).
 - **Ticket 06 Resolved:** Implemented e2e integration suite `tests/integration/conversational-rag.test.ts` and AFCA benchmark scenarios TC-11 through TC-15 in `tests/evals/afca-compliance.test.ts`, verifying full `npm run verify` pass ([`06-e2e-conversational-integration-afca-benchmark-suite.md`](issues/06-e2e-conversational-integration-afca-benchmark-suite.md)).
+- **Code Review Complete:** Two-axis code review (Standards + Spec) conducted and verified. Refactored repeated switch peril boosts into table-driven map, resolved primitive obsession with `InsurancePeril` type, deduplicated follow-up prompt eligibility predicate, stripped voice transcription noise prior to retrieval, added context-aware retrieval query enrichment, and enabled conversational brand alias extraction. Full verification gate passing.

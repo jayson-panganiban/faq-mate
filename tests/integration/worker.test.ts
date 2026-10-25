@@ -224,9 +224,11 @@ describe("Worker End-to-End Integration Suite (Spec 02 & Spec 03)", () => {
     expect(searchMock).toHaveBeenCalledWith(
       expect.objectContaining({
         query: expect.any(String),
-        topK: 5,
-        rerank: true,
-        filter: { insurer: "allianz" },
+        ai_search_options: expect.objectContaining({
+          retrieval: expect.objectContaining({
+            max_num_results: 5,
+          }),
+        }),
       })
     );
 

@@ -27,13 +27,11 @@ export interface Env {
     search(params: {
       query?: string;
       messages?: Array<{ role: string; content: string }>;
-      topK?: number;
-      rerank?: boolean;
-      filter?: Record<string, string>;
       ai_search_options?: {
         retrieval?: {
           max_num_results?: number;
-          filters?: Record<string, string>;
+          return_on_failure?: boolean;
+          filters?: Record<string, unknown>;
         };
       };
     }): Promise<{

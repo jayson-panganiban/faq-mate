@@ -90,14 +90,10 @@ async function retrievePolicyChunks(
     try {
       const resp = await aiSearch.search({
         query,
-        messages: [{ role: "user", content: query }],
-        topK: 5,
-        rerank: true,
-        filter: insurer ? { insurer } : undefined,
         ai_search_options: {
           retrieval: {
             max_num_results: 5,
-            filters: insurer ? { insurer } : undefined,
+            return_on_failure: true,
           },
         },
       });
@@ -126,10 +122,19 @@ async function retrievePolicyChunks(
       });
 
       if (chunks.length > 0) {
-        return { chunks, durationMs: performance.now() - start };
+        let filteredChunks = chunks;
+        if (insurer) {
+          const matched = chunks.filter(
+            (c) => c.source.insurer.toLowerCase() === insurer.toLowerCase()
+          );
+          if (matched.length > 0) {
+            filteredChunks = matched;
+          }
+        }
+        return { chunks: filteredChunks, durationMs: performance.now() - start };
       }
     } catch (err) {
-      console.error("[AI_SEARCH::Failure]", err);
+      console.warn("[AI_SEARCH::Failure]", err instanceof Error ? err.message : String(err));
     }
   }
 

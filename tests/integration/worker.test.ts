@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { getDailySalt, sanitizePii } from "../../src/guardrails/pii-sanitizer";
-import worker from "../../src/index";
+import worker, { getCorsHeaders, isOriginAllowed, SECURITY_HEADERS } from "../../src/index";
 import type { Env } from "../../src/types/bindings";
 
 describe("Worker End-to-End Integration Suite (Spec 02 & Spec 03)", () => {
@@ -309,5 +309,191 @@ describe("Worker End-to-End Integration Suite (Spec 02 & Spec 03)", () => {
     const text = await res.text();
     expect(text).toContain("event: metadata");
     expect(text).toContain("Water defined under modern AI Search chunks format.");
+  });
+
+  it("11. isOriginAllowed strictly validates production, preview subdomains, localhost, and env overrides", () => {
+    // Valid origins
+    expect(isOriginAllowed("https://faq-mate.pages.dev")).toBe(true);
+    expect(isOriginAllowed("https://preview-123.faq-mate.pages.dev")).toBe(true);
+    expect(isOriginAllowed("https://feat-security.faq-mate.pages.dev")).toBe(true);
+    expect(isOriginAllowed("http://localhost:3000")).toBe(true);
+    expect(isOriginAllowed("http://localhost:8787")).toBe(true);
+    expect(isOriginAllowed("http://127.0.0.1:5173")).toBe(true);
+
+    // Custom origin via env
+    const customEnv: Env = {
+      ...mockEnv,
+      ALLOWED_ORIGINS: "https://custom-partner.com.au,https://staging.insure.org",
+    };
+    expect(isOriginAllowed("https://custom-partner.com.au", customEnv)).toBe(true);
+    expect(isOriginAllowed("https://staging.insure.org", customEnv)).toBe(true);
+
+    // Disallowed / Malicious origins
+    expect(isOriginAllowed("https://malicious-phishing.com")).toBe(false);
+    expect(isOriginAllowed("https://faq-mate.pages.dev.attacker.com")).toBe(false);
+    expect(isOriginAllowed("https://not-faq-mate.pages.dev")).toBe(false);
+    expect(isOriginAllowed("")).toBe(false);
+  });
+
+  it("12. OPTIONS preflight handles allowed vs disallowed origins and emits security headers", async () => {
+    // Allowed origin
+    const preflightAllowed = new Request("http://localhost/api/chat", {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://faq-mate.pages.dev",
+        "Access-Control-Request-Method": "POST",
+      },
+    });
+    const resAllowed = await worker.fetch(preflightAllowed, mockEnv, mockCtx);
+    expect(resAllowed.status).toBe(204);
+    expect(resAllowed.headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://faq-mate.pages.dev"
+    );
+    expect(resAllowed.headers.get("Vary")).toBe("Origin");
+    expect(resAllowed.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(resAllowed.headers.get("X-Frame-Options")).toBe("DENY");
+
+    // Disallowed origin
+    const preflightDisallowed = new Request("http://localhost/api/chat", {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://evil-attacker.com",
+        "Access-Control-Request-Method": "POST",
+      },
+    });
+    const resDisallowed = await worker.fetch(preflightDisallowed, mockEnv, mockCtx);
+    expect(resDisallowed.status).toBe(403);
+    expect(resDisallowed.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
+
+  it("13. POST /api/chat enforces CORS origin restrictions and attaches full OWASP security headers", async () => {
+    // Unauthorized origin receives 403 Forbidden
+    const unauthReq = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://rogue-ai-scraper.org",
+      },
+      body: JSON.stringify({
+        query: "What is flood?",
+        conversationId: "550e8400-e29b-41d4-a716-446655440004",
+      }),
+    });
+    const unauthRes = await worker.fetch(unauthReq, mockEnv, mockCtx);
+    expect(unauthRes.status).toBe(403);
+    const unauthBody = (await unauthRes.json()) as { error: string };
+    expect(unauthBody.error).toBe("Forbidden");
+
+    // Authorized origin receives 200 with dynamic CORS and defense-in-depth headers
+    const authReq = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "https://faq-mate.pages.dev",
+        "cf-connecting-ip": "192.168.1.104",
+      },
+      body: JSON.stringify({
+        query: "What is flood?",
+        conversationId: "550e8400-e29b-41d4-a716-446655440005",
+      }),
+    });
+    const authRes = await worker.fetch(authReq, mockEnv, mockCtx);
+    expect(authRes.status).toBe(200);
+    expect(authRes.headers.get("Access-Control-Allow-Origin")).toBe("https://faq-mate.pages.dev");
+    expect(authRes.headers.get("Vary")).toBe("Origin");
+    expect(authRes.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(authRes.headers.get("X-Frame-Options")).toBe("DENY");
+    expect(authRes.headers.get("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
+    expect(authRes.headers.get("Permissions-Policy")).toBeDefined();
+  });
+
+  it("14. Worker respects configurable environment variables (AI_MODEL, RETRIEVAL_TOP_K, RATE_LIMIT_MAX)", async () => {
+    const aiRunMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(
+              new TextEncoder().encode(`data: {"text": "Configurable model output"}\n\n`)
+            );
+            controller.close();
+          },
+        })
+      )
+    );
+
+    const configuredEnv: Env = {
+      ...mockEnv,
+      AI_MODEL: "@cf/meta/llama-custom-model",
+      AI_MAX_TOKENS: "512",
+      RATE_LIMIT_MAX: "2",
+      RATE_LIMIT_WINDOW_SECONDS: "30",
+      AI: { run: aiRunMock },
+    };
+
+    const clientIp = "192.168.1.200";
+
+    // Request 1: Allowed
+    const req1 = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "cf-connecting-ip": clientIp },
+      body: JSON.stringify({
+        query: "What is flood?",
+        conversationId: "550e8400-e29b-41d4-a716-446655440006",
+      }),
+    });
+    const res1 = await worker.fetch(req1, configuredEnv, mockCtx);
+    expect(res1.status).toBe(200);
+    expect(res1.headers.get("X-RateLimit-Limit")).toBe("2");
+    expect(res1.headers.get("X-RateLimit-Remaining")).toBe("1");
+    expect(aiRunMock).toHaveBeenCalledWith(
+      "@cf/meta/llama-custom-model",
+      expect.objectContaining({ max_tokens: 512 })
+    );
+
+    // Request 2: Allowed
+    const req2 = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "cf-connecting-ip": clientIp },
+      body: JSON.stringify({
+        query: "What is flood?",
+        conversationId: "550e8400-e29b-41d4-a716-446655440007",
+      }),
+    });
+    const res2 = await worker.fetch(req2, configuredEnv, mockCtx);
+    expect(res2.status).toBe(200);
+    expect(res2.headers.get("X-RateLimit-Remaining")).toBe("0");
+
+    // Request 3: Blocked by custom RATE_LIMIT_MAX = 2
+    const req3 = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "cf-connecting-ip": clientIp },
+      body: JSON.stringify({
+        query: "What is flood?",
+        conversationId: "550e8400-e29b-41d4-a716-446655440008",
+      }),
+    });
+    const res3 = await worker.fetch(req3, configuredEnv, mockCtx);
+    expect(res3.status).toBe(429);
+  });
+
+  it("15. Turnstile bot protection gates requests when TURNSTILE_SECRET_KEY is configured", async () => {
+    const envWithTurnstile: Env = {
+      ...mockEnv,
+      TURNSTILE_SECRET_KEY: "0x4AAAAAAtestsecret",
+    };
+
+    // Missing token should be rejected with 403
+    const reqNoToken = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "cf-connecting-ip": "192.168.1.205" },
+      body: JSON.stringify({
+        query: "What is flood?",
+        conversationId: "550e8400-e29b-41d4-a716-446655440009",
+      }),
+    });
+    const resNoToken = await worker.fetch(reqNoToken, envWithTurnstile, mockCtx);
+    expect(resNoToken.status).toBe(403);
+    const body = (await resNoToken.json()) as { error: string; message: string };
+    expect(body.message).toContain("Turnstile bot verification required");
   });
 });

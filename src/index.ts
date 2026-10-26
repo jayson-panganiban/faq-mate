@@ -20,25 +20,129 @@ import {
   type GroundedChunk,
 } from "./types/chat";
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+/**
+ * Standard HTTP Security Headers (OWASP & Cloudflare Best Practices)
+ */
+export const SECURITY_HEADERS: Record<string, string> = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy":
+    "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
 };
 
 /**
+ * Default Allowed Browser Origins for CORS
+ */
+export const DEFAULT_ALLOWED_ORIGINS: readonly string[] = [
+  "https://faq-mate.pages.dev",
+  "http://localhost:3000",
+  "http://localhost:8787",
+  "http://localhost:5173",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:8787",
+  "http://127.0.0.1:5173",
+];
+
+/**
+ * Validates whether an incoming Origin header is permitted.
+ * Permits production pages.dev, preview deployments (*.faq-mate.pages.dev),
+ * local development origins, and any comma-separated entries in env.ALLOWED_ORIGINS.
+ */
+export function isOriginAllowed(origin: string, env?: Env): boolean {
+  if (!origin) return false;
+  const cleanOrigin = origin.trim().toLowerCase().replace(/\/+$/, "");
+
+  // Match production Pages and preview subdomains (e.g. https://*.faq-mate.pages.dev)
+  if (/^https:\/\/([a-z0-9-]+\.)*faq-mate\.pages\.dev$/i.test(cleanOrigin)) {
+    return true;
+  }
+
+  // Match local dev hosts on any port
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(cleanOrigin)) {
+    return true;
+  }
+
+  // Configured allowed origins from env.ALLOWED_ORIGINS
+  if (env?.ALLOWED_ORIGINS) {
+    const list = env.ALLOWED_ORIGINS.split(",").map((o) =>
+      o.trim().toLowerCase().replace(/\/+$/, "")
+    );
+    if (list.includes(cleanOrigin)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Generates dynamic CORS & Security response headers based on the request origin.
+ */
+export function getCorsHeaders(request: Request, env?: Env): Record<string, string> {
+  const origin = request.headers.get("Origin");
+
+  const headers: Record<string, string> = {
+    ...SECURITY_HEADERS,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, cf-turnstile-token",
+    "Access-Control-Max-Age": "86400",
+  };
+
+  if (!origin) {
+    // Non-browser or direct curl/test request: permit with wildcard
+    headers["Access-Control-Allow-Origin"] = "*";
+    return headers;
+  }
+
+  if (isOriginAllowed(origin, env)) {
+    headers["Access-Control-Allow-Origin"] = origin;
+    headers["Vary"] = "Origin";
+  }
+
+  return headers;
+}
+
+/**
+ * Cloudflare Turnstile Siteverify Helper (Optional Bot Mitigation)
+ */
+async function verifyTurnstileToken(
+  token: string,
+  secretKey: string,
+  clientIp: string
+): Promise<boolean> {
+  try {
+    const formData = new FormData();
+    formData.append("secret", secretKey);
+    formData.append("response", token);
+    formData.append("remoteip", clientIp);
+
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      body: formData,
+    });
+    const outcome = (await res.json()) as { success?: boolean };
+    return Boolean(outcome.success);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * In-Memory Sliding-Window Rate Limiter (PRD § 4.1 Step 1 & Spec 02 § 3)
- * Limits requests to 10 req/min per IP/session.
+ * Limits requests per IP/session (defaults to 10 req/min, configurable via env.RATE_LIMIT_MAX).
  */
 interface RateLimitState {
   count: number;
   resetTime: number;
 }
 const rateLimitMap = new Map<string, RateLimitState>();
-const RATE_LIMIT_MAX = 10;
-const RATE_LIMIT_WINDOW_MS = 60_000;
 
-function evaluateRateLimit(clientIp: string): {
+function evaluateRateLimit(
+  clientIp: string,
+  maxLimit = 10,
+  windowMs = 60_000
+): {
   allowed: boolean;
   limit: number;
   remaining: number;
@@ -48,20 +152,20 @@ function evaluateRateLimit(clientIp: string): {
   const existing = rateLimitMap.get(clientIp);
 
   if (!existing || now >= existing.resetTime) {
-    const resetTime = now + RATE_LIMIT_WINDOW_MS;
+    const resetTime = now + windowMs;
     rateLimitMap.set(clientIp, { count: 1, resetTime });
     return {
       allowed: true,
-      limit: RATE_LIMIT_MAX,
-      remaining: RATE_LIMIT_MAX - 1,
+      limit: maxLimit,
+      remaining: maxLimit - 1,
       resetSeconds: Math.ceil(resetTime / 1000),
     };
   }
 
-  if (existing.count >= RATE_LIMIT_MAX) {
+  if (existing.count >= maxLimit) {
     return {
       allowed: false,
-      limit: RATE_LIMIT_MAX,
+      limit: maxLimit,
       remaining: 0,
       resetSeconds: Math.ceil(existing.resetTime / 1000),
     };
@@ -70,8 +174,8 @@ function evaluateRateLimit(clientIp: string): {
   existing.count++;
   return {
     allowed: true,
-    limit: RATE_LIMIT_MAX,
-    remaining: RATE_LIMIT_MAX - existing.count,
+    limit: maxLimit,
+    remaining: maxLimit - existing.count,
     resetSeconds: Math.ceil(existing.resetTime / 1000),
   };
 }
@@ -83,12 +187,13 @@ function evaluateRateLimit(clientIp: string): {
 async function retrievePolicyChunks(
   query: string,
   insurer?: string,
-  aiSearch?: Env["AI_SEARCH"]
+  aiSearch?: Env["AI_SEARCH"],
+  topK = 5
 ): Promise<{ chunks: GroundedChunk[]; durationMs: number }> {
   const start = performance.now();
 
   if (!insurer && !isInsuranceRelatedQuery(query)) {
-    const localMatches = localHybridSearch({ query, topK: 5 });
+    const localMatches = localHybridSearch({ query, topK });
     return { chunks: localMatches, durationMs: performance.now() - start };
   }
 
@@ -98,7 +203,7 @@ async function retrievePolicyChunks(
         query,
         ai_search_options: {
           retrieval: {
-            max_num_results: 5,
+            max_num_results: topK,
             return_on_failure: true,
           },
         },
@@ -157,7 +262,7 @@ async function retrievePolicyChunks(
 
   const chunks = localHybridSearch({
     query,
-    topK: 5,
+    topK,
     filter: insurer ? { insurer } : undefined,
   });
 
@@ -453,10 +558,15 @@ function generateFallbackResponse(
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    const corsHeaders = getCorsHeaders(request, env);
 
     // 1. CORS Preflight
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: CORS_HEADERS });
+      const origin = request.headers.get("Origin");
+      if (origin && !isOriginAllowed(origin, env)) {
+        return new Response(null, { status: 403, headers: corsHeaders });
+      }
+      return new Response(null, { status: 204, headers: corsHeaders });
     }
 
     // 2. Health Endpoint
@@ -469,7 +579,7 @@ export default {
           timestamp: new Date().toISOString(),
           service: "faq-mate-edge-api",
         },
-        { headers: CORS_HEADERS }
+        { headers: corsHeaders }
       );
     }
 
@@ -479,9 +589,20 @@ export default {
       const popLocation = (request.cf?.colo as string) || "LOCAL";
       const requestId = crypto.randomUUID();
 
+      // Origin Check for POST (Block cross-site browser requests from unlisted origins)
+      const origin = request.headers.get("Origin");
+      if (origin && !isOriginAllowed(origin, env)) {
+        return Response.json(
+          { error: "Forbidden", message: "Origin not allowed by CORS policy." },
+          { status: 403, headers: corsHeaders }
+        );
+      }
+
       // Rate Limiting Gate (PRD § 4.1 Step 1 & Spec 02 § 3)
       const clientIp = request.headers.get("cf-connecting-ip") || "127.0.0.1";
-      const rateLimit = evaluateRateLimit(clientIp);
+      const maxLimit = Number.parseInt(env?.RATE_LIMIT_MAX || "10", 10);
+      const windowSeconds = Number.parseInt(env?.RATE_LIMIT_WINDOW_SECONDS || "60", 10);
+      const rateLimit = evaluateRateLimit(clientIp, maxLimit, windowSeconds * 1000);
       const rateLimitHeaders = {
         "X-RateLimit-Limit": String(rateLimit.limit),
         "X-RateLimit-Remaining": String(rateLimit.remaining),
@@ -490,8 +611,11 @@ export default {
 
       if (!rateLimit.allowed) {
         return Response.json(
-          { error: "Too Many Requests", message: "Rate limit exceeded (10 requests per minute)." },
-          { status: 429, headers: { ...CORS_HEADERS, ...rateLimitHeaders } }
+          {
+            error: "Too Many Requests",
+            message: `Rate limit exceeded (${rateLimit.limit} requests per minute).`,
+          },
+          { status: 429, headers: { ...corsHeaders, ...rateLimitHeaders } }
         );
       }
 
@@ -501,8 +625,36 @@ export default {
       } catch {
         return Response.json(
           { error: "Invalid JSON body" },
-          { status: 400, headers: { ...CORS_HEADERS, ...rateLimitHeaders } }
+          { status: 400, headers: { ...corsHeaders, ...rateLimitHeaders } }
         );
+      }
+
+      // Cloudflare Turnstile Verification (if configured via env.TURNSTILE_SECRET_KEY)
+      if (env?.TURNSTILE_SECRET_KEY) {
+        const turnstileToken =
+          request.headers.get("cf-turnstile-token") ||
+          (typeof bodyJson === "object" && bodyJson !== null && "turnstileToken" in bodyJson
+            ? String((bodyJson as Record<string, unknown>).turnstileToken)
+            : undefined);
+
+        if (!turnstileToken) {
+          return Response.json(
+            { error: "Forbidden", message: "Turnstile bot verification required." },
+            { status: 403, headers: { ...corsHeaders, ...rateLimitHeaders } }
+          );
+        }
+
+        const isHuman = await verifyTurnstileToken(
+          turnstileToken,
+          env.TURNSTILE_SECRET_KEY,
+          clientIp
+        );
+        if (!isHuman) {
+          return Response.json(
+            { error: "Forbidden", message: "Turnstile bot verification failed." },
+            { status: 403, headers: { ...corsHeaders, ...rateLimitHeaders } }
+          );
+        }
       }
 
       // Validate inbound request schema (Spec 02 Section 1.1)
@@ -510,7 +662,7 @@ export default {
       if (!parseResult.success) {
         return Response.json(
           { error: "Validation Error", details: parseResult.error.format() },
-          { status: 422, headers: { ...CORS_HEADERS, ...rateLimitHeaders } }
+          { status: 422, headers: { ...corsHeaders, ...rateLimitHeaders } }
         );
       }
 
@@ -559,7 +711,7 @@ export default {
 
         return new Response(`event: error\ndata: ${JSON.stringify(refusalPayload)}\n\n`, {
           headers: {
-            ...CORS_HEADERS,
+            ...corsHeaders,
             ...rateLimitHeaders,
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
@@ -579,10 +731,12 @@ export default {
         parseResult.data.filters?.insurer || extractInsurerFromQuery(normalized.cleanedQuery);
 
       // Hybrid Retrieval (Spec 02 Section 2 & PRD § 2.1)
+      const topK = Number.parseInt(env?.RETRIEVAL_TOP_K || "5", 10);
       const { chunks, durationMs: searchDurationMs } = await retrievePolicyChunks(
         retrievalQuery,
         detectedInsurer,
-        env.AI_SEARCH
+        env.AI_SEARCH,
+        topK
       );
 
       // Context Assembly (Spec 07 Section 4 & 5)
@@ -619,26 +773,29 @@ export default {
 
             let tokenCount = 0;
             let rawAiStream: ReadableStream<Uint8Array> | null = null;
+            const aiModel = env?.AI_MODEL || "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+            const aiFallbackModel = env?.AI_FALLBACK_MODEL || "@cf/meta/llama-3.1-8b-instruct-fp8";
+            const maxTokens = Number.parseInt(env?.AI_MAX_TOKENS || "1024", 10);
 
             try {
-              const aiResponse = await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+              const aiResponse = await env.AI.run(aiModel, {
                 messages,
                 stream: true,
-                max_tokens: 1024,
+                max_tokens: maxTokens,
               });
               if (aiResponse && typeof (aiResponse as ReadableStream).getReader === "function") {
                 rawAiStream = aiResponse as ReadableStream<Uint8Array>;
               }
             } catch (aiErr) {
               console.warn(
-                "[WorkersAI::70B_Warning]",
+                `[WorkersAI::${aiModel}_Warning]`,
                 aiErr instanceof Error ? aiErr.message : String(aiErr)
               );
               try {
-                const fallbackAi = await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fp8", {
+                const fallbackAi = await env.AI.run(aiFallbackModel, {
                   messages,
                   stream: true,
-                  max_tokens: 1024,
+                  max_tokens: maxTokens,
                 });
                 if (fallbackAi && typeof (fallbackAi as ReadableStream).getReader === "function") {
                   rawAiStream = fallbackAi as ReadableStream<Uint8Array>;
@@ -752,7 +909,7 @@ export default {
 
       return new Response(stream, {
         headers: {
-          ...CORS_HEADERS,
+          ...corsHeaders,
           ...rateLimitHeaders,
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
@@ -761,6 +918,6 @@ export default {
       });
     }
 
-    return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
+    return new Response("Not Found", { status: 404, headers: corsHeaders });
   },
 };

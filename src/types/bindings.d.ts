@@ -56,4 +56,14 @@ export interface Env {
 
   // Cloudflare KV Config
   CONFIG_KV: KVNamespace;
+
+  // Configurable Runtime Environment Variables (wrangler.jsonc vars)
+  AI_MODEL?: string;
+  AI_FALLBACK_MODEL?: string;
+  AI_MAX_TOKENS?: string;
+  RETRIEVAL_TOP_K?: string;
+  RATE_LIMIT_MAX?: string;
+  RATE_LIMIT_WINDOW_SECONDS?: string;
+  ALLOWED_ORIGINS?: string;
+  TURNSTILE_SECRET_KEY?: string;
 }

@@ -481,4 +481,39 @@ describe("AssistantMessage Component (Ticket 5)", () => {
       expect(orderedLists[1].getAttribute("start")).toBe("3");
     });
   });
+
+  describe("Assistant Message Feedback Affordance (Spec 05 G6 & ui-craft ai-chat)", () => {
+    it("renders helpful and unhelpful feedback controls and fires onFeedback callback", () => {
+      const onFeedback = vi.fn();
+      const { container } = render(
+        <AssistantMessage
+          message="Flood is defined as the covering of normally dry land."
+          isStreaming={false}
+          onFeedback={onFeedback}
+        />
+      );
+
+      const helpfulBtn = within(container).getByRole("button", { name: /^helpful response$/i });
+      const unhelpfulBtn = within(container).getByRole("button", { name: /^unhelpful response$/i });
+
+      expect(helpfulBtn).toBeInTheDocument();
+      expect(unhelpfulBtn).toBeInTheDocument();
+
+      fireEvent.click(helpfulBtn);
+      expect(onFeedback).toHaveBeenCalledWith("positive");
+
+      fireEvent.click(unhelpfulBtn);
+      expect(onFeedback).toHaveBeenCalledWith("negative");
+    });
+
+    it("hides feedback controls while actively streaming", () => {
+      const { container } = render(
+        <AssistantMessage message="Generating policy explanation..." isStreaming={true} />
+      );
+
+      expect(
+        within(container).queryByTestId("assistant-feedback-controls")
+      ).not.toBeInTheDocument();
+    });
+  });
 });

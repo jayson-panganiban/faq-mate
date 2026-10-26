@@ -100,7 +100,7 @@ export function PolicyComparisonView({
             type="button"
             data-testid="close-comparison-button"
             onClick={onClose}
-            className="self-start sm:self-auto px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+            className="self-start sm:self-auto px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-[color,background-color,border-color,box-shadow] duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 focus-visible:outline-hidden"
           >
             Back to Chat
           </button>
@@ -121,7 +121,7 @@ export function PolicyComparisonView({
             data-testid="insurer-a-select"
             value={insurerA}
             onChange={(e) => setInsurerA(e.target.value as PrimaryInsurerCode)}
-            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 transition-[border-color,background-color] duration-150 cursor-pointer"
           >
             {GROUPED_INSURER_OPTIONS.map((group) => (
               <optgroup key={group.category} label={group.label}>
@@ -147,7 +147,7 @@ export function PolicyComparisonView({
             data-testid="insurer-b-select"
             value={insurerB}
             onChange={(e) => setInsurerB(e.target.value as PrimaryInsurerCode)}
-            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 transition-[border-color,background-color] duration-150 cursor-pointer"
           >
             {GROUPED_INSURER_OPTIONS.map((group) => (
               <optgroup key={group.category} label={group.label}>
@@ -200,7 +200,7 @@ export function PolicyComparisonView({
                     <button
                       type="button"
                       onClick={() => onSelectCitation?.(chunk)}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer pt-1"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline cursor-pointer pt-1 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-hidden rounded"
                     >
                       <BookOpen className="w-3 h-3" />
                       <span>Inspect Operative Excerpt</span>
@@ -237,7 +237,7 @@ export function PolicyComparisonView({
                     <button
                       type="button"
                       onClick={() => onSelectCitation?.(chunk)}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer pt-1"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer pt-1 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-hidden rounded"
                     >
                       <BookOpen className="w-3 h-3" />
                       <span>Inspect Operative Excerpt</span>
@@ -315,9 +315,9 @@ export function PolicyComparisonView({
               onClick={() =>
                 onSelectQuery(`Compare flood definitions between ${insurerA} and ${insurerB}`)
               }
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition-[color,background-color,transform] duration-150 active:scale-[0.98] cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-hidden"
             >
-              <ArrowRight className="w-3 h-3 text-blue-500" />
+              <ArrowRight className="w-3 h-3 text-sky-500" />
               <span>Compare Flood Definitions</span>
             </button>
             <button
@@ -325,9 +325,9 @@ export function PolicyComparisonView({
               onClick={() =>
                 onSelectQuery(`What are jewellery sub-limits under ${insurerA} vs ${insurerB}?`)
               }
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition-[color,background-color,transform] duration-150 active:scale-[0.98] cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-hidden"
             >
-              <ArrowRight className="w-3 h-3 text-blue-500" />
+              <ArrowRight className="w-3 h-3 text-sky-500" />
               <span>Compare Jewellery Sub-limits</span>
             </button>
           </div>

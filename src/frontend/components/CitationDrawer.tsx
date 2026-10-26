@@ -142,22 +142,24 @@ export function CitationDrawer({
           role="dialog"
           aria-modal="true"
           aria-labelledby="citation-drawer-title"
-          className="w-screen max-w-full sm:max-w-md md:max-w-lg lg:max-w-xl bg-white shadow-2xl flex flex-col h-full transform transition-transform duration-300 ease-in-out border-l border-slate-200"
+          className="w-screen max-w-full sm:max-w-md md:max-w-lg lg:max-w-xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col h-full transform transition-transform duration-300 ease-in-out border-l border-slate-200 dark:border-slate-800"
         >
           {/* Drawer Top Navigation Bar */}
-          <div className="p-4 sm:px-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+          <div className="p-4 sm:px-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-sky-100 text-sky-700">
+              <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300">
                 <BookOpen className="w-5 h-5" aria-hidden="true" />
               </div>
               <div>
                 <h2
                   id="citation-drawer-title"
-                  className="text-base sm:text-lg font-bold text-slate-900 tracking-tight"
+                  className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight"
                 >
                   Grounding Inspector
                 </h2>
-                <p className="text-xs text-slate-500">Operative Insurance Policy Verification</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Operative Insurance Policy Verification
+                </p>
               </div>
             </div>
 
@@ -165,7 +167,7 @@ export function CitationDrawer({
               type="button"
               onClick={onClose}
               aria-label="Close citations"
-              className="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200/70 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200/70 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 transition-[color,background-color] duration-150 min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
             >
               <X className="w-5 h-5" aria-hidden="true" />
             </button>
@@ -176,12 +178,11 @@ export function CitationDrawer({
             <div
               role="tablist"
               aria-label="Retrieved citations"
-              className="flex border-b border-slate-200 overflow-x-auto px-4 py-1 gap-2 bg-slate-100/70 scrollbar-thin"
+              className="flex border-b border-slate-200 dark:border-slate-800 overflow-x-auto px-4 py-1 gap-2 bg-slate-100/70 dark:bg-slate-800/50 scrollbar-thin"
             >
               {chunks.map((chunk, idx) => {
                 const isSelected = chunk.id === currentChunk?.id;
                 const tabTitle = `${chunk.source.product || chunk.source.insurer}`;
-                const tabSubtitle = chunk.source.section;
 
                 return (
                   <button
@@ -192,10 +193,10 @@ export function CitationDrawer({
                     aria-controls={`panel-${chunk.id}`}
                     type="button"
                     onClick={() => handleSelectTab(chunk.id)}
-                    className={`px-3 py-2 text-xs font-medium whitespace-nowrap min-h-[44px] flex items-center gap-2 rounded-md transition-all cursor-pointer ${
+                    className={`px-3 py-2 text-xs font-medium whitespace-nowrap min-h-[44px] flex items-center gap-2 rounded-md transition-[color,background-color,border-color,box-shadow] duration-150 cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 ${
                       isSelected
-                        ? "bg-white text-sky-800 shadow-xs border border-slate-200/80 font-semibold"
-                        : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+                        ? "bg-white dark:bg-slate-800 text-sky-800 dark:text-sky-300 shadow-xs border border-slate-200/80 dark:border-slate-700 font-semibold"
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-700/50"
                     }`}
                   >
                     <Layers
@@ -205,7 +206,9 @@ export function CitationDrawer({
                     <span className="truncate max-w-[140px] sm:max-w-[180px]">{tabTitle}</span>
                     <span
                       className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
-                        isSelected ? "bg-sky-100 text-sky-700" : "bg-slate-200 text-slate-600"
+                        isSelected
+                          ? "bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300"
+                          : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
                       }`}
                     >
                       #{idx + 1}
@@ -219,10 +222,10 @@ export function CitationDrawer({
           {/* Drawer Body */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
             {!currentChunk ? (
-              <div className="text-center py-12 text-slate-500">
-                <FileText className="w-10 h-10 mx-auto text-slate-300 mb-3" />
+              <div className="text-center py-12 text-slate-500 dark:text-slate-400">
+                <FileText className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
                 <p className="text-sm font-medium">No citations available for this response.</p>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                   Answers without grounding citations rely on general product guidelines.
                 </p>
               </div>
@@ -235,26 +238,28 @@ export function CitationDrawer({
               >
                 {/* Operative Section Breadcrumb */}
                 <div className="space-y-1.5">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                     Operative Breadcrumb
                   </span>
                   <nav
                     aria-label="Operative section breadcrumb"
-                    className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center gap-1.5 text-xs sm:text-sm text-slate-700 font-medium flex-wrap"
+                    className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex items-center gap-1.5 text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-medium flex-wrap"
                   >
-                    <span className="text-slate-500 uppercase tracking-wide text-[11px] font-semibold">
+                    <span className="text-slate-500 dark:text-slate-400 uppercase tracking-wide text-[11px] font-semibold">
                       {currentChunk.source.insurer}
                     </span>
                     <ChevronRight
                       className="w-3.5 h-3.5 text-slate-400 flex-shrink-0"
                       aria-hidden="true"
                     />
-                    <span className="text-slate-900 font-bold">{productDoc}</span>
+                    <span className="text-slate-900 dark:text-slate-100 font-bold">
+                      {productDoc}
+                    </span>
                     <ChevronRight
                       className="w-3.5 h-3.5 text-slate-400 flex-shrink-0"
                       aria-hidden="true"
                     />
-                    <span className="text-sky-700 font-semibold">
+                    <span className="text-sky-700 dark:text-sky-400 font-semibold">
                       {currentChunk.source.section}
                     </span>
                     {currentChunk.source.clauseId && (
@@ -263,7 +268,7 @@ export function CitationDrawer({
                           className="w-3.5 h-3.5 text-slate-400 flex-shrink-0"
                           aria-hidden="true"
                         />
-                        <span className="text-slate-600 text-xs font-mono">
+                        <span className="text-slate-600 dark:text-slate-400 text-xs font-mono">
                           Clause {currentChunk.source.clauseId}
                         </span>
                       </>
@@ -275,16 +280,16 @@ export function CitationDrawer({
                 <div className="flex flex-wrap items-center gap-2">
                   {/* Relevance Confidence Score */}
                   <div
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums border ${
                       matchPercentage >= 85
-                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                        ? "bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
                         : matchPercentage >= 70
-                          ? "bg-amber-50 text-amber-800 border-amber-200"
-                          : "bg-slate-50 text-slate-700 border-slate-200"
+                          ? "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+                          : "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
                     }`}
                   >
                     <ShieldCheck
-                      className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0"
+                      className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 flex-shrink-0"
                       aria-hidden="true"
                     />
                     <span>{matchPercentage}% Match</span>
@@ -294,20 +299,20 @@ export function CitationDrawer({
                   </div>
 
                   {/* Document Type Badge */}
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800">
                     {currentChunk.source.docType}
                   </span>
 
                   {/* Chunk ID Badge */}
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-100 text-slate-700 border border-slate-200">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
                     {currentChunk.id}
                   </span>
 
                   {/* Effective Date if Present */}
                   {currentChunk.source.effectiveDate && (
-                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-slate-600 bg-slate-100 border border-slate-200">
+                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-slate-600 dark:text-slate-300 bg-slate-100 border border-slate-200 dark:bg-slate-800 dark:border-slate-700">
                       <Calendar
-                        className="w-3 h-3 text-slate-500 flex-shrink-0"
+                        className="w-3 h-3 text-slate-500 dark:text-slate-400 flex-shrink-0"
                         aria-hidden="true"
                       />
                       <span>Effective: {currentChunk.source.effectiveDate}</span>
@@ -318,23 +323,31 @@ export function CitationDrawer({
                 {/* Operative Markdown/Text Excerpt Viewer */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Operative Policy Excerpt
                     </span>
                     <button
                       type="button"
                       onClick={handleCopyExcerpt}
                       aria-label="Copy excerpt"
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors cursor-pointer min-h-[36px]"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 dark:text-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-md transition-[color,background-color] duration-150 cursor-pointer min-h-[36px] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500"
                     >
                       {copied ? (
                         <>
-                          <Check className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" />
-                          <span className="text-emerald-700 font-semibold">Copied</span>
+                          <Check
+                            className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"
+                            aria-hidden="true"
+                          />
+                          <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
+                            Copied
+                          </span>
                         </>
                       ) : (
                         <>
-                          <Copy className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
+                          <Copy
+                            className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400"
+                            aria-hidden="true"
+                          />
                           <span>Copy</span>
                         </>
                       )}
@@ -347,12 +360,12 @@ export function CitationDrawer({
                 </div>
 
                 {/* Statutory Grounding Guarantee Card */}
-                <div className="p-3.5 rounded-lg bg-sky-50/70 border border-sky-100 text-xs text-sky-900 space-y-1">
-                  <div className="font-semibold flex items-center gap-1.5 text-sky-800">
-                    <ShieldCheck className="w-4 h-4 text-sky-600 flex-shrink-0" />
+                <div className="p-3.5 rounded-lg bg-sky-50/70 border border-sky-100 dark:bg-sky-950/40 dark:border-sky-900/60 text-xs text-sky-900 dark:text-sky-200 space-y-1">
+                  <div className="font-semibold flex items-center gap-1.5 text-sky-800 dark:text-sky-300">
+                    <ShieldCheck className="w-4 h-4 text-sky-600 dark:text-sky-400 flex-shrink-0" />
                     <span>Verbatim Grounding Verification</span>
                   </div>
-                  <p className="text-[11px] leading-relaxed text-sky-800/90">
+                  <p className="text-[11px] leading-relaxed text-sky-800/90 dark:text-sky-300/90">
                     This excerpt was retrieved directly from the insurer&apos;s operative disclosure
                     documents stored in R2 via Cloudflare AI Search hybrid retrieval. The generated
                     answer reflects these terms pursuant to ASIC RG 244 factual advice standards.
@@ -363,14 +376,14 @@ export function CitationDrawer({
           </div>
 
           {/* Drawer Footer */}
-          <div className="p-4 border-t border-slate-200 bg-slate-50/80 flex items-center justify-between">
-            <span className="text-[11px] text-slate-500">
+          <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 flex items-center justify-between">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
               {chunks.length} {chunks.length === 1 ? "retrieved chunk" : "retrieved chunks"}
             </span>
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-md shadow-xs transition-colors cursor-pointer min-h-[44px]"
+              className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md shadow-xs transition-[color,background-color,border-color,box-shadow] duration-150 cursor-pointer min-h-[44px] focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500"
             >
               Done
             </button>

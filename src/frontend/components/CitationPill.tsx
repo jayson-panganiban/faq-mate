@@ -87,9 +87,12 @@ export function CitationPill({
       data-testid="citation-pill"
       onClick={handleClick}
       aria-label={`View citation source: ${productDoc}, ${effectiveSection}`}
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 my-0.5 mx-0.5 rounded-full text-xs font-medium bg-sky-50 text-sky-800 border border-sky-200 hover:bg-sky-100 hover:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-500/50 transition-colors cursor-pointer select-none align-middle touch-manipulation min-h-[32px] sm:min-h-[28px] ${className}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 my-0.5 mx-0.5 rounded-full text-xs font-medium bg-sky-50 text-sky-800 border border-sky-200 hover:bg-sky-100 hover:border-sky-300 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/80 dark:hover:bg-sky-900/60 transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 focus-visible:outline-hidden cursor-pointer select-none align-middle touch-manipulation min-h-[32px] sm:min-h-[28px] ${className}`}
     >
-      <BookOpen className="w-3.5 h-3.5 text-sky-600 flex-shrink-0" aria-hidden="true" />
+      <BookOpen
+        className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 flex-shrink-0"
+        aria-hidden="true"
+      />
       <span className="truncate max-w-[280px] sm:max-w-[360px]">{displayText}</span>
     </button>
   );

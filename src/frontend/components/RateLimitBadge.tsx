@@ -81,16 +81,16 @@ export function RateLimitBadge({
     >
       <span
         data-status={statusColor}
-        className={`h-2 w-2 rounded-full shrink-0 ${dotStyles} ${isBlocked ? "animate-pulse" : ""}`}
+        className={`h-2 w-2 rounded-full shrink-0 ${dotStyles} ${isBlocked ? "animate-pulse motion-safe:animate-pulse" : ""}`}
         aria-hidden="true"
       />
       {isBlocked ? (
-        <span className="flex items-center gap-1 font-mono font-semibold">
+        <span className="flex items-center gap-1 font-mono tabular-nums font-semibold">
           <Clock className="w-3 h-3 shrink-0" aria-hidden="true" />
           <span>Rate Limited: Resets in {countdown}s</span>
         </span>
       ) : (
-        <span className="font-mono">
+        <span className="font-mono tabular-nums">
           {remaining}/{limit} requests
         </span>
       )}

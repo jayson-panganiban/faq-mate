@@ -1,4 +1,4 @@
-import { AlertCircle, Bot, Check, Copy } from "lucide-react";
+import { AlertCircle, Bot, Check, Copy, ThumbsDown, ThumbsUp } from "lucide-react";
 import React, { useState } from "react";
 import {
   isGawDisclaimerText,
@@ -32,6 +32,10 @@ export interface AssistantMessageProps {
    * Optional callback fired when the response is copied.
    */
   onCopy?: () => void;
+  /**
+   * Optional callback fired when user submits helpful/unhelpful rating.
+   */
+  onFeedback?: (rating: "positive" | "negative") => void;
   /**
    * Suggested follow-up prompt chips (Spec 07 Section 6).
    */
@@ -255,7 +259,7 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
           type="button"
           onClick={handleCopyCode}
           aria-label="Copy code block"
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-[color,background-color] duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:outline-hidden"
         >
           {copied ? (
             <>
@@ -307,10 +311,12 @@ export function AssistantMessage({
   onCopy,
   suggestedFollowUps,
   onSelectFollowUp,
+  onFeedback,
   showGaw = true,
   className = "",
 }: AssistantMessageProps) {
   const [copied, setCopied] = useState(false);
+  const [feedback, setFeedback] = useState<"positive" | "negative" | null>(null);
 
   // Strip duplicate statutory GAW if backend appended it to the raw message
   const bodyText = stripStatutoryGaw(message);
@@ -523,27 +529,74 @@ export function AssistantMessage({
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={handleCopy}
-            aria-label="Copy answer"
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer select-none"
-          >
-            {copied ? (
-              <>
-                <Check
-                  className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"
-                  aria-hidden="true"
-                />
-                <span className="text-emerald-600 dark:text-emerald-400 font-medium">Copied!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>Copy</span>
-              </>
+          <div className="flex items-center gap-1.5">
+            {/* Feedback Affordance Controls (Spec 05 G6 & ui-craft ai-chat pattern) */}
+            {!isStreaming && message.trim().length > 0 && (
+              <div
+                className="flex items-center mr-1 gap-0.5 border-r border-slate-200 dark:border-slate-800 pr-1.5"
+                data-testid="assistant-feedback-controls"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = feedback === "positive" ? null : "positive";
+                    setFeedback(next);
+                    if (next) onFeedback?.("positive");
+                  }}
+                  aria-label="Helpful response"
+                  title="Mark response as helpful"
+                  className={`p-1 rounded-md text-xs transition-[color,background-color] duration-150 cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-hidden ${
+                    feedback === "positive"
+                      ? "text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 font-semibold"
+                      : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <ThumbsUp className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = feedback === "negative" ? null : "negative";
+                    setFeedback(next);
+                    if (next) onFeedback?.("negative");
+                  }}
+                  aria-label="Unhelpful response"
+                  title="Mark response as unhelpful"
+                  className={`p-1 rounded-md text-xs transition-[color,background-color] duration-150 cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-hidden ${
+                    feedback === "negative"
+                      ? "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 font-semibold"
+                      : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <ThumbsDown className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+              </div>
             )}
-          </button>
+
+            <button
+              type="button"
+              onClick={handleCopy}
+              aria-label="Copy answer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-[color,background-color] duration-150 cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-hidden"
+            >
+              {copied ? (
+                <>
+                  <Check
+                    className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"
+                    aria-hidden="true"
+                  />
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                    Copied!
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Copy</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Structured Rendered Blocks */}
@@ -700,7 +753,7 @@ export function AssistantMessage({
               data-testid="streaming-cursor"
               role="status"
               aria-label="Assistant is generating"
-              className="inline-block w-2 h-4 ml-1 bg-sky-500 animate-pulse align-middle rounded-xs"
+              className="inline-block w-2 h-4 ml-1 bg-sky-500 animate-pulse motion-safe:animate-pulse align-middle rounded-xs"
             />
           )}
         </div>
@@ -720,7 +773,7 @@ export function AssistantMessage({
                   key={idx}
                   type="button"
                   onClick={() => onSelectFollowUp?.(prompt)}
-                  className="inline-flex items-center text-xs font-medium px-3 py-1.5 rounded-full bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60 border border-sky-200 dark:border-sky-800/80 transition-colors focus:outline-hidden focus:ring-2 focus:ring-sky-500 text-left"
+                  className="inline-flex items-center text-xs font-medium px-3 py-1.5 rounded-full bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60 border border-sky-200 dark:border-sky-800/80 transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 focus-visible:outline-hidden text-left cursor-pointer"
                 >
                   {prompt}
                 </button>

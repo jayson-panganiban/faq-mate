@@ -151,7 +151,7 @@ export function ChatContainer({
         {/* Empty State: Starter Prompt Cards */}
         {isEmpty && (
           <div className="max-w-3xl mx-auto my-auto py-8 px-4 flex flex-col items-center text-center space-y-6">
-            <div className="p-3.5 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 ring-1 ring-blue-100 dark:ring-blue-900 shadow-xs">
+            <div className="p-3.5 rounded-2xl bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 ring-1 ring-sky-100 dark:ring-sky-900 shadow-xs">
               <Compass className="w-8 h-8" aria-hidden="true" />
             </div>
 
@@ -170,23 +170,26 @@ export function ChatContainer({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full pt-2 text-left">
               {STARTER_PROMPTS.map((prompt, idx) => (
                 <button
-                  key={idx}
+                  key={prompt.query}
                   type="button"
                   data-testid={`starter-prompt-${idx}`}
                   onClick={() => onSelectStarterQuery?.(prompt.query, prompt.insurer)}
-                  className="group p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md transition-all text-left flex flex-col justify-between cursor-pointer"
+                  className="group p-4 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-sky-400 dark:hover:border-sky-500 hover:shadow-md transition-[border-color,box-shadow,transform] duration-200 ease-out active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:outline-hidden text-left flex flex-col justify-between cursor-pointer"
                 >
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between gap-2">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                        <Shield className="w-3 h-3 text-blue-500" aria-hidden="true" />
+                        <Shield
+                          className="w-3 h-3 text-sky-600 dark:text-sky-400"
+                          aria-hidden="true"
+                        />
                         {prompt.insurer}
                       </span>
                       <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
                         {prompt.tag}
                       </span>
                     </div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
                       {prompt.query}
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
@@ -194,7 +197,7 @@ export function ChatContainer({
                     </p>
                   </div>
 
-                  <div className="pt-2 flex items-center justify-end text-xs font-medium text-blue-600 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="pt-2 flex items-center justify-end text-xs font-medium text-sky-600 dark:text-sky-400 opacity-0 group-hover:opacity-100 transition-opacity">
                     <span>Ask this query</span>
                     <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
                   </div>
@@ -260,14 +263,14 @@ export function ChatContainer({
                   className="flex items-start gap-3 my-4 group animate-fade-in"
                 >
                   <div
-                    className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-1 shadow-xs ring-2 ring-white dark:ring-slate-900"
+                    className="w-8 h-8 rounded-full bg-sky-100 dark:bg-sky-900/60 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 mt-1 shadow-xs ring-2 ring-white dark:ring-slate-900"
                     aria-hidden="true"
                   >
-                    <Bot className="w-4 h-4 animate-spin" />
+                    <Bot className="w-4 h-4 motion-safe:animate-spin" />
                   </div>
                   <div className="flex-1 max-w-[85%] sm:max-w-[80%] rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 shadow-xs space-y-3">
                     <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                      <Sparkles className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
+                      <Sparkles className="w-3.5 h-3.5 text-sky-500 motion-safe:animate-pulse" />
                       <span>
                         {status === "METADATA_RECEIVED"
                           ? "Grounded chunks retrieved. Generating response..."
@@ -275,8 +278,8 @@ export function ChatContainer({
                       </span>
                     </div>
                     <div className="space-y-2">
-                      <div className="h-3.5 bg-slate-200 dark:bg-slate-800 rounded-full w-3/4 animate-pulse" />
-                      <div className="h-3.5 bg-slate-200 dark:bg-slate-800 rounded-full w-1/2 animate-pulse" />
+                      <div className="h-3.5 bg-slate-200 dark:bg-slate-800 rounded-full w-3/4 motion-safe:animate-pulse" />
+                      <div className="h-3.5 bg-slate-200 dark:bg-slate-800 rounded-full w-1/2 motion-safe:animate-pulse" />
                     </div>
                   </div>
                 </div>
@@ -313,7 +316,7 @@ export function ChatContainer({
             data-testid="scroll-to-bottom-button"
             onClick={scrollToBottom}
             aria-label="Scroll to bottom"
-            className="pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-xs font-semibold shadow-lg hover:shadow-xl transition-all cursor-pointer active:scale-95 border border-slate-700 dark:border-slate-300"
+            className="pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-xs font-semibold shadow-lg hover:shadow-xl transition-[transform,box-shadow,background-color] duration-150 cursor-pointer active:scale-95 border border-slate-700 dark:border-slate-300 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:outline-hidden"
           >
             <ArrowDown className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Scroll to bottom</span>

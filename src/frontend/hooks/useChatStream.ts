@@ -185,22 +185,30 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
           const dataString = dataLines.join("\n");
           if (!dataString) return;
 
-          let parsedData: any;
+          let parsedData: unknown;
           try {
             parsedData = JSON.parse(dataString);
           } catch {
             parsedData = dataString;
           }
 
+          const parsedObj =
+            typeof parsedData === "object" && parsedData !== null
+              ? (parsedData as Record<string, unknown>)
+              : undefined;
+
           if (eventType === "metadata") {
             setStatus("METADATA_RECEIVED");
             statusRef.current = "METADATA_RECEIVED";
-            const retrievedChunks: GroundedChunk[] = parsedData.retrieved_chunks || [];
-            const suggestedFollowUps: string[] = parsedData.suggested_follow_ups || [];
+            const retrievedChunks: GroundedChunk[] =
+              (parsedObj?.retrieved_chunks as GroundedChunk[]) || [];
+            const suggestedFollowUps: string[] =
+              (parsedObj?.suggested_follow_ups as string[]) || [];
             setCitations(retrievedChunks);
             setTelemetry((prev) => ({
               ...prev,
-              latencyMs: parsedData.latency_ms,
+              latencyMs:
+                typeof parsedObj?.latency_ms === "number" ? parsedObj.latency_ms : undefined,
               popLocation: popLocation || prev.popLocation,
             }));
             setMessages((prev) =>
@@ -210,7 +218,10 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
                       ...msg,
                       metadata: {
                         ...msg.metadata,
-                        latencyMs: parsedData.latency_ms,
+                        latencyMs:
+                          typeof parsedObj?.latency_ms === "number"
+                            ? parsedObj.latency_ms
+                            : undefined,
                         retrievedChunks,
                         popLocation: popLocation || msg.metadata?.popLocation,
                         suggestedFollowUps,
@@ -228,16 +239,15 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
               statusRef.current = "STREAMING";
             }
             const tokenText =
-              typeof parsedData === "object" && parsedData !== null
-                ? (parsedData.text ?? "")
-                : String(parsedData);
+              parsedObj !== undefined ? String(parsedObj.text ?? "") : String(parsedData);
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === assistantMessageId ? { ...msg, content: msg.content + tokenText } : msg
               )
             );
           } else if (eventType === "done") {
-            const suggestedFollowUps: string[] = parsedData.suggested_follow_ups || [];
+            const suggestedFollowUps: string[] =
+              (parsedObj?.suggested_follow_ups as string[]) || [];
             if (suggestedFollowUps.length > 0) {
               setMessages((prev) =>
                 prev.map((msg) =>

@@ -45,8 +45,8 @@ export function AppShell({
         <div className="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
           {/* Brand Identity & PoP */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-linear-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-sky-600 dark:bg-sky-500 flex items-center justify-center text-white shadow-xs ring-1 ring-sky-700/20">
                 <Shield className="w-4 h-4" aria-hidden="true" />
               </div>
               <div>
@@ -65,7 +65,10 @@ export function AppShell({
               className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-mono font-medium bg-amber-50 text-amber-900 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 shadow-2xs"
               title="Cloudflare Anycast edge point-of-presence data center"
             >
-              <Radio className="w-3 h-3 text-[#F38020] animate-pulse" aria-hidden="true" />
+              <Radio
+                className="w-3 h-3 text-amber-500 dark:text-amber-400 motion-safe:animate-pulse"
+                aria-hidden="true"
+              />
               <span>{popLocation}</span>
             </div>
           </div>
@@ -76,10 +79,10 @@ export function AppShell({
             {retrievalMs !== undefined && (
               <span
                 data-testid="retrieval-latency-badge"
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800 shadow-2xs"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-medium tabular-nums bg-sky-50 text-sky-800 border border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800 shadow-2xs"
                 title="Cloudflare AI Search hybrid vector+BM25 retrieval latency"
               >
-                <Activity className="w-3 h-3 text-blue-500" aria-hidden="true" />
+                <Activity className="w-3 h-3 text-sky-600 dark:text-sky-400" aria-hidden="true" />
                 <span>{retrievalMs}ms retrieval</span>
               </span>
             )}
@@ -88,7 +91,7 @@ export function AppShell({
             {ttftMs !== undefined && (
               <span
                 data-testid="ttft-badge"
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800 shadow-2xs"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-medium tabular-nums bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800 shadow-2xs"
                 title="Time to First Token (sub-350ms budget)"
               >
                 <Zap className="w-3 h-3 text-indigo-500" aria-hidden="true" />
@@ -109,9 +112,9 @@ export function AppShell({
                 aria-label={
                   isComparisonMode ? "Switch to chat view" : "Switch to policy comparison view"
                 }
-                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors border cursor-pointer shadow-2xs ${
+                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border cursor-pointer shadow-2xs transition-[color,background-color,border-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:outline-hidden ${
                   isComparisonMode
-                    ? "bg-blue-600 text-white border-blue-700 dark:bg-blue-500"
+                    ? "bg-sky-600 text-white border-sky-700 dark:bg-sky-500"
                     : "text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700"
                 }`}
               >
@@ -126,7 +129,7 @@ export function AppShell({
               data-testid="reset-chat-button"
               onClick={onReset}
               aria-label="Start new chat"
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs transition-[color,background-color,border-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:outline-hidden"
             >
               <RotateCcw
                 className="w-3 h-3 text-slate-500 dark:text-slate-400"

@@ -85,10 +85,10 @@ export function EmergencyBanner({
                 key={hotline.id}
                 href={hotline.tel}
                 aria-label={hotline.label}
-                className={`min-h-[44px] min-w-[44px] px-4 py-2.5 rounded-lg font-bold text-sm shadow-md flex items-center justify-center gap-2 focus:outline-none focus:ring-4 transition-colors ${
+                className={`min-h-[44px] min-w-[44px] px-4 py-2.5 rounded-lg font-bold text-sm shadow-md flex items-center justify-center gap-2 focus:outline-hidden focus-visible:ring-4 focus-visible:ring-white transition-[background-color,transform,box-shadow] duration-150 active:scale-[0.98] ${
                   hotline.primary
-                    ? "bg-white text-red-700 hover:bg-red-50 active:bg-red-100 focus:ring-white/60"
-                    : "bg-red-900/90 hover:bg-red-950 active:bg-black text-white border border-red-500 focus:ring-red-300"
+                    ? "bg-white text-red-700 hover:bg-red-50 active:bg-red-100"
+                    : "bg-red-900/90 hover:bg-red-950 active:bg-black text-white border border-red-500"
                 }`}
               >
                 <PhoneCall

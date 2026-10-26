@@ -63,7 +63,7 @@ export function PiiAssuranceBadge({
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         aria-label="Australian Privacy Principles APP 3 and 11 client-side privacy protection"
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100 hover:border-teal-300 dark:border-teal-800/80 dark:bg-teal-950/40 dark:text-teal-300 dark:hover:bg-teal-900/60 transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500 cursor-pointer shadow-2xs"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100 hover:border-teal-300 dark:border-teal-800/80 dark:bg-teal-950/40 dark:text-teal-300 dark:hover:bg-teal-900/60 transition-[color,background-color,border-color,box-shadow] duration-150 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500 cursor-pointer shadow-2xs"
       >
         <ShieldCheck
           className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0"
@@ -91,7 +91,7 @@ export function PiiAssuranceBadge({
               type="button"
               onClick={() => setIsOpen(false)}
               aria-label="Close privacy protection details"
-              className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
+              className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-[color,background-color] duration-150 cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500"
             >
               <X className="w-3.5 h-3.5" aria-hidden="true" />
             </button>

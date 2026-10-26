@@ -36,7 +36,14 @@ export function InputBar({
   const hasTurnstileApi =
     typeof window !== "undefined" &&
     Boolean(
-      (window as unknown as { turnstile?: { render: Function; remove?: Function } }).turnstile
+      (
+        window as unknown as {
+          turnstile?: {
+            render: (...args: unknown[]) => unknown;
+            remove?: (...args: unknown[]) => unknown;
+          };
+        }
+      ).turnstile
     );
   const useRealTurnstile = Boolean(turnstileSiteKey && hasTurnstileApi);
 
@@ -130,7 +137,7 @@ export function InputBar({
 
   return (
     <div
-      className={`w-full rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-md dark:border-slate-800 dark:bg-slate-900 transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 dark:focus-within:border-blue-500 dark:focus-within:ring-blue-500/20 ${className}`}
+      className={`w-full rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-md dark:border-slate-800 dark:bg-slate-900 transition-[border-color,box-shadow] duration-150 focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-500/20 dark:focus-within:border-sky-500 dark:focus-within:ring-sky-500/20 ${className}`}
     >
       {/* Top Filter & Protection Toolbar */}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 dark:border-slate-800/80">
@@ -149,7 +156,7 @@ export function InputBar({
               value={selectedInsurer}
               onChange={(e) => setSelectedInsurer(e.target.value)}
               disabled={isBlocked}
-              className="appearance-none rounded-lg border border-slate-200 bg-slate-50 py-1 pl-2.5 pr-7 text-xs font-medium text-slate-700 shadow-2xs transition-colors hover:bg-slate-100 focus:border-blue-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-750 cursor-pointer"
+              className="appearance-none rounded-lg border border-slate-200 bg-slate-50 py-1 pl-2.5 pr-7 text-xs font-medium text-slate-700 shadow-2xs transition-[border-color,background-color] duration-150 hover:bg-slate-100 focus:border-sky-500 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-750 cursor-pointer"
             >
               <option value="">All Insurers (39)</option>
               {GROUPED_INSURER_OPTIONS.map((group) => (
@@ -213,14 +220,14 @@ export function InputBar({
           onClick={handleSend}
           disabled={isSendDisabled}
           aria-label="Send message"
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all shadow-xs cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 ${
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-[transform,background-color,box-shadow] duration-150 shadow-xs cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 ${
             isSendDisabled
               ? "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600 cursor-not-allowed"
-              : "bg-blue-600 text-white hover:bg-blue-700 active:scale-95 dark:bg-blue-600 dark:hover:bg-blue-500"
+              : "bg-sky-600 text-white hover:bg-sky-700 active:scale-95 dark:bg-sky-600 dark:hover:bg-sky-500"
           }`}
         >
           {isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            <Loader2 className="h-4 w-4 motion-safe:animate-spin animate-spin" aria-hidden="true" />
           ) : (
             <ArrowUp className="h-4 w-4" aria-hidden="true" />
           )}

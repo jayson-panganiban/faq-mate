@@ -36,7 +36,7 @@ export const ChatRequestSchema = z.object({
         })
         .optional(),
       product: z.string().optional(),
-      docType: z.enum(["PDS", "TMD", "SPDS", "FSG", "FAQ"]).default("PDS"),
+      docType: z.enum(["PDS", "TMD", "SPDS", "FSG", "FAQ", "GUIDE"]).default("PDS"),
     })
     .optional(),
 });

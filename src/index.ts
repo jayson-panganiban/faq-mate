@@ -103,9 +103,15 @@ async function retrievePolicyChunks(
         const itemKey = r.item?.key || r.metadata?.filename || "";
         let parsedInsurer = r.metadata?.insurer;
         if (!parsedInsurer && itemKey) {
-          const match = itemKey.match(/corpus\/(?:faqs|pds)\/([^/]+)/);
+          const match = itemKey.match(/corpus\/(?:faqs|pds|guides)\/([^/]+)/);
           if (match) parsedInsurer = match[1];
         }
+
+        const fallbackDocType = itemKey.includes("/faqs/")
+          ? "FAQ"
+          : itemKey.includes("/guides/")
+            ? "GUIDE"
+            : "PDS";
 
         return {
           id: r.id || `ai-${Math.random().toString(36).slice(2, 9)}`,
@@ -114,7 +120,7 @@ async function retrievePolicyChunks(
           source: {
             insurer: parsedInsurer || insurer || "General",
             product: r.metadata?.product || "Insurance",
-            docType: r.metadata?.docType || (itemKey.includes("faqs") ? "FAQ" : "PDS"),
+            docType: r.metadata?.docType || fallbackDocType,
             section: r.metadata?.section || itemKey || "General Terms",
             effectiveDate: r.metadata?.effectiveDate,
           },

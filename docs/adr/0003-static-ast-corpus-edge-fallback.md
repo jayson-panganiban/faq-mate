@@ -15,7 +15,7 @@ The Worker runtime cannot read the corpus from disk (`AGENTS.md` Rule 1 forbids 
 ## Decision
 We compile the normalized corpus into a **static TypeScript module** that ships inside the Worker bundle and serves as the retrieval fallback:
 
-1. **Generation:** `npm run compile:corpus` (`scripts/compile-corpus.ts`) runs `lintCorpusBatch()` on `data/corpus/`, then `compileMarkdownToChunks()` and `compileCorpusToTypeScript()` (`src/ingest/corpus-compiler.ts`) to emit `src/rag/corpus-data.ts` (`STATIC_CORPUS_CHUNKS: IndexedChunk[]`).
+1. **Generation:** `npm run compile:corpus` (`scripts/compile-corpus.ts`) runs `lintCorpusBatch()` on `data/corpus/`, then `compileMarkdownToChunks()` and `compileCorpusToTypeScript()` (`src/ingest/corpus-compiler.ts`) to emit `src/rag/corpus-data.ts` (`STATIC_CORPUS_CHUNKS: IndexedChunk[]`). Only committed PDS/FAQ documents are compiled; generated guide documents are linted when present but excluded from the static bundle.
 2. **Chunking rules:** Heading-only sections are folded, never emitted. GFM tables stay atomic. Each chunk carries pre-extracted `keywords` and a `source` block (`insurer`, `product`, `docType`, `section`, `effectiveDate`).
 3. **Budget:** Chunks are value-scored and capped (currently **480 chunks / ~1.0 MB** across all 39 insurers, guaranteeing AFCA-10 benchmark coverage) so the bundle stays well within Workers limits.
 4. **Runtime:** `retrievePolicyChunks()` in `src/index.ts` calls `env.AI_SEARCH.search()` when bound. If the binding is absent or the call throws, it calls `localHybridSearch()` (`src/rag/local-retriever.ts`), which scores `STATIC_CORPUS_CHUNKS` in-isolate and applies the same `insurer` filter (resolved via `resolveInsurer()`).

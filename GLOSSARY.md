@@ -21,6 +21,11 @@ This glossary establishes the canonical, non-negotiable domain language for FAQ-
 ### Financial Services Guide (FSG)
 * **Definition:** A document required under Part 7.7 of the *Corporations Act 2001 (Cth)* describing the financial services provided, licensing status, remuneration, and internal/external dispute resolution avenues.
 
+### Curated Insurer Guide (GUIDE)
+* **Definition:** An official insurer knowledge base document published online by an issuing underwriter to explain policy concepts, claim steps, peril/event distinctions, and coverage boundaries in consumer-friendly, plain-English terms across Home, Motor, Travel, Life, and Commercial product lines.
+* **Role in Tripartite Knowledge Base:** Functions as the conversational explanation layer (`corpus/guides/`), bridging retail consumer queries and legal contractual baseline clauses (`corpus/pds/`).
+* **Invariant:** Explanatory guides provide conversational clarity and context, but cannot override binding contractual exclusions or definitions set forth in the statutory PDS/SPDS. Dual-provenance responses synthesize both sources and cite them distinctly with dedicated `GUIDE` and `PDS` provenance badges.
+
 ### Issuing Underwriter vs. Distributing Brand (Bancassurance & White-Label)
 * **Definition:** In Australian general and life insurance, a retail **Distributing Brand** (such as a bank in a Bancassurance arrangement like CommBank, Westpac, ANZ, or NAB, or a retail challenger like Coles Insurance or Everyday Insurance) markets policies under its own brand name, while a licensed **Issuing Underwriter** (an APRA-authorised insurer holding an Australian Financial Services Licence, such as AAI Limited, Allianz Australia Insurance Limited, Insurance Australia Limited, QBE Insurance (Australia) Limited, or Auto & General Insurance Company Limited) bears the underwriting risk and issues the PDS.
 * **Invariant:** Queries referencing a Distributing Brand must resolve to the underlying Issuing Underwriter's operative PDS/SPDS terms while preserving provenance of the underwriter relationship in the document breadcrumb.

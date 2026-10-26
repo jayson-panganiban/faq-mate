@@ -9,6 +9,7 @@ import { buildR2PathKey, parseBreadcrumb } from "../src/ingest/corpus-codec";
  * Implements Spec 01 (v2.0) path conventions:
  * - PDS/SPDS: corpus/pds/{insurer_code}/{product_slug}/{doc_type}_{effective_date}.md
  * - FAQs:     corpus/faqs/{insurer_code}.md
+ * - Guides:   corpus/guides/{insurer_code}/{page_slug}/GUIDE_{effective_date}.md
  */
 
 interface CorpusItem {

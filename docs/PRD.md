@@ -19,7 +19,7 @@ Design and implement a production-grade, low-latency, edge-deployed Retrieval-Au
 1. **Zero-Origin, Pure Edge Execution:** 100% of compute, caching, hybrid search, state telemetry, and LLM inference executes within Cloudflare's global Anycast edge network (<10ms network distance to Australian metropolitan centres: Sydney `SYD`, Melbourne `MEL`, Brisbane `BNE`, Perth `PER`, Adelaide `ADL`). Zero Node.js filesystem APIs exist inside the Worker runtime (`src/`).
 2. **Sub-350ms Time-to-First-Token (TTFT):** Elimination of origin roundtrips, multi-region database queries, and redundant network hops via native Cloudflare Worker bindings (`env.AI_SEARCH`, `env.AI`, `env.DB`) and a pre-compiled V8 isolate static AST index (`src/rag/corpus-data.ts`).
 3. **Dual-Path Hybrid Retrieval (AI Search + Local AST Fallback):** Primary execution uses Cloudflare AI Search (BM25 lexical + `@cf/baai/bge-large-en-v1.5` dense vectors + cross-encoder reranking) to ensure statutory terms (e.g., "prescribed flood definition", "72-hour embargo", "\$2,500 jewelry sub-limit") match with exact precision, backed by an in-isolate keyword retriever (`localHybridSearch()` in `src/rag/local-retriever.ts`) over **480 compiled AST chunks** when `env.AI_SEARCH` is unbound or throws.
-4. **4-Stage Pre-Normalized Markdown & AST Compilation Pipeline:** A domain-specific pipeline (`scripts/collector/` → `data/raw/` → `data/corpus/{pds,faqs}/` → `src/rag/corpus-data.ts` + Cloudflare R2) that normalizes complex multi-column insurer PDFs and 5,416 Q&As into structured Markdown with `<!-- BREADCRUMB -->` frontmatter, GFM tables, and peril-exclusion co-location.
+4. **4-Stage Pre-Normalized Markdown & AST Compilation Pipeline:** A domain-specific pipeline (`scripts/collector/` → `data/raw/` → `data/corpus/{pds,faqs,guides}/` → `src/rag/corpus-data.ts` + Cloudflare R2) that normalizes complex multi-column insurer PDFs, 5,416 Q&As, and curated guide pages into structured Markdown with `<!-- BREADCRUMB -->` frontmatter, GFM tables, and peril-exclusion co-location. PDS/FAQ are committed and compiled into the static edge bundle; guides are generated, gitignored, and published to R2 only.
 5. **Deterministic Regulatory Boundaries:** Strict technical isolation between general financial product information and personal financial advice under the *Corporations Act 2001 (Cth)* / ASIC RG 244, life-safety emergency interception under the General Insurance Code of Practice (COP), and high-fidelity grounding to mitigate misleading conduct liabilities under the *Insurance Contracts Act 1984 (Cth)*.
 
 ---
@@ -32,9 +32,9 @@ flowchart TD
     Client -->|POST /api/chat + Turnstile| Worker["Cloudflare Worker<br/>(API Gateway & Orchestrator)"]
     
     subgraph StorageIngest ["4-Stage Ingestion & Compilation Foundation"]
-        RawArchive["Stage 1: Raw Collector Archive<br/>(39 Insurers, 1,277 PDFs, 5,416 Q&As)"] --> Normalizer["Stage 2: Domain Normalizer<br/>(331 Normalized Markdown Files)"]
+        RawArchive["Stage 1: Raw Collector Archive<br/>(39 Insurers, 1,277 PDFs, 5,416 Q&As)"] --> Normalizer["Stage 2: Domain Normalizer<br/>(331 Committed PDS/FAQ + 937 R2-only Guides)"]
         Normalizer -->|Stage 3: AST Linter & Compiler| StaticCorpus["V8 Isolate Static Index<br/>(src/rag/corpus-data.ts — 480 Chunks)"]
-        Normalizer -->|Stage 4: R2 Sync| R2["Cloudflare R2 Bucket<br/>(corpus/pds/... & corpus/faqs/...)"]
+        Normalizer -->|Stage 4: R2 Sync| R2["Cloudflare R2 Bucket<br/>(corpus/pds/... , corpus/faqs/... & corpus/guides/...)"]
         R2 -->|Continuous Auto-Sync| AISearch["Cloudflare AI Search<br/>(Hybrid BM25 + bge-large + Reranker)"]
     end
 
@@ -58,7 +58,7 @@ flowchart TD
 | **Frontend** | Cloudflare Pages | React 19 + Vite SPA (`src/frontend/`), Tailwind CSS, Cloudflare Turnstile widget | Serves chat UI, interactive `[Source: ...]` Citation Drawer, 39-Insurer Policy Comparison Matrix, client-side PII scrubbing, SSE client, `sessionStorage` chat persistence. | Free unlimited requests / bandwidth. |
 | **Compute & API Gateway** | Cloudflare Workers | V8 Isolate (`workerd`), TypeScript, WinterCG runtime, ES Modules | Request routing, IP rate limiting (`10 req/min`), COP emergency & ASIC RG 244 gatekeeper, prompt synthesis, telemetry dispatcher. | 100,000 req/day free; \$5/mo Workers Paid. |
 | **Retrieval Engine** | Cloudflare AI Search + Local AST Index | Primary: Hybrid BM25 + `@cf/baai/bge-large-en-v1.5` + reranker<br>Fallback: `localHybridSearch()` in `src/rag/local-retriever.ts` over `src/rag/corpus-data.ts` | Managed hybrid search bound to R2, backed by zero-I/O in-isolate keyword scoring over 480 compiled AST chunks (used when `env.AI_SEARCH` is unbound or throws). | **Free tier: 5M tokens + 1,000 semantic queries/mo**; \$0.75/1k queries thereafter. |
-| **Corpus Storage** | Cloudflare R2 | S3-compatible object storage (`corpus/pds/...`, `corpus/faqs/...`) | Stores 331 normalized semantic Markdown documents (`292` current PDS/SPDS + `39` insurer FAQ documents) with statutory GAW footers. | **Free tier: 10 GB storage**, 1M Class A ops/mo free. |
+| **Corpus Storage** | Cloudflare R2 | S3-compatible object storage (`corpus/pds/...`, `corpus/faqs/...`, `corpus/guides/...`) | Stores 1,268 normalized semantic Markdown documents (`292` current PDS/SPDS + `39` insurer FAQ + `937` guide documents) with statutory GAW footers. PDS/FAQ are also committed; guides are R2-only. | **Free tier: 10 GB storage**, 1M Class A ops/mo free. |
 | **Inference Engine** | Cloudflare Workers AI | LLM: `@cf/meta/llama-3.3-70b-instruct`<br>(Current fallback: deterministic grounded synthesizer; Planned: `@cf/meta/llama-3.1-8b-instruct`) | In-worker hardware-accelerated tensor execution. Zero external API calls to OpenAI/Anthropic; private edge GPUs. | 10,000 Neurons/day free; pay-as-you-go thereafter. |
 | **Transactional DB** | Cloudflare D1 | Serverless SQLite at the edge; Read Replicas enabled in Oceania | Stores k-anonymous query telemetry (`getDailySalt()`), latency benchmarks, groundedness scores, and user feedback (`user_feedback_score`; ingestion endpoint planned). | 5M read rows + 100k write rows/day free. |
 | **Config & Flags** | Workers KV | Read-heavy key-value store with global edge replication (`CONFIG_KV` binding) | Reserved for insurer metadata overrides, prompt templates, and regulatory feature flags (not yet read at runtime). | 100k reads/day free. |
@@ -74,9 +74,9 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    Collector["Stage 1: Collector (`scripts/collector/`)<br/>1,277 PDFs + 5,416 Q&As (`data/raw/`)"] --> Normalizer["Stage 2: Normalizer (`npm run normalize`)<br/>331 Markdown Files (`data/corpus/`)"]
+    Collector["Stage 1: Collector (`scripts/collector/`)<br/>1,277 PDFs + 5,416 Q&As (`data/raw/`)"] --> Normalizer["Stage 2: Normalizer (`npm run normalize`)<br/>331 committed PDS/FAQ + 937 R2-only guides"]
     Normalizer --> Compiler["Stage 3: Linter & AST Compiler (`npm run compile:corpus`)<br/>480 Chunks (`src/rag/corpus-data.ts`)"]
-    Normalizer --> R2["Stage 4: R2 Upload (`npm run upload:r2`)<br/>Cloudflare R2 Bucket"]
+    Normalizer --> R2["Stage 4: R2 Upload (`npm run upload:r2`)<br/>Cloudflare R2 Bucket (`pds/`, `faqs/`, `guides/`)"]
     R2 -->|Automatic Ingestion| AISearch["Cloudflare AI Search<br/>(Auto BM25 + Vector Indexing)"]
 ```
 
@@ -88,7 +88,7 @@ The canonical registry (`src/constants/insurers.ts`) governs **39 primary Austra
 * **Travel Specialists (`travel-specialists`, 8):** Go Insurance, 1Cover, InsureandGo, Fast Cover, Southern Cross Travel Insurance, Zoom, Cover-More, Travel Insurance Direct.
 * **Life Insurers (`life-insurers`, 12):** Zurich, AIA, NobleOak, NEOS, HCF Life, Acenda (formerly MLC Life), Challenger, ClearView, MetLife, TAL, PPS Mutual, Asteron Life.
 * **Archive Volume (`data/raw/`):** `all_manifest.csv` tracks **1,277 validated PDFs** (PDS, SPDS, TMD) across all 39 insurers; `data/raw/FAQs/` contains **39 curated FAQ Markdown files** comprising **5,416 consumer Q&A pairs**.
-* **Normalized Active Corpus (`data/corpus/`):** Stage 2 (`npm run normalize`) selects the latest current PDS/SPDS per `(insurer, product, doc_type)` tuple (**292 PDS/SPDS documents**) plus all **39 insurer FAQ documents** (**331 Markdown files total**; `--all-historical` processes all 1,277 historical PDFs).
+* **Normalized Active Corpus (`data/corpus/`):** Stage 2 (`npm run normalize`) selects the latest current PDS/SPDS per `(insurer, product, doc_type)` tuple (**292 PDS/SPDS documents**) plus all **39 insurer FAQ documents** (**331 committed Markdown files total**; `--all-historical` processes all 1,277 historical PDFs). It also rebuilds **937 curated guide documents** under `data/corpus/guides/`; guides are gitignored, excluded from the static edge bundle, and published to R2 only.
 
 ### 3.2 Pre-Normalized Ingestion & AST Compilation Strategy (Mitigating Chunking Blindness)
 To prevent Cloudflare AI Search or edge retrieval from splitting complex legal clauses on arbitrary token boundaries, the system enforces a unified **Corpus Document Codec (`src/ingest/corpus-codec.ts`)** and **Corpus Linter (`src/ingest/corpus-linter.ts`)**:
@@ -142,7 +142,7 @@ In accordance with the Insurance Contracts Regulations 2012 (Cth), 'Flood' means
 3. **Domain-Specific Exclusion Co-Location & AST Edge Compilation (`npm run compile:corpus`):**
    * **The Standard Flood Definition:** Preserves statutory wording mandated under the *Insurance Contracts Regulations 2012 (Cth)*, keeping riverine flood, rainwater run-off, and sea storm surge exclusions in the same atomic chunk.
    * **Bushfire and Grassfire Embargoes:** Embargo clauses (48-hour or 72-hour waiting periods post-inception) are co-located alongside inception coverage terms.
-   * **Deterministic AST Edge Bundle (`src/rag/corpus-data.ts`):** Stage 3 validates all 331 Markdown files via `lintCorpusBatch()` (valid breadcrumb, balanced GFM tables, mandatory `STATUTORY_GAW` footer), then `compileMarkdownToChunks()` drops heading-only sections and `compileCorpusToTypeScript()` emits **480 budgeted AST chunks** covering all 39 insurers and the AFCA-10 benchmark scenarios.
+   * **Deterministic AST Edge Bundle (`src/rag/corpus-data.ts`):** Stage 3 validates the 331 committed PDS/FAQ Markdown files (plus any locally generated guides, 1,268 documents in the current snapshot) via `lintCorpusBatch()` (valid breadcrumb, balanced GFM tables, mandatory `STATUTORY_GAW` footer), then `compileMarkdownToChunks()` drops heading-only sections and `compileCorpusToTypeScript()` emits **480 budgeted AST chunks** from PDS/FAQ covering all 39 insurers and the AFCA-10 benchmark scenarios. Guides are linted but intentionally excluded from the compiled bundle.
 
 ---
 
@@ -333,7 +333,7 @@ CREATE INDEX idx_telemetry_pop ON rag_telemetry_audit(pop_location);
 6. **Phase 6: Cloudflare Pages Chat Interface (`✅ Complete`)**
    * Ship the React 19 + Vite SPA (`src/frontend/`) featuring interactive `[Source: ...]` Citation Pills, Slide-Over Citation Drawer, 39-Insurer Policy Comparison Matrix, client-side PII warning badge, and persistent `STATUTORY_GAW` banner.
 7. **Phase 7: Ground-Up 39-Insurer Corpus Ingestion, Linter & AST Compiler (`✅ Complete`)**
-   * Consolidate the 39-insurer archive (`1,277` validated PDFs + `5,416` Q&As in `data/raw/`), canonical insurer & Bancassurance alias registry (`src/constants/insurers.ts`), unified Corpus Document Codec (`src/ingest/corpus-codec.ts`), Corpus Linter (`src/ingest/corpus-linter.ts`), and AST Edge Compiler (`src/ingest/corpus-compiler.ts`) generating **331 normalized Markdown documents** and **480 compiled AST chunks** in `src/rag/corpus-data.ts`.
+   * Consolidate the 39-insurer archive (`1,277` validated PDFs + `5,416` Q&As in `data/raw/`), canonical insurer & Bancassurance alias registry (`src/constants/insurers.ts`), unified Corpus Document Codec (`src/ingest/corpus-codec.ts`), Corpus Linter (`src/ingest/corpus-linter.ts`), and AST Edge Compiler (`src/ingest/corpus-compiler.ts`) generating **331 committed PDS/FAQ documents** and **480 compiled AST chunks** in `src/rag/corpus-data.ts`, plus **937 guide documents** published to R2 only.
 8. **Phase 8: Runtime Hardening (`🟡 Planned`)**
    * Close the gaps tracked in each spec's **Known Gaps** section ([02](../.scratch/02-edge-rag-runtime/spec.md#7-known-gaps), [03](../.scratch/03-regulatory-compliance/spec.md#6-known-gaps), [04](../.scratch/04-afca-eval-benchmarks/spec.md#6-known-gaps), [06](../.scratch/06-corpus-refinement-and-compilation/spec.md#9-known-gaps)): server-side Turnstile verification, `@cf/meta/llama-3.1-8b-instruct` secondary fallback, true first-token `inference_ttft_ms` measurement, runtime groundedness scoring, `POST /api/feedback`, durable (cross-isolate) rate limiting, and linter-enforced peril co-location.
 
@@ -346,4 +346,4 @@ CREATE INDEX idx_telemetry_pop ON rag_telemetry_audit(pop_location);
   * [ADR-0002](adr/0002-pre-normalized-markdown-r2-ingestion.md) — Pre-normalized Markdown into R2
   * [ADR-0003](adr/0003-static-ast-corpus-edge-fallback.md) — Compiled static AST corpus as in-isolate retrieval fallback
   * [ADR-0004](adr/0004-canonical-insurer-registry-alias-resolution.md) — Canonical 39-insurer registry & bancassurance alias resolution
-* **Living Specifications:** [`.scratch/`](../.scratch/) — Specs 01–07, each ending with a **Known Gaps** section.
+* **Living Specifications:** [`.scratch/`](../.scratch/) — Specs 01–08, including multi-line PDS and tripartite guide corpus integration.

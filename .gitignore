@@ -50,6 +50,14 @@ data/raw/*
 !data/raw/archive_summary.csv
 !data/raw/FAQs/
 !data/raw/FAQs/**
+!data/raw/guide_seeds/
+!data/raw/guide_seeds/**
+!data/raw/guides_manifest.csv
 data/raw/**/*.pdf
 data/raw/**/*.html
 *.log
+
+# Generated Guide Corpus (R2-only)
+# Rebuilt by `npm run normalize`; excluded from the static edge bundle.
+# Published to R2 via `npm run upload:r2`; do not commit generated guides.
+data/corpus/guides/

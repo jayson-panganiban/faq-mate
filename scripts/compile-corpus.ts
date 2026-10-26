@@ -37,9 +37,14 @@ async function main() {
   // Prioritize PDS files before FAQ files so high-signal PDS clauses sort first
   const pdsFiles = collectMarkdownFiles(path.join(CORPUS_DIR, "pds"));
   const faqFiles = collectMarkdownFiles(path.join(CORPUS_DIR, "faqs"));
-  const allFiles = [...pdsFiles, ...faqFiles];
+  const guideFiles = collectMarkdownFiles(path.join(CORPUS_DIR, "guides"));
 
-  if (allFiles.length === 0) {
+  // Guides are linted for provenance/GAW invariants but kept out of the static
+  // edge bundle to protect the 1.5 MB isolate budget (Spec 06 § 5).
+  const lintFiles = [...pdsFiles, ...faqFiles, ...guideFiles];
+  const compileFiles = [...pdsFiles, ...faqFiles];
+
+  if (compileFiles.length === 0) {
     console.error(
       "No normalized Markdown files found in data/corpus/. Run `npm run normalize` first."
     );
@@ -47,11 +52,11 @@ async function main() {
   }
 
   console.log(
-    `Discovered ${allFiles.length} normalized Markdown documents (${pdsFiles.length} PDS/SPDS, ${faqFiles.length} FAQ).`
+    `Discovered ${lintFiles.length} normalized Markdown documents (${pdsFiles.length} PDS/SPDS, ${faqFiles.length} FAQ, ${guideFiles.length} GUIDE).`
   );
 
   // 1. Run Corpus Linter
-  const lintReport = lintCorpusBatch(allFiles);
+  const lintReport = lintCorpusBatch(lintFiles);
   if (!lintReport.passed) {
     console.error(`\n✗ Corpus Linter detected ${lintReport.violations.length} violation(s):`);
     for (const v of lintReport.violations.slice(0, 25)) {
@@ -68,7 +73,7 @@ async function main() {
   }
 
   // 2. Compile AST Chunks to src/rag/corpus-data.ts
-  const compiled = compileCorpusToTypeScript(allFiles, {
+  const compiled = compileCorpusToTypeScript(compileFiles, {
     maxChunksPerInsurer: 14,
     maxTotalChunks: 480,
   });

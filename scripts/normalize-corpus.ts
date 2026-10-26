@@ -4,6 +4,7 @@ import { extractText } from "unpdf";
 import { resolveInsurer } from "../src/constants/insurers";
 import { buildBenchmarkPolicyDocuments } from "../src/ingest/benchmark-policies";
 import { normalizeFaqDocument, parseRawFaqMarkdown } from "../src/ingest/faq-normalizer";
+import { normalizeGuideDocument, type ParsedGuideDocument } from "../src/ingest/guide-normalizer";
 import {
   type ManifestEntry,
   parseManifestCsv,
@@ -19,6 +20,22 @@ const RAW_DIR = path.resolve(process.cwd(), "data/raw");
 const CORPUS_DIR = path.resolve(process.cwd(), "data/corpus");
 const PDS_OUT_DIR = path.join(CORPUS_DIR, "pds");
 const FAQ_OUT_DIR = path.join(CORPUS_DIR, "faqs");
+const GUIDES_OUT_DIR = path.join(CORPUS_DIR, "guides");
+const RAW_GUIDES_DIR = path.join(RAW_DIR, "guides");
+
+function walkFiles(dir: string, extension: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  const results: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...walkFiles(fullPath, extension));
+    } else if (entry.isFile() && entry.name.endsWith(extension)) {
+      results.push(fullPath);
+    }
+  }
+  return results.sort();
+}
 
 /**
  * Extracts text from a PDF file using `unpdf` with a safe page/character cap,
@@ -194,8 +211,50 @@ async function main() {
     }
   }
 
+  // 4. Normalize curated official insurer guide pages from data/raw/guides/
+  const rawGuideFiles = walkFiles(RAW_GUIDES_DIR, ".json");
+  let guideFilesWritten = 0;
+  let totalGuideChars = 0;
+  let guideFilesSkipped = 0;
+
+  if (rawGuideFiles.length > 0) {
+    fs.rmSync(GUIDES_OUT_DIR, { recursive: true, force: true });
+
+    for (const file of rawGuideFiles) {
+      let parsed: ParsedGuideDocument;
+      try {
+        parsed = JSON.parse(fs.readFileSync(file, "utf-8")) as ParsedGuideDocument;
+      } catch {
+        console.warn(`⚠ Skipping unreadable guide JSON: ${path.relative(RAW_DIR, file)}`);
+        guideFilesSkipped++;
+        continue;
+      }
+
+      if (!parsed.markdown || parsed.markdown.trim().length === 0) {
+        console.warn(`⚠ Skipping empty guide: ${parsed.canonical_url || file}`);
+        guideFilesSkipped++;
+        continue;
+      }
+
+      if (insurerFilter && !parsed.insurer.toLowerCase().includes(insurerFilter.toLowerCase())) {
+        continue;
+      }
+
+      const normalized = normalizeGuideDocument(parsed);
+      const outPath = path.join(CORPUS_DIR, normalized.r2Key.replace(/^corpus\//, ""));
+      fs.mkdirSync(path.dirname(outPath), { recursive: true });
+      fs.writeFileSync(outPath, normalized.markdown, "utf-8");
+      guideFilesWritten++;
+      totalGuideChars += normalized.markdown.length;
+    }
+
+    console.log(
+      `✓ Normalized ${guideFilesWritten} GUIDE pages (${totalGuideChars.toLocaleString()} chars, ${guideFilesSkipped} skipped) -> data/corpus/guides/`
+    );
+  }
+
   console.log(
-    `=== Normalization Complete: ${pdsFilesWritten} PDS/SPDS files + ${faqFilesWritten} FAQ files in data/corpus/ ===`
+    `=== Normalization Complete: ${pdsFilesWritten} PDS/SPDS files + ${faqFilesWritten} FAQ files + ${guideFilesWritten} GUIDE files in data/corpus/ ===`
   );
 }
 

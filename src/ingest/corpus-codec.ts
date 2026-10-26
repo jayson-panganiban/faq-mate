@@ -1,12 +1,14 @@
 import { toInsurerSlug } from "../constants/insurers";
 import { AFCA_CONTACT, STATUTORY_GAW } from "../constants/statutory";
 
+export type CorpusDocType = "PDS" | "TMD" | "SPDS" | "FSG" | "FAQ" | "GUIDE";
+
 export interface CorpusDocumentMetadata {
   insurer: string;
   insurerCode: string;
   product: string;
   productSlug: string;
-  docType: "PDS" | "TMD" | "SPDS" | "FSG" | "FAQ";
+  docType: CorpusDocType;
   effectiveDate: string;
   version?: string;
   jurisdiction?: string;
@@ -21,7 +23,7 @@ export interface ParsedBreadcrumb {
   category: string;
   product: string;
   productSlug: string;
-  docType: "PDS" | "TMD" | "SPDS" | "FSG" | "FAQ";
+  docType: CorpusDocType;
   effectiveDate: string;
   jurisdiction: string;
   underwriter?: string;
@@ -43,6 +45,7 @@ export const REQUIRED_BREADCRUMB_FIELDS = [
  * Deep Module: Canonical R2 Path Key Resolver (Spec 01 § 2.1 v2.0)
  * - Policy documents (PDS/SPDS/TMD/FSG): `corpus/pds/{insurer_code}/{product_slug}/{doc_type}_{effective_date}.md`
  * - FAQ documents: `corpus/faqs/{insurer_code}.md`
+ * - Guide documents: `corpus/guides/{insurer_code}/{page_slug}/{doc_type}_{effective_date}.md`
  */
 export function buildR2PathKey(meta: CorpusDocumentMetadata): string {
   const insurer = toInsurerSlug(meta.insurerCode);
@@ -54,6 +57,11 @@ export function buildR2PathKey(meta: CorpusDocumentMetadata): string {
 
   const product = toInsurerSlug(meta.productSlug) || "policy";
   const versionTag = meta.version || meta.effectiveDate;
+
+  if (docType === "GUIDE") {
+    return `corpus/guides/${insurer}/${product}/${docType}_${versionTag}.md`;
+  }
+
   return `corpus/pds/${insurer}/${product}/${docType}_${versionTag}.md`;
 }
 
@@ -121,7 +129,7 @@ export function parseBreadcrumb(markdown: string): ParsedBreadcrumb {
   const productSlug = rawFields["product_slug"] || toInsurerSlug(product) || "policy";
   const rawDocType = (rawFields["doc_type"] || "PDS").toUpperCase();
   const docType = (
-    ["PDS", "TMD", "SPDS", "FSG", "FAQ"].includes(rawDocType) ? rawDocType : "PDS"
+    ["PDS", "TMD", "SPDS", "FSG", "FAQ", "GUIDE"].includes(rawDocType) ? rawDocType : "PDS"
   ) as CorpusDocumentMetadata["docType"];
 
   return {

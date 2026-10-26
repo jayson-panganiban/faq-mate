@@ -200,6 +200,16 @@ describe("AssistantMessage Component (Ticket 5)", () => {
 
       expect(screen.queryByTestId("silent-pds-notice")).not.toBeInTheDocument();
     });
+
+    it("does not render false-positive Silent PDS Notice on known contractual exclusions ('not covered' / 'does not cover')", () => {
+      const message =
+        "Under the NRMA Home & Contents Insurance PDS, Flood means the covering of normally dry land by water escaping a natural watercourse.\n\n" +
+        "Critical Exclusions:\n" +
+        "Actions of the sea, high tide, and storm surge are not covered under standard policy terms. Furthermore, the policy does not cover flood or bushfire damage during the first 72 hours of inception.";
+      render(<AssistantMessage message={message} isStreaming={false} />);
+
+      expect(screen.queryByTestId("silent-pds-notice")).not.toBeInTheDocument();
+    });
   });
 
   describe("Inline Citation Pill Rendering & Selection (Spec 05 US-4)", () => {
@@ -289,8 +299,98 @@ describe("AssistantMessage Component (Ticket 5)", () => {
 
       // The raw text does not appear twice in the document
       const fullText = document.body.textContent ?? "";
-      const count = (fullText.match(/Corporations Act 2001/g) || []).length;
-      expect(count).toBe(1);
+      const corpActCount = (fullText.match(/Corporations Act 2001/g) || []).length;
+      expect(corpActCount).toBe(1);
+      const gawCount = (fullText.match(/General Advice Warning/g) || []).length;
+      expect(gawCount).toBe(1);
+    });
+
+    it("deduplicates raw GAW when formatted without emoji", () => {
+      const message =
+        "Flood cover is standard.\n\nGeneral Advice Warning: This information is general product information only and does not take into account your personal objectives, financial situation, or needs. Before making any financial decision, you should read the relevant Product Disclosure Statement (PDS) and Target Market Determination (TMD) and seek independent professional advice.";
+      render(<AssistantMessage message={message} isStreaming={false} />);
+
+      const gaws = screen.getAllByTestId("statutory-gaw");
+      expect(gaws).toHaveLength(1);
+
+      const fullText = document.body.textContent ?? "";
+      const gawCount = (fullText.match(/General Advice Warning/g) || []).length;
+      expect(gawCount).toBe(1);
+    });
+
+    it("deduplicates raw GAW with bold heading or markdown formatting", () => {
+      const message =
+        "Flood cover is standard.\n\n### General Advice Warning\nThis information is general product information only and does not take into account your personal objectives, financial situation, or needs.";
+      render(<AssistantMessage message={message} isStreaming={false} />);
+
+      const gaws = screen.getAllByTestId("statutory-gaw");
+      expect(gaws).toHaveLength(1);
+
+      const fullText = document.body.textContent ?? "";
+      const gawCount = (fullText.match(/General Advice Warning/g) || []).length;
+      expect(gawCount).toBe(1);
+    });
+
+    it("deduplicates raw GAW preceded by horizontal rules without leaving trailing divider syntax", () => {
+      const message = `Flood cover is standard.\n\n---\n\n${STATUTORY_GAW}`;
+      const { container } = render(<AssistantMessage message={message} isStreaming={false} />);
+
+      const fullText = document.body.textContent ?? "";
+      const gawCount = (fullText.match(/General Advice Warning/g) || []).length;
+      expect(gawCount).toBe(1);
+
+      // Verify no dangling markdown hr or --- remains in body prose
+      expect(container.querySelector("hr")).toBeNull();
+      expect(fullText).not.toContain("---");
+    });
+
+    it("deduplicates repeated GAW occurrences at the end of the response", () => {
+      const message = `Flood cover is standard.\n\n${STATUTORY_GAW}\n\n${STATUTORY_GAW}`;
+      render(<AssistantMessage message={message} isStreaming={false} />);
+
+      const gaws = screen.getAllByTestId("statutory-gaw");
+      expect(gaws).toHaveLength(1);
+
+      const fullText = document.body.textContent ?? "";
+      const gawCount = (fullText.match(/General Advice Warning/g) || []).length;
+      expect(gawCount).toBe(1);
+    });
+
+    it("deduplicates bulleted or section-5 GAW items inside the markdown block parser while preserving citations", () => {
+      const message =
+        "### 1. Direct Definition\nFlood means the covering of normally dry land by water.\n\n" +
+        "### 5. Provenance Citations & Statutory Disclaimer\n" +
+        "- [Source: NRMA Home & Contents Insurance PDS (Definitions — Flood)]\n" +
+        `- ${STATUTORY_GAW}`;
+      render(<AssistantMessage message={message} isStreaming={false} />);
+
+      const gaws = screen.getAllByTestId("statutory-gaw");
+      expect(gaws).toHaveLength(1);
+
+      const fullText = document.body.textContent ?? "";
+      const gawCount = (fullText.match(/General Advice Warning/g) || []).length;
+      expect(gawCount).toBe(1);
+      expect(fullText).toContain("NRMA Home & Contents Insurance PDS");
+    });
+
+    it("preserves informational explanations of General Advice Warning in message body while deduplicating trailing statutory disclaimer", () => {
+      const message = `Under Section 949A of the Corporations Act 2001 (Cth), a General Advice Warning is required whenever general financial advice is given.\n\n[Source: ASIC RG 244, Section B]\n\n${STATUTORY_GAW}`;
+      render(<AssistantMessage message={message} isStreaming={false} />);
+
+      const gaws = screen.getAllByTestId("statutory-gaw");
+      expect(gaws).toHaveLength(1);
+
+      const fullText = document.body.textContent ?? "";
+      // Explanatory body text is preserved
+      expect(fullText).toContain(
+        "Under Section 949A of the Corporations Act 2001 (Cth), a General Advice Warning is required"
+      );
+      // Corporations Act appears twice: once in the educational prose, once in <StatutoryGaw />
+      const corpActCount = (fullText.match(/Corporations Act 2001/g) || []).length;
+      expect(corpActCount).toBe(2);
+      // General Advice Warning appears twice: once in educational prose ("a General Advice Warning is required"), once in <StatutoryGaw />
+      const gawCount = (fullText.match(/General Advice Warning/g) || []).length;
+      expect(gawCount).toBe(2);
     });
   });
 
@@ -345,6 +445,40 @@ describe("AssistantMessage Component (Ticket 5)", () => {
         "const excess = 500;\nconst isCovered = true;"
       );
       expect(screen.getByText(/copied!/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("Ordered List Number Sequencing", () => {
+    it("preserves sequential 1..5 numbering across blank lines, sub-headings, and tables", () => {
+      const markdownWithInterruptedList = [
+        "1. **DIRECT DEFINITION**: First point.",
+        "",
+        "2. **RELATED EVENT & PRODUCT LINE DEMARCATION**: Second point.",
+        "",
+        "### Summary Table",
+        "| Type | Description |",
+        "| --- | --- |",
+        "| A | Alpha |",
+        "",
+        "3. **CRITICAL EXCLUSIONS**: Third point.",
+        "",
+        "4. **CERTIFICATE OF INSURANCE**: Fourth point.",
+        "",
+        "5. **PROVENANCE CITATIONS**: Fifth point.",
+      ].join("\n");
+
+      const { container } = render(
+        <AssistantMessage message={markdownWithInterruptedList} isStreaming={false} />
+      );
+
+      const listItems = Array.from(container.querySelectorAll("ol > li"));
+      expect(listItems).toHaveLength(5);
+      expect(listItems.map((li) => li.getAttribute("value"))).toEqual(["1", "2", "3", "4", "5"]);
+
+      const orderedLists = Array.from(container.querySelectorAll("ol"));
+      expect(orderedLists).toHaveLength(2);
+      expect(orderedLists[0].getAttribute("start")).toBe("1");
+      expect(orderedLists[1].getAttribute("start")).toBe("3");
     });
   });
 });

@@ -45,7 +45,7 @@ const CITATION_PATTERN = /\[(?:Source: )?[^\]]+(?:Section|p\.|Page|\d+)[^\]]*\]/
  * - Citation Precision == 100%
  */
 export function evaluateGroundedness(input: EvaluationInput): EvaluationReport {
-  const { query, response, retrievedChunks } = input;
+  const { query, response } = input;
   const violations: string[] = [];
 
   // 1. Personal Advice Leakage Gate (Target: 0.00%)

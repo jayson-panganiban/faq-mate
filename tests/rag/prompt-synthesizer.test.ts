@@ -69,4 +69,24 @@ describe("Product-Line Disambiguation & Prompt Synthesis (Ticket 04 & Spec 07)",
     expect(messages[0].content).toContain("CONVERSATIONAL DILEMMA");
     expect(messages[0].content).toContain("objective decision factors");
   });
+
+  it("enforces the 5-Part Australian Insurance Specialist Response Anatomy and bans meta-RAG phrasing (Spec 08)", () => {
+    const messages = synthesizePrompt("What is flood definition for NRMA?", [dummyChunk]);
+    const sys = messages[0].content;
+
+    expect(sys).toContain("1. DIRECT DEFINITION OR COVERAGE POSITION");
+    expect(sys).toContain("2. RELATED EVENT & PRODUCT LINE DEMARCATION");
+    expect(sys).toContain("3. CRITICAL EXCLUSIONS, WAITING PERIODS & SUB-LIMITS");
+    expect(sys).toContain("4. CERTIFICATE OF INSURANCE (POLICY SCHEDULE) CONTEXT");
+    expect(sys).toContain("5. PROVENANCE CITATIONS, NO PERSONAL ADVICE & STATUTORY DISCLAIMER");
+    expect(sys).toContain('Never use tentative or meta-RAG phrasing ("in the provided context"');
+  });
+
+  it("injects off-topic override when query is unrelated to insurance and no chunks are retrieved", () => {
+    const messages = synthesizePrompt("What is adobo?", []);
+    const sys = messages[0].content;
+
+    expect(sys).toContain("OFF-TOPIC / NON-INSURANCE INQUIRY DETECTED");
+    expect(sys).toContain("DO NOT apply the 5-part insurance anatomy above");
+  });
 });

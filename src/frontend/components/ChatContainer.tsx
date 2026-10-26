@@ -1,5 +1,5 @@
-import { ArrowDown, Bot, ChevronRight, Compass, FileText, Shield, Sparkles } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import { ArrowDown, Bot, ChevronRight, Compass, Shield, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { ChatMessage, GroundedChunk, StreamState } from "../types/chat-ui";
 import { AssistantMessage } from "./AssistantMessage";
 import { EmergencyBanner } from "./EmergencyBanner";
@@ -112,6 +112,29 @@ export function ChatContainer({
 
   const isEmpty = messages.length === 0;
 
+  // Identify the latest message that renders an inline StatutoryGaw banner so multi-turn chats
+  // never stack duplicate GAW banners across historical turns.
+  let lastGawMessageIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role === "user") continue;
+    if (m.refusal?.code === "ADVICE_BOUNDARY_VIOLATION") {
+      lastGawMessageIdx = i;
+      break;
+    }
+    if (m.refusal?.code === "EMERGENCY_INTERCEPTION") {
+      continue;
+    }
+    const isLast = i === messages.length - 1;
+    const isActiveStream =
+      isLast &&
+      (status === "CONNECTING" || status === "METADATA_RECEIVED" || status === "STREAMING");
+    if (!isActiveStream && m.content.trim().length > 0) {
+      lastGawMessageIdx = i;
+      break;
+    }
+  }
+
   return (
     <div className={`relative flex-1 flex flex-col min-h-0 overflow-hidden ${className}`}>
       {/* Scrollable Message List Canvas */}
@@ -203,6 +226,7 @@ export function ChatContainer({
                   code={msg.refusal.code}
                   message={msg.refusal.message}
                   reason={msg.refusal.reason}
+                  showGaw={idx === lastGawMessageIdx}
                 />
               );
             }
@@ -273,6 +297,7 @@ export function ChatContainer({
                 suggestedFollowUps={msg.metadata?.suggestedFollowUps}
                 onSelectFollowUp={onSelectStarterQuery}
                 onSelectCitation={onSelectCitation}
+                showGaw={idx === lastGawMessageIdx}
               />
             );
           })}

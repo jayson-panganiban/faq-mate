@@ -1,7 +1,7 @@
 import { resolveInsurer } from "../constants/insurers";
 import type { GroundedChunk } from "../types/chat";
 import { type IndexedChunk, STATIC_CORPUS_CHUNKS } from "./corpus-data";
-import { type InsurancePeril, normalizeIntent } from "./intent-normalizer";
+import { type InsurancePeril, isInsuranceRelatedQuery, normalizeIntent } from "./intent-normalizer";
 
 export interface SearchOptions {
   query: string;
@@ -30,6 +30,11 @@ const PERIL_BOOSTS: readonly PerilBoostConfig[] = [
   { peril: "JEWELRY_SUBLIMIT", keywords: ["jewelry", "jewellery", "sub-limit"], boost: 10.0 },
   { peril: "EMBARGO_72_HOUR", keywords: ["72-hour", "embargo"], boost: 10.0 },
   { peril: "UNLICENSED_DRIVER", keywords: ["unlicensed driver", "licence"], boost: 10.0 },
+  {
+    peril: "DEFINITION_INQUIRY",
+    keywords: ["**flood** means", "**excess** means", "means the"],
+    boost: 4.0,
+  },
 ];
 
 /**
@@ -41,6 +46,9 @@ const PERIL_BOOSTS: readonly PerilBoostConfig[] = [
  */
 export function localHybridSearch(options: SearchOptions): GroundedChunk[] {
   const topK = options.topK ?? 5;
+  if (!options.filter?.insurer && !isInsuranceRelatedQuery(options.query)) {
+    return [];
+  }
   const normalized = normalizeIntent(options.query);
   const rawTerms = normalized.searchTokens;
 
@@ -98,6 +106,35 @@ export function localHybridSearch(options: SearchOptions): GroundedChunk[] {
 
     if (options.query.toLowerCase().includes("flood") && contentLower.includes("flood")) {
       score += 5.0;
+    }
+
+    // Boost discrete `Definitions — [Term]` chunks when query asks for a policy definition
+    const sectionLower = chunk.source.section.toLowerCase();
+    if (
+      normalized.detectedPerils.includes("DEFINITION_INQUIRY") &&
+      sectionLower.includes("definitions")
+    ) {
+      const queryWords = options.query
+        .toLowerCase()
+        .split(/[^a-z0-9-]+/)
+        .filter(
+          (w) =>
+            w.length >= 3 &&
+            w !== "what" &&
+            w !== "does" &&
+            w !== "for" &&
+            w !== "the" &&
+            w !== "and" &&
+            w !== "mean" &&
+            w !== "means" &&
+            w !== "definition" &&
+            w !== "definitions"
+        );
+      for (const term of queryWords) {
+        if (sectionLower.includes(term)) {
+          score += 25.0;
+        }
+      }
     }
     if (
       (options.query.toLowerCase().includes("embargo") ||

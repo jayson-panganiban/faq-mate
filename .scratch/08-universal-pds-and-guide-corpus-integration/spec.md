@@ -48,14 +48,14 @@ Establish a unified, multi-brand and multi-line ingestion and retrieval pipeline
    - Deprecate synthetic stubs in `src/ingest/benchmark-policies.ts`. All 39 insurers across all 5 canonical categories (`suncorp-group`, `major-insurers`, `challengers-auto-clubs`, `travel-specialists`, `life-insurers`) are processed uniformly through the automated PDF normalization pipeline.
 
 4. **Category-Balanced Edge AST Compilation Budgeting:**
-   - Update `scripts/compile-corpus.ts` to compile from `pdsFiles`, `faqFiles`, and a balanced, multi-line selection of `guideFiles`.
-   - **Multi-Line Selection Policy:** Reject home-peril-only regex filtering. Allocate compiled chunks proportionally across all 5 canonical insurer categories:
+   - Maintain strict adherence to `AGENTS.md` Rule 7 and [ADR-0003](../../docs/adr/0003-static-ast-corpus-edge-fallback.md): `data/corpus/pds/` and `data/corpus/faqs/` are committed and feed `src/rag/corpus-data.ts`, while `data/corpus/guides/` (937 documents) is linted by `npm run lint:corpus` and published to R2 (`npm run upload:r2`) for Cloudflare AI Search.
+   - **Multi-Line Selection Policy:** Allocate compiled PDS/FAQ chunks proportionally across all 5 canonical insurer categories so extracted `Definitions — [Term]`, `Insured Events`, `Exclusions & Embargoes`, and `Sub-Limits` clauses are represented across:
      - `suncorp-group` (Home, Motor, Landlord, Commercial)
      - `major-insurers` (Home, Motor, Business, Travel, Life)
      - `challengers-auto-clubs` (Home, Motor, Roadside, Caravan/Boat)
      - `travel-specialists` (Emergency Medical, Trip Cancellation, Baggage)
      - `life-insurers` (Term Life, TPD, Trauma, Income Protection)
-   - Cap compiled chunks per insurer at 14–16 chunks total, preserving rich multi-line coverage while strictly adhering to the 1.5MB isolate budget ($\le 550$ total chunks).
+   - Cap compiled chunks per insurer at 14–16 chunks total, preserving rich multi-line contractual definitions and coverage rules while strictly adhering to the 1.5MB isolate budget ($\le 550$ total chunks).
 
 5. **Universal Definition Inquiry Intent & Heuristic Boosting:**
    - Add generalized `DEFINITION_INQUIRY` pattern to `src/rag/intent-normalizer.ts` capturing definitions across all lines:
@@ -66,8 +66,15 @@ Establish a unified, multi-brand and multi-line ingestion and retrieval pipeline
      - Commercial: `public liability`, `indemnity period`, `business interruption`
    - Apply heuristic scoring boosts in `src/rag/local-retriever.ts` when a query seeks any insurance definition and the chunk represents an authentic glossary definition.
 
-6. **Dual-Provenance Multi-Line Prompt Synthesis:**
-   - Teach `src/rag/prompt-synthesizer.ts` to synthesize answers attributing both the legal PDS terms and the consumer guide explanation across any insurance line, matching the conversational clarity of commercial search overviews while maintaining 100% AFCA compliance and mandatory `STATUTORY_GAW` disclaimers.
+6. **Insurance Specialist Persona, 5-Part Response Anatomy & Dual-Provenance Synthesis:**
+   - Upgrade `src/rag/prompt-synthesizer.ts`, `src/index.ts`, and `src/frontend/components/AssistantMessage.tsx` so the chatbot responds with the precision, structure, and authoritative tone of an experienced Australian insurance product and claims specialist:
+     1. **Lead with the Exact Definition or Coverage Position:** Open directly with the policy definition or statutory meaning (e.g., *Insurance Contracts Regulations 2012* for Flood) without meta-commentary.
+     2. **Group & Contrast Related Policy Events:** Proactively distinguish adjacent policy events that policyholders commonly confuse (e.g., *Flood* vs. *Rainwater Run-off* vs. *Storm Surge / Actions of the Sea* vs. *Escape of Liquid*; *Agreed Value* vs. *Market Value*; *Own* vs. *Any Occupation TPD*).
+     3. **Call Out Critical Exclusions, Embargoes & Sub-Limits:** Explicitly state waiting periods (48h/72h embargoes), exclusions (wear and tear, retaining walls, actions of the sea, unforced entry, unlicensed driving), and monetary caps.
+     4. **Certificate of Insurance (Policy Schedule) Nuance:** Note where optional cover elections, flood opt-outs, and specific Excess tiers appear on the customer's *Certificate of Insurance*.
+     5. **Dual-Provenance Inline Citations & Verbatim `STATUTORY_GAW`:** Attribute contractual rules to `[Source: {Insurer} {Product} PDS ({Section})]` and plain-English explanations to `[Source: {Insurer} {Product} GUIDE ({Section})]`, always concluding with `STATUTORY_GAW`.
+   - **Strict Anti-Meta-Language Invariant:** Prohibit robotic RAG meta-phrases (`"in the provided context"`, `"within the provided context"`, `"based on the provided passages"`).
+   - **Known Exclusion vs. Silent PDS Demarcation:** Tighten `SILENT_PDS_REGEX` in `src/frontend/components/AssistantMessage.tsx` so standard exclusion prose (`"is not covered"`, `"does not cover"`) renders as normal specialist text rather than triggering a false-positive `Silent PDS Notice` alert banner. Reserve `Silent PDS Notice` strictly for genuinely unlisted hazards (`does not specify`, `silent on`, `unlisted domestic hazard`).
 
 ---
 
@@ -88,6 +95,8 @@ Establish a unified, multi-brand and multi-line ingestion and retrieval pipeline
 13. **Statutory General Advice Warning (s.949A):** As a compliance officer, I want 100% of responses across all insurance lines (Home, Motor, Travel, Life, Commercial) to conclude with the mandatory `STATUTORY_GAW` disclaimer, guaranteeing strict ASIC RG 244 adherence.
 14. **AFCA Multi-Line Evaluator Suite:** As an AFCA evaluator, I want `npm run test:evals` to execute benchmarks across multiple lines—Home (flood definition/embargo), Motor (unlicensed driver/total loss), Travel (medical/cancellation), and Life (cooling-off/non-disclosure)—verifying multi-line accuracy and zero advice leakage.
 15. **Technical Insurance Glossaries:** As a policyholder querying obscure terms (*"What is hydrostatic pressure in building insurance?"* or *"What is subrogation in car insurance?"*), I want the system to pull the definition directly from the relevant policy glossary, transparently explaining complex insurance concepts.
+16. **Insurance Agent Precision & Structured Anatomy:** As a retail customer asking *"What is flood definition for NRMA?"*, I want the assistant to respond with the authority and structured clarity of an experienced Australian insurance specialist—leading with the statutory definition, grouping related events (*Flood*, *Rainwater Run-off*, *Storm Surge*), calling out the 72-hour embargo and sea exclusions, noting Certificate of Insurance elections, and never using robotic phrases like *"in the provided context"*.
+17. **Clean Exclusion Rendering (No False Silent PDS Banners):** As a user reading an explanation of covered events and exclusions (e.g., *"Actions of the sea and high tides are not covered"*), I want standard exclusion statements to render as clean specialist prose or bullet points rather than triggering a false-positive orange `Silent PDS Notice` alert banner.
 
 ---
 
@@ -117,8 +126,8 @@ Establish a unified, multi-brand and multi-line ingestion and retrieval pipeline
 - Use `/opt/homebrew/bin/pdftotext` with a fallback to `unpdf` to extract raw text across all 391 active manifest PDFs.
 
 ### 3. Category-Balanced Edge AST Compilation Budgeting
-- Update `scripts/compile-corpus.ts` to compile from `pdsFiles`, `faqFiles`, and a curated multi-line subset of `guideFiles`:
-  - **Category Quota Allocation:** Rather than filtering exclusively by home weather perils, allocate static edge chunks equitably across all five canonical insurer categories:
+- In accordance with `AGENTS.md` Rule 7 and [ADR-0003](../../docs/adr/0003-static-ast-corpus-edge-fallback.md), `scripts/compile-corpus.ts` lints `pdsFiles`, `faqFiles`, and any locally generated `guideFiles`, and deterministically compiles `src/rag/corpus-data.ts` from committed `pdsFiles` and `faqFiles`:
+  - **Category Quota Allocation:** Allocate static edge chunks equitably across all five canonical insurer categories so extracted PDS definitions and core clauses are represented across the entire market:
     - `suncorp-group` (Target: ~14 chunks/insurer across Home, Motor, Commercial)
     - `major-insurers` (Target: ~14 chunks/insurer across Home, Motor, Business, Travel, Life)
     - `challengers-auto-clubs` (Target: ~12 chunks/insurer across Home, Motor, Roadside, Property)
@@ -138,11 +147,22 @@ Establish a unified, multi-brand and multi-line ingestion and retrieval pipeline
   - Universal definition tokens: `definition`, `definitions`, `means`, `prescribed definition`, `words with special meanings`, `defined terms`
 - In `src/rag/local-retriever.ts`, add a `+12.0` scoring boost for chunks whose `source.section` contains `Definitions` or whose body defines the queried term when `DEFINITION_INQUIRY` is detected, regardless of whether the inquiry is for Home, Motor, Travel, Life, or Business.
 
-### 5. Multi-Source Prompt Synthesis & Grounded Citations
-- Update `src/rag/prompt-synthesizer.ts`:
-  - When retrieved chunks contain both `PDS` and `GUIDE` documents, instruct the model:
-    `"Synthesize your answer by combining the binding legal definitions and exclusions from the PDS with the plain-English explanations from the official Insurer Guide. Attribute each part to its respective source."`
-  - Guarantee that the `STATUTORY_GAW` disclaimer is appended to 100% of responses in compliance with Corporations Act s.949A.
+### 5. Insurance Specialist Persona, 5-Part Response Anatomy & Dual-Provenance Synthesis
+- Upgrade `src/rag/prompt-synthesizer.ts` and `src/index.ts`:
+  - **Specialist Persona:** Instruct the LLM to communicate with the precision, clarity, and structured authority of an experienced Australian insurance product and claims specialist operating within the statutory *Factual Information & General Advice* boundary.
+  - **5-Part Specialist Response Structure:**
+    1. **Core Definition / Coverage Position:** Open directly with the exact policy or statutory definition (e.g., *Insurance Contracts Regulations 2012* for Flood: covering of normally dry land by water escaping or released from the normal confines of a lake, river, creek, natural watercourse whether altered or modified, reservoir, canal, or dam).
+    2. **Related Policy Event Demarcation:** Group and contrast adjacent concepts (e.g., *Flood* vs. *Rainwater Run-off* vs. *Storm Surge / Actions of the Sea* vs. *Escape of Liquid*; *Agreed Value* vs. *Market Value*; *Own* vs. *Any Occupation TPD*).
+    3. **Exclusions, Waiting Periods & Sub-Limits:** Explicitly state applicable embargoes (48h/72h), exclusions (actions of the sea, high tides, retaining walls, gradual wear and tear, unforced entry, unlicensed driving), and sub-limit schedules.
+    4. **Certificate of Insurance (Policy Schedule) Context:** Remind the policyholder that optional cover selections, flood opt-outs, and applicable Excess amounts are specified on their *Certificate of Insurance*.
+    5. **Canonical Inline Citations & Verbatim `STATUTORY_GAW`:** Attribute contractual terms to `[Source: {Insurer} {Product} PDS ({Section})]` and plain-English guide explanations to `[Source: {Insurer} {Product} GUIDE ({Section})]`, always concluding with `STATUTORY_GAW`.
+  - **Zero Meta-Language Rule:** Strictly forbid outputting *"in the provided context"*, *"within the provided context"*, or *"based on the provided passages"*.
+  - **Tightened `SILENT_PDS_REGEX` in `src/frontend/components/AssistantMessage.tsx`:** Restrict `SILENT_PDS_REGEX` strictly to genuine policy silence (`does not specify`, `silent on`, `policy is silent`, `pds is silent`, `unlisted domestic hazard`, `not named in the insured events`) so normal exclusion statements (`is not covered`, `does not cover`) never trigger false-positive orange `Silent PDS Notice` banners.
+  - **Multi-Layer Statutory GAW Deduplication & Specialist UI Refinements (`src/constants/statutory.ts`, `AssistantMessage.tsx`, `RefusalCard.tsx`, `ChatContainer.tsx`, `AppShell.tsx`, `useChatStream.ts`):**
+    - `stripStatutoryGaw()` and `isGawDisclaimerText()` in `src/constants/statutory.ts` strip raw statutory GAW disclaimers across all markdown variations (exact copy, headings, bold/italic, blockquotes, bulleted/numbered items, quoted strings, partial/streaming tails, and preceding `---` horizontal rules) while preserving educational prose explaining Section 949A.
+    - Block-level filtering in `AssistantMessage.tsx` suppresses any residual GAW list items, paragraphs, or orphaned disclaimer headings so `<StatutoryGaw />` renders cleanly once without duplicate text inside the message card.
+    - Viewport-level GAW coordination across `App.tsx`, `AppShell.tsx`, `ChatContainer.tsx`, `AssistantMessage.tsx`, and `RefusalCard.tsx` ensures only one active `<StatutoryGaw />` component is displayed at a time (in the `AppShell` footer during empty/streaming/comparison states, and on the latest completed response card during active conversation).
+    - `useChatStream.ts` strips trailing GAW boilerplate from historical assistant turns before sending multi-turn context (`history`) to the edge API so the LLM is not primed with repeated disclaimers.
 
 ---
 
@@ -162,6 +182,7 @@ Establish a unified, multi-brand and multi-line ingestion and retrieval pipeline
   - *Travel:* Emergency medical expenses, trip cancellation
   - *Life:* Cooling-off periods, TPD occupation criteria
 - `tests/ingest/guide-normalizer.test.ts`: Verify that guide normalization preserves breadcrumb frontmatter across all five insurer categories.
+- `tests/constants/statutory.test.ts` & `tests/frontend/message-canvas.test.tsx`: Verify `isGawDisclaimerText()` and `stripStatutoryGaw()` deduplicate all markdown/bullet/heading/quoted variations of `STATUTORY_GAW` and prevent duplicate GAW banners across the UI.
 
 ### 3. Prior Art in the Codebase
 - Existing test patterns in `tests/rag/local-retriever.test.ts`, `tests/evals/afca-compliance.test.ts`, and `tests/ingest/guide-normalizer.test.ts`.
@@ -172,7 +193,6 @@ Establish a unified, multi-brand and multi-line ingestion and retrieval pipeline
 
 - Ingesting historical/archived PDS editions (the 886 older PDS versions in `all_manifest.csv`); only the 391 current active editions are in scope.
 - Automated web crawling of external insurer marketing domains; guides are generated only from curated official insurer pages listed in `data/raw/guide_seeds/`.
-- Changes to frontend CSS or message layout components; existing `CitationDrawer` and `CitationPill` already support `docType: GUIDE`.
 
 ---
 

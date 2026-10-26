@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   enrichRetrievalQuery,
   extractInsurerFromQuery,
+  isInsuranceRelatedQuery,
   normalizeIntent,
 } from "../../src/rag/intent-normalizer";
 
@@ -91,6 +92,33 @@ describe("Sub-ms Voice & Colloquial Intent Normalizer (Ticket 03 & Spec 07)", ()
       expect(result.searchTokens).toContain("pipe");
       expect(result.searchTokens).toContain("burst");
       expect(result.searchTokens.some((t) => t.includes("escape"))).toBe(true);
+    });
+
+    it("detects DEFINITION_INQUIRY and expands universal definition tokens across Home, Motor, and Life lines (Spec 08 § 4)", () => {
+      const nrmaFlood = normalizeIntent("What is flood definition for NRMA?");
+      expect(nrmaFlood.detectedPerils).toContain("DEFINITION_INQUIRY");
+      expect(nrmaFlood.expandedTerms).toContain("definition");
+      expect(nrmaFlood.expandedTerms).toContain("definitions");
+      expect(nrmaFlood.expandedTerms).toContain("means");
+      expect(nrmaFlood.expandedTerms).toContain("prescribed definition");
+      expect(nrmaFlood.expandedTerms).toContain("words with special meanings");
+      expect(nrmaFlood.expandedTerms).toContain("defined terms");
+
+      const aamiMotor = normalizeIntent("What does agreed value mean for AAMI?");
+      expect(aamiMotor.detectedPerils).toContain("DEFINITION_INQUIRY");
+      expect(aamiMotor.canonicalTokens).toContain("Definitions");
+
+      const zurichLife = normalizeIntent("What is TPD definition for Zurich?");
+      expect(zurichLife.detectedPerils).toContain("DEFINITION_INQUIRY");
+      expect(zurichLife.expandedTerms).toContain("defined terms");
+    });
+
+    it("does not trigger DEFINITION_INQUIRY or inject insurance terms on unrelated queries like 'What is adobo?'", () => {
+      expect(isInsuranceRelatedQuery("What is adobo?")).toBe(false);
+      const adobo = normalizeIntent("What is adobo?");
+      expect(adobo.detectedPerils).not.toContain("DEFINITION_INQUIRY");
+      expect(adobo.expandedTerms).toHaveLength(0);
+      expect(adobo.searchTokens).toEqual(["adobo"]);
     });
   });
 

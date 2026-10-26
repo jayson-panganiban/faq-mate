@@ -1,12 +1,13 @@
 import { AlertTriangle, UserCheck } from "lucide-react";
 import React from "react";
-import { STATUTORY_SAFE_HARBOR_REFUSAL } from "../../constants/statutory";
+import { STATUTORY_SAFE_HARBOR_REFUSAL, stripStatutoryGaw } from "../../constants/statutory";
 import { StatutoryGaw } from "./StatutoryGaw";
 
 export interface RefusalCardProps {
   code?: string;
   reason?: string;
   message?: string;
+  showGaw?: boolean;
   className?: string;
 }
 
@@ -19,13 +20,15 @@ export function RefusalCard({
   code = "ADVICE_BOUNDARY_VIOLATION",
   reason: _reason,
   message,
+  showGaw = true,
   className = "",
 }: RefusalCardProps) {
   if (code && code !== "ADVICE_BOUNDARY_VIOLATION") {
     return null;
   }
 
-  const effectiveMessage = message || STATUTORY_SAFE_HARBOR_REFUSAL;
+  const rawMessage = message || STATUTORY_SAFE_HARBOR_REFUSAL;
+  const cleanMessage = stripStatutoryGaw(rawMessage);
 
   return (
     <section
@@ -49,7 +52,7 @@ export function RefusalCard({
           </div>
 
           <div className="text-sm leading-relaxed text-amber-950 dark:text-amber-100 font-medium whitespace-pre-line space-y-2">
-            {effectiveMessage}
+            {cleanMessage}
           </div>
 
           <div className="rounded-lg border border-amber-200 bg-white/80 p-3.5 text-xs leading-relaxed text-amber-950 dark:border-amber-800/60 dark:bg-amber-900/30 dark:text-amber-100">
@@ -68,7 +71,7 @@ export function RefusalCard({
             </p>
           </div>
 
-          {!effectiveMessage.includes("⚠️ General Advice Warning:") && (
+          {showGaw && (
             <StatutoryGaw className="border-amber-200 bg-amber-100/60 text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200" />
           )}
         </div>

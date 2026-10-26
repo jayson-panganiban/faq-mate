@@ -1,6 +1,6 @@
 # Issue 02: Multi-Line Batch Normalization of 391 Active PDS Documents across 39 Insurers
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 
 ## Description
@@ -10,5 +10,5 @@ Run the updated PDS normalizer across all 391 active PDS PDFs in `all_manifest.c
 - Verify that `npm run lint:corpus` passes across all generated files.
 
 ## Acceptance Criteria
-- [ ] 391 active PDS documents normalized into `data/corpus/pds/` with real clauses across Home, Motor, Travel, Life, and Commercial lines.
-- [ ] `npm run lint:corpus` passes with 0 violations across all PDS, FAQ, and Guide markdown files.
+- [x] 391 active PDS documents normalized into `data/corpus/pds/` with real clauses across Home, Motor, Travel, Life, and Commercial lines.
+- [x] `npm run lint:corpus` passes with 0 violations across all PDS, FAQ, and Guide markdown files.

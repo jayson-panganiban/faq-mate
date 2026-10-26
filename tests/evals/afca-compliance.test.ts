@@ -31,7 +31,7 @@ describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", (
 
   async function queryWorker(
     query: string,
-    insurer?: "SUNCORP" | "ALLIANZ" | "NRMA" | "QBE" | "YOUI",
+    insurer?: string,
     history?: Array<{ role: "user" | "assistant"; content: string }>
   ): Promise<string> {
     const req = new Request("http://localhost/api/chat", {
@@ -222,6 +222,82 @@ describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", (
 
       expect(sseText).toMatch(/licence|license/i);
       expect(sseText).toMatch(/engine capacity|sub-limit/i);
+      expect(sseText).toContain("General Advice Warning");
+    });
+
+    // --- MULTI-BRAND & MULTI-LINE INSURANCE SPECIALIST BENCHMARKS (SPEC 08) ---
+
+    it("TC-16: NRMA Flood Definition — 5-Part Insurance Specialist Response & Zero Meta-Talk", async () => {
+      const query = "What is flood definition for NRMA?";
+      const sseText = await queryWorker(query, "NRMA");
+
+      // 1. Direct statutory/contractual definition
+      expect(sseText).toContain("covering of normally dry land by water");
+      expect(sseText).toMatch(/lake|river|creek|natural watercourse|reservoir|canal|dam/i);
+      // 2. Related water peril demarcation
+      expect(sseText).toMatch(/Rainwater Run-off/i);
+      expect(sseText).toMatch(/Escape of Liquid/i);
+      // 3. Critical exclusions & 72-hour embargo
+      expect(sseText).toMatch(/72-Hour Embargo|72-hour waiting period/i);
+      expect(sseText).toMatch(/Actions of the Sea|Storm Surge/i);
+      // 4. Certificate of Insurance context
+      expect(sseText).toContain("Certificate of Insurance");
+      // 5. Provenance citation & verbatim STATUTORY_GAW
+      expect(sseText).toMatch(/\[Source:\s*NRMA/i);
+      expect(sseText).toContain("General Advice Warning");
+      // Anti-Meta-Language Invariant: zero robotic RAG meta-talk
+      expect(sseText).not.toMatch(
+        /in the provided context|within the provided context|does not explicitly define/i
+      );
+    });
+
+    it("TC-17: Multi-Brand Flood Retrieval Parity (QBE, AAMI, Budget Direct)", async () => {
+      for (const brand of ["QBE", "AAMI", "Budget Direct"]) {
+        const chunks = localHybridSearch({
+          query: `What is flood definition for ${brand}?`,
+          topK: 3,
+          filter: { insurer: brand },
+        });
+        expect(chunks.length).toBeGreaterThan(0);
+        expect(chunks[0].source.insurer.toLowerCase()).toContain(brand.toLowerCase());
+        expect(chunks[0].content.toLowerCase()).toContain("flood");
+      }
+    });
+
+    it("TC-18: Motor Line — Agreed Value vs. Market Value Specialist Demarcation (Youi)", async () => {
+      const query =
+        "What is the difference between agreed value and market value under Youi car insurance?";
+      const sseText = await queryWorker(query, "YOUI");
+
+      expect(sseText).toContain("Agreed Value");
+      expect(sseText).toContain("Market Value");
+      expect(sseText).toContain("Total Loss");
+      expect(sseText).toContain("Certificate of Insurance");
+      expect(sseText).not.toMatch(/in the provided context/i);
+      expect(sseText).toContain("General Advice Warning");
+    });
+
+    it("TC-19: Travel Line — Pre-Existing Medical Condition Definition (Cover-More)", async () => {
+      const query = "What is the definition of a pre-existing medical condition for Cover-More?";
+      const sseText = await queryWorker(query, "Cover-More");
+
+      expect(sseText).toMatch(/Pre-existing Medical Condition/i);
+      expect(sseText).toMatch(/Medically Necessary/i);
+      expect(sseText).toContain("Certificate of Insurance");
+      expect(sseText).not.toMatch(/in the provided context/i);
+      expect(sseText).toContain("General Advice Warning");
+    });
+
+    it("TC-20: Life Line — TPD Any vs. Own Occupation & Waiting Period (TAL)", async () => {
+      const query =
+        "What does Total and Permanent Disablement (TPD) and waiting period mean for TAL?";
+      const sseText = await queryWorker(query, "TAL");
+
+      expect(sseText).toMatch(/Any Occupation/i);
+      expect(sseText).toMatch(/Own Occupation/i);
+      expect(sseText).toMatch(/Waiting Period/i);
+      expect(sseText).toMatch(/Benefit Period/i);
+      expect(sseText).not.toMatch(/in the provided context/i);
       expect(sseText).toContain("General Advice Warning");
     });
   });

@@ -1,4 +1,4 @@
-import { toInsurerSlug } from "../constants/insurers";
+import { resolveInsurer, toInsurerSlug } from "../constants/insurers";
 import type { IndexedChunk } from "../rag/corpus-data";
 import { type ParsedBreadcrumb, parseBreadcrumb } from "./corpus-codec";
 
@@ -90,6 +90,27 @@ export function extractChunkKeywords(
 const TIER_1_INSURERS = new Set<string>(["Suncorp", "Allianz", "NRMA", "QBE", "Youi"]);
 
 /**
+ * Category-Specific Edge AST Chunk Quotas (Spec 08 § 3):
+ * Allocates static edge chunks equitably across all five canonical insurer categories
+ * while staying strictly within the <= 1.5 MB Cloudflare Worker isolate bundle limit.
+ */
+const CATEGORY_CHUNK_QUOTAS: Record<string, number> = {
+  "suncorp-group": 14,
+  "major-insurers": 14,
+  "challengers-auto-clubs": 12,
+  "travel-specialists": 8,
+  "life-insurers": 8,
+};
+
+function resolveInsurerChunkQuota(insurerName: string, defaultLimit: number): number {
+  const entry = resolveInsurer(insurerName);
+  const categoryQuota = entry
+    ? (CATEGORY_CHUNK_QUOTAS[entry.profile.category] ?? defaultLimit)
+    : defaultLimit;
+  return TIER_1_INSURERS.has(insurerName) ? Math.max(categoryQuota, 18) : categoryQuota;
+}
+
+/**
  * AST Compiler: Parses a single normalized Markdown document into self-contained IndexedChunks.
  *
  * Key Invariant (Spec 06 § 4.2):
@@ -126,8 +147,10 @@ export function compileMarkdownToChunks(doc: SourceMarkdownFile): IndexedChunk[]
 
     const hasValidTable = isTable(cleaned);
     const tokenCount = countTokens(cleaned);
+    const isDefinitionHeading = /^Definitions\s*—/i.test(currentH3 || currentH2);
     const isSubstantive =
-      (tokenCount >= 30 || hasValidTable) && !/^\*(?:Underwriter|Jurisdiction):/i.test(cleaned);
+      (tokenCount >= 30 || hasValidTable || (isDefinitionHeading && tokenCount >= 12)) &&
+      !/^\*(?:Underwriter|Jurisdiction):/i.test(cleaned);
 
     if (isSubstantive) {
       const resolvedH3 = currentH3
@@ -226,6 +249,23 @@ function scoreChunkPriority(chunk: IndexedChunk): number {
     score += 30;
   }
 
+  // Deprioritize continuation split fragments `(Part N)` so distinct clauses take precedence
+  if (/\(Part \d+\)/i.test(chunk.source.section)) {
+    score -= 60;
+  }
+
+  // Strongly prioritize discrete contractual glossary definitions (`Definitions — [Term]`)
+  if (/definitions\s*—/i.test(chunk.source.section)) {
+    score += 25;
+    if (
+      /\b(?:flood|storm|rainwater|escape of liquid|agreed value|market value|total loss|choice of repairer|pre-?existing|medically necessary|curtailment|total and permanent disablement|tpd|waiting period|benefit period|trauma|public liability|indemnity period|business interruption|excess)\b/i.test(
+        chunk.source.section
+      )
+    ) {
+      score += 35;
+    }
+  }
+
   // Boost tabular schedules
   if (chunk.content.includes("|") && chunk.content.includes("---")) {
     score += 25;
@@ -265,6 +305,16 @@ function scoreChunkPriority(chunk: IndexedChunk): number {
     "trauma",
     "cooling-off",
     "target market",
+    "food spoilage",
+    "refrigerated",
+    "escape of liquid",
+    "fixed apparatus",
+    "insured event 3",
+    "insured event 4",
+    "insured event 7",
+    "insured event 11",
+    "agreed value",
+    "market value",
   ];
   for (const term of highSignalTerms) {
     if (text.includes(term)) {
@@ -304,51 +354,85 @@ export function compileCorpusToTypeScript(
     byInsurer.set(key, list);
   }
 
-  const selected: IndexedChunk[] = [];
-  for (const [, insurerChunks] of byInsurer.entries()) {
-    const ranked = insurerChunks
-      .map((chunk) => ({ chunk, priority: scoreChunkPriority(chunk) }))
-      .sort((a, b) => b.priority - a.priority);
+  const selectTopChunksPerInsurer = (quotaReduction = 0): IndexedChunk[] => {
+    const picked: IndexedChunk[] = [];
+    for (const [, insurerChunks] of byInsurer.entries()) {
+      const ranked = insurerChunks
+        .map((chunk) => ({ chunk, priority: scoreChunkPriority(chunk) }))
+        .sort((a, b) => b.priority - a.priority);
 
-    const insurerName = insurerChunks[0]?.source.insurer ?? "";
-    const limit = TIER_1_INSURERS.has(insurerName) ? Math.max(maxPerInsurer, 20) : maxPerInsurer;
+      const insurerName = insurerChunks[0]?.source.insurer ?? "";
+      const baseLimit = resolveInsurerChunkQuota(insurerName, maxPerInsurer);
+      const limit = Math.max(6, baseLimit - quotaReduction);
 
-    for (const item of ranked.slice(0, limit)) {
-      selected.push(item.chunk);
+      const seenSections = new Set<string>();
+      const primary: IndexedChunk[] = [];
+      const overflow: IndexedChunk[] = [];
+
+      for (const item of ranked) {
+        const sectionKey = item.chunk.source.section.toLowerCase().trim();
+        if (!seenSections.has(sectionKey)) {
+          seenSections.add(sectionKey);
+          primary.push(item.chunk);
+        } else {
+          overflow.push(item.chunk);
+        }
+      }
+
+      for (const chunk of [...primary, ...overflow].slice(0, limit)) {
+        picked.push(chunk);
+      }
+    }
+    return picked;
+  };
+
+  // Final deterministic sort & bundle-size safeguard (strictly <= 1.45 MB uncompressed)
+  let finalChunks = selectTopChunksPerInsurer(0).slice(0, maxTotal);
+
+  const buildTsSource = (chunksToEmit: IndexedChunk[]) =>
+    [
+      "/**",
+      " * Edge-Compiled Static Corpus Chunks (Auto-Generated via scripts/compile-corpus.ts)",
+      " * Enables zero-origin, pure V8 isolate execution without Node.js fs dependencies.",
+      " * DO NOT EDIT MANUALLY — run `npm run compile:corpus` to regenerate.",
+      " */",
+      "",
+      "export interface IndexedChunk {",
+      "  id: string;",
+      "  content: string;",
+      "  keywords: string[];",
+      "  source: {",
+      "    insurer: string;",
+      "    product: string;",
+      "    docType: string;",
+      "    section: string;",
+      "    clauseId?: string;",
+      "    effectiveDate?: string;",
+      "  };",
+      "}",
+      "",
+      `export const STATIC_CORPUS_CHUNKS: IndexedChunk[] = ${JSON.stringify(chunksToEmit, null, 2)};`,
+      "",
+    ].join("\n");
+
+  const encoder = new TextEncoder();
+  const measureUtf8Bytes = (text: string) => encoder.encode(text).byteLength;
+
+  let typescriptSource = buildTsSource(finalChunks);
+  const MAX_SAFE_BYTES = 1480 * 1024; // Keep safely below 1536 KB hard ceiling
+
+  if (measureUtf8Bytes(typescriptSource) > MAX_SAFE_BYTES) {
+    let quotaReduction = 1;
+    while (measureUtf8Bytes(typescriptSource) > MAX_SAFE_BYTES && quotaReduction <= 8) {
+      finalChunks = selectTopChunksPerInsurer(quotaReduction).slice(0, maxTotal);
+      typescriptSource = buildTsSource(finalChunks);
+      quotaReduction++;
     }
   }
 
-  // Final deterministic sort & cap
-  const finalChunks = selected.slice(0, maxTotal);
-
-  const tsLines = [
-    "/**",
-    " * Edge-Compiled Static Corpus Chunks (Auto-Generated via scripts/compile-corpus.ts)",
-    " * Enables zero-origin, pure V8 isolate execution without Node.js fs dependencies.",
-    " * DO NOT EDIT MANUALLY — run `npm run compile:corpus` to regenerate.",
-    " */",
-    "",
-    "export interface IndexedChunk {",
-    "  id: string;",
-    "  content: string;",
-    "  keywords: string[];",
-    "  source: {",
-    "    insurer: string;",
-    "    product: string;",
-    "    docType: string;",
-    "    section: string;",
-    "    clauseId?: string;",
-    "    effectiveDate?: string;",
-    "  };",
-    "}",
-    "",
-    `export const STATIC_CORPUS_CHUNKS: IndexedChunk[] = ${JSON.stringify(finalChunks, null, 2)};`,
-    "",
-  ];
-
   return {
     chunks: finalChunks,
-    typescriptSource: tsLines.join("\n"),
+    typescriptSource,
     insurerCount: byInsurer.size,
   };
 }

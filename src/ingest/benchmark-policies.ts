@@ -1,4 +1,18 @@
-import { type NormalizedDocument, normalizePdsDocument } from "./pds-normalizer";
+import {
+  type NormalizedDocument,
+  normalizePdsDocument,
+  type PolicySection,
+} from "./pds-normalizer";
+
+const HOME_LIQUID_AND_FOOD_SECTION: PolicySection = {
+  title: "Insured Event 4: Escape of Liquid & Insured Event 11: Food Spoilage",
+  level: 3,
+  clauseType: "Coverage",
+  content: [
+    "- **Insured Event 4 (Escape of Liquid):** We cover sudden and unexpected loss or damage caused by liquid escaping from a fixed pipe, tank, waterbed, washing machine, dishwasher, sink, bath, or fixed internal apparatus at the insured address. Gradual leaking, splashing, and repair of the defective pipe itself are excluded.",
+    "- **Insured Event 11 (Food Spoilage):** Under Contents Insurance, we cover spoilage of refrigerated food and prescription medication up to **$2,000** caused by sudden failure of the public electricity supply or breakdown of your domestic refrigerator or freezer during a blackout.",
+  ].join("\n"),
+};
 
 /**
  * Curated Regulatory Benchmark Policy Disclosures (Spec 01, Spec 04, Spec 06)
@@ -41,6 +55,7 @@ export function buildBenchmarkPolicyDocuments(): Array<{
           "- **72-Hour Embargo:** We do not insure you for any loss or damage caused by flood, bushfire, grassfire, or named cyclone that occurs within the first **72 hours** of purchasing this policy, unless this policy replaces an existing continuous policy with equivalent cover without lapse.",
           "- **Actions of the Sea / Storm Surge:** We do not cover loss or damage caused by high tide, tidal waves, or actions of the sea, even if occurring concurrently with a storm or flood event.",
           "- **Rainwater Run-off:** Rainwater that has pooled or run over the ground without escaping from the confines of a natural channel, lake, or dam is assessed under **Insured Event 3 (Storm)**, not Flood.",
+          "- **Official Policy Source:** <https://www.suncorp.com.au/insurance/home.html>",
         ].join("\n"),
         exclusions: [
           "72-Hour Embargo: No cover for flood, bushfire, grassfire, or named cyclone within the first 72 hours of policy purchase.",
@@ -92,6 +107,7 @@ export function buildBenchmarkPolicyDocuments(): Array<{
           },
         ],
       },
+      HOME_LIQUID_AND_FOOD_SECTION,
     ]
   );
 
@@ -173,6 +189,29 @@ export function buildBenchmarkPolicyDocuments(): Array<{
     },
     [
       {
+        title: "Definitions — Flood",
+        level: 3,
+        clauseType: "Definition",
+        content: [
+          "**Flood** means the covering of normally dry land by water that has escaped or been released from the normal confines of any of the following:",
+          "- a lake (whether or not it has been altered or modified);",
+          "- a river (whether or not it has been altered or modified);",
+          "- a creek (whether or not it has been altered or modified);",
+          "- another natural watercourse (whether or not it has been altered or modified);",
+          "- a reservoir;",
+          "- a canal; or",
+          "- a dam.",
+          "",
+          "Under NRMA Home & Contents Insurance (and the *Insurance Contracts Regulations 2012 (Cth)* Reg 29D standard definition), **Flood** is distinct from **Rainwater run-off** (rainwater flowing over normally dry ground during a Storm without escaping a natural watercourse) and **Storm surge / Actions of the sea** (ocean or tidal water pushed onto land). Flood cover is included as standard on NRMA Home and Contents policies unless an approved flood opt-out is recorded on your Certificate of Insurance.",
+        ].join("\n"),
+        exclusions: [
+          "Actions of the sea, high tide, king tides, and tidal waves are strictly excluded under NRMA Home & Contents Insurance.",
+          "A 72-hour waiting period (embargo) applies to flood, storm, and bushfire from policy inception unless replacing an existing policy without a break in cover.",
+          "Retaining walls, sea walls, garden borders, and free-standing outdoor structures are excluded from flood cover.",
+        ],
+        embargoHours: 72,
+      },
+      {
         title: "Insured Events: Flood, Storm, Bushfire & Embargo Periods",
         level: 3,
         clauseType: "Coverage",
@@ -206,6 +245,7 @@ export function buildBenchmarkPolicyDocuments(): Array<{
           },
         ],
       },
+      HOME_LIQUID_AND_FOOD_SECTION,
     ]
   );
 
@@ -224,6 +264,21 @@ export function buildBenchmarkPolicyDocuments(): Array<{
     },
     [
       {
+        title: "Definitions — Flood",
+        level: 3,
+        clauseType: "Definition",
+        content: [
+          "**Flood** means the covering of normally dry land by water that has escaped or been released from the normal confines of any lake, river, creek, or other natural watercourse (whether or not altered or modified), or any reservoir, canal, or dam, in accordance with the *Insurance Contracts Regulations 2012 (Cth)* Reg 29D.",
+          "",
+          "Under QBE Home & Contents Insurance, **Flood** is distinguished from **Storm & Rainwater Run-off** (surface water following rainfall) and **Actions of the Sea / Storm Surge** (which are excluded). Check your Certificate of Insurance to confirm whether optional or standard Flood cover and specific Excess levels apply to your insured address.",
+        ].join("\n"),
+        exclusions: [
+          "72-hour embargo period applies to bushfire, storm, and flood claims after policy inception.",
+          "Storm surge, high tide, and actions of the sea are excluded.",
+        ],
+        embargoHours: 72,
+      },
+      {
         title: "Defined Insured Events, Flood & Theft Conditions",
         level: 3,
         clauseType: "Coverage",
@@ -235,6 +290,7 @@ export function buildBenchmarkPolicyDocuments(): Array<{
         ],
         embargoHours: 72,
       },
+      HOME_LIQUID_AND_FOOD_SECTION,
     ]
   );
 
@@ -252,6 +308,17 @@ export function buildBenchmarkPolicyDocuments(): Array<{
       jurisdiction: "Australia (Cth)",
     },
     [
+      {
+        title: "Definitions — Agreed Value & Market Value",
+        level: 3,
+        clauseType: "Definition",
+        content: [
+          "Under **Youi Comprehensive Car Insurance** (PDS):",
+          "- **Agreed Value** means the fixed dollar amount we agree to insure your vehicle for during the current policy period, as shown on your Policy Schedule (Certificate of Insurance).",
+          "- **Market Value** means the reasonable retail cost to replace your vehicle with one of comparable make, model, age, kilometres, and condition immediately prior to the total loss incident.",
+          "- **Total Loss** means your vehicle is stolen and unrecovered after 14 days, or damaged so severely that it is unsafe or uneconomical to repair.",
+        ].join("\n"),
+      },
       {
         title: "Comprehensive Cover, Excess Schedule & Driver Exclusions",
         level: 3,

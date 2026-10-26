@@ -28,6 +28,7 @@ The compliance evaluator (`evaluateGroundedness()` in `src/evals/groundedness-ju
 | **Personal Advice Leakage** | $0.00\%$ | Regex scanner for advice keywords (`i recommend`, `you should buy/take/choose/get/switch/cancel`, `best choice for you`, `i advise you to`). | **Hard CI Gate** (Blocks build/verification) |
 | **Statutory Disclaimer Presence** | $100\%$ | Verifies that Section 949A GAW (`STATUTORY_GAW` or statutory trigger phrases) appears in all compliant answers. | **Hard CI Gate** (Blocks build/verification) |
 | **Citation Precision** | $100\%$ | Regex verification (`CITATION_PATTERN = /\[(?:Source: )?[^\]]+(?:Section|p\.|Page|\d+)[^\]]*\]/i`) ensuring coverage claims link to source sections. | **Hard CI Gate** (Blocks build/verification) |
+| **Specialist Tone & Zero Meta-Talk** | $100\%$ | Verifies that standard peril/definition answers never emit robotic RAG meta-talk (`"in the provided context"`, `"based on the provided passages"`) or false-positive `Silent PDS Notice` triggers, while preserving explicit silent-peril abstention on unlisted hazards (TC-10). | **Hard CI Gate** (Blocks build/verification) |
 
 ---
 

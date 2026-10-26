@@ -1,6 +1,11 @@
 import { AlertCircle, Bot, Check, Copy } from "lucide-react";
 import React, { useState } from "react";
-import { STATUTORY_GAW } from "../../constants/statutory";
+import {
+  isGawDisclaimerText,
+  isGawHeadingLine,
+  STATUTORY_GAW,
+  stripStatutoryGaw,
+} from "../../constants/statutory";
 import type { GroundedChunk } from "../../types/chat";
 import { findMatchingChunk } from "../utils/citations";
 import { CitationPill } from "./CitationPill";
@@ -36,17 +41,22 @@ export interface AssistantMessageProps {
    */
   onSelectFollowUp?: (prompt: string) => void;
   /**
+   * Whether to render the inline StatutoryGaw banner at the bottom of the card.
+   */
+  showGaw?: boolean;
+  /**
    * Optional custom styling classes.
    */
   className?: string;
 }
 
 /**
- * Generalized regex pattern detecting ungrounded, silent, or non-covered PDS statements.
- * Matches standard non-coverage/silent phrasing without test-fixture hardcoding.
+ * Generalized regex pattern detecting genuine policy silence or unlisted exotic hazards (AFCA TC-10).
+ * Strictly distinguishes Known Policy Exclusions ("not covered", "does not cover") from
+ * genuine Policy Silence ("does not specify", "policy is silent", "not named in the insured events").
  */
 const SILENT_PDS_REGEX =
-  /(?:does not|do not|cannot)\s+(?:specify|cover|provide cover)|not\s+(?:covered|insured|listed)|unlisted domestic hazard|silent on|unspecified|policy is silent|pds is silent|silent pds|no cover for unlisted|not named in the insured events/i;
+  /(?:does not|do not|cannot)\s+specify|unlisted domestic hazards?|unlisted exotic|silent on|policy is silent|pds is silent|silent pds|no cover for unlisted|not named in the insured events/i;
 
 /**
  * Checks if a block of text represents an ungrounded or silent PDS statement.
@@ -146,7 +156,8 @@ function renderInlineText(
   chunks?: GroundedChunk[],
   onSelectCitation?: (chunk: GroundedChunk | string) => void
 ): React.ReactNode {
-  const citationPattern = /(\[(?:Source:\s*[^\]]+|[^\]]+(?:PDS|TMD|SPDS|Section)[^\]]*)\])/g;
+  const citationPattern =
+    /(\[(?:Source:\s*[^\]]+|[^\]]+(?:PDS|TMD|SPDS|FAQ|GUIDE|Section)[^\]]*)\])/g;
   const parts = text.split(citationPattern);
 
   return (
@@ -161,6 +172,8 @@ function renderInlineText(
             lower.includes("pds") ||
             lower.includes("tmd") ||
             lower.includes("spds") ||
+            lower.includes("faq") ||
+            lower.includes("guide") ||
             lower.includes("section");
 
           if (isCitation) {
@@ -192,7 +205,7 @@ type MarkdownBlock =
     }
   | { type: "code"; language: string; code: string }
   | { type: "ul"; items: string[] }
-  | { type: "ol"; items: string[] }
+  | { type: "ol"; start: number; items: string[] }
   | { type: "silent-notice"; text: string }
   | { type: "paragraph"; text: string };
 
@@ -294,14 +307,19 @@ export function AssistantMessage({
   onCopy,
   suggestedFollowUps,
   onSelectFollowUp,
+  showGaw = true,
   className = "",
 }: AssistantMessageProps) {
   const [copied, setCopied] = useState(false);
 
+  // Strip duplicate statutory GAW if backend appended it to the raw message
+  const bodyText = stripStatutoryGaw(message);
+
   const handleCopy = async () => {
     try {
       if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(message);
+        const textToCopy = bodyText !== message ? `${bodyText}\n\n${STATUTORY_GAW}` : message;
+        await navigator.clipboard.writeText(textToCopy);
       }
       setCopied(true);
       onCopy?.();
@@ -313,22 +331,10 @@ export function AssistantMessage({
     }
   };
 
-  // Strip duplicate statutory GAW if backend appended it to the raw message
-  let bodyText = message;
-  const gawMarker = "⚠️ General Advice Warning:";
-  const gawIndex = bodyText.indexOf(gawMarker);
-  if (gawIndex !== -1) {
-    bodyText = bodyText.substring(0, gawIndex).trimEnd();
-  } else {
-    const exactIndex = bodyText.indexOf(STATUTORY_GAW);
-    if (exactIndex !== -1) {
-      bodyText = bodyText.substring(0, exactIndex).trimEnd();
-    }
-  }
-
   // Parse lines into structured blocks
   const lines = bodyText.split("\n");
   const blocks: MarkdownBlock[] = [];
+  let runningOlCounter = 0;
   let i = 0;
 
   while (i < lines.length) {
@@ -374,41 +380,91 @@ export function AssistantMessage({
       continue;
     }
 
-    // 2. Header
+    // 3. Header
     const headerMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
     if (headerMatch) {
+      const level = headerMatch[1].length;
+      if (level <= 2) {
+        runningOlCounter = 0;
+      }
       blocks.push({
         type: "header",
-        level: headerMatch[1].length,
+        level,
         text: headerMatch[2],
       });
       i++;
       continue;
     }
 
-    // 3. Unordered list
+    // 4. Unordered list (filtering out any GAW disclaimer items)
     if (/^[-*]\s+/.test(trimmed)) {
       const items: string[] = [];
-      while (i < lines.length && /^[-*]\s+/.test(lines[i].trim())) {
-        items.push(lines[i].trim().replace(/^[-*]\s+/, ""));
+      while (i < lines.length) {
+        const curTrimmed = lines[i].trim();
+        if (curTrimmed === "") {
+          let nextNonEmpty = i + 1;
+          while (nextNonEmpty < lines.length && lines[nextNonEmpty].trim() === "") {
+            nextNonEmpty++;
+          }
+          if (nextNonEmpty < lines.length && /^[-*]\s+/.test(lines[nextNonEmpty].trim())) {
+            i = nextNonEmpty;
+            continue;
+          }
+          break;
+        }
+        if (!/^[-*]\s+/.test(curTrimmed)) {
+          break;
+        }
+        const itemText = curTrimmed.replace(/^[-*]\s+/, "");
+        if (!isGawDisclaimerText(itemText)) {
+          items.push(itemText);
+        }
         i++;
       }
-      blocks.push({ type: "ul", items });
+      if (items.length > 0) {
+        blocks.push({ type: "ul", items });
+      }
       continue;
     }
 
-    // 4. Ordered list
-    if (/^\d+\.\s+/.test(trimmed)) {
+    // 5. Ordered list (preserving sequence across blank lines & interrupted sub-blocks)
+    const olFirstMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+    if (olFirstMatch) {
+      const firstParsedNum = Number.parseInt(olFirstMatch[1], 10);
+      const start =
+        firstParsedNum > 1 ? firstParsedNum : runningOlCounter > 0 ? runningOlCounter + 1 : 1;
       const items: string[] = [];
-      while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) {
-        items.push(lines[i].trim().replace(/^\d+\.\s+/, ""));
+
+      while (i < lines.length) {
+        const curTrimmed = lines[i].trim();
+        if (curTrimmed === "") {
+          let nextNonEmpty = i + 1;
+          while (nextNonEmpty < lines.length && lines[nextNonEmpty].trim() === "") {
+            nextNonEmpty++;
+          }
+          if (nextNonEmpty < lines.length && /^\d+\.\s+/.test(lines[nextNonEmpty].trim())) {
+            i = nextNonEmpty;
+            continue;
+          }
+          break;
+        }
+        if (!/^\d+\.\s+/.test(curTrimmed)) {
+          break;
+        }
+        const itemText = curTrimmed.replace(/^\d+\.\s+/, "");
+        if (!isGawDisclaimerText(itemText)) {
+          items.push(itemText);
+        }
         i++;
       }
-      blocks.push({ type: "ol", items });
+      if (items.length > 0) {
+        blocks.push({ type: "ol", start, items });
+        runningOlCounter = start + items.length - 1;
+      }
       continue;
     }
 
-    // 5. Paragraph or Silent PDS Notice
+    // 6. Paragraph or Silent PDS Notice
     const pLines: string[] = [line];
     i++;
     while (i < lines.length && lines[i].trim() !== "" && !isStartOfOtherBlock(lines, i)) {
@@ -417,16 +473,29 @@ export function AssistantMessage({
     }
     const fullParagraph = pLines.join("\n");
 
+    if (isGawDisclaimerText(fullParagraph)) {
+      continue;
+    }
+
     if (isSilentPdsNotice(fullParagraph)) {
       if (blocks.length > 0 && blocks[blocks.length - 1].type === "silent-notice") {
         (blocks[blocks.length - 1] as { type: "silent-notice"; text: string }).text +=
-          "\n\n" + fullParagraph;
+          `\n\n${fullParagraph}`;
       } else {
         blocks.push({ type: "silent-notice", text: fullParagraph });
       }
     } else {
       blocks.push({ type: "paragraph", text: fullParagraph });
     }
+  }
+
+  // Drop any orphaned trailing GAW / Statutory Disclaimer header
+  while (
+    blocks.length > 0 &&
+    blocks[blocks.length - 1].type === "header" &&
+    isGawHeadingLine((blocks[blocks.length - 1] as { type: "header"; text: string }).text)
+  ) {
+    blocks.pop();
   }
 
   return (
@@ -575,10 +644,11 @@ export function AssistantMessage({
               return (
                 <ol
                   key={bIdx}
-                  className="my-2.5 ml-4 sm:ml-5 space-y-1 list-decimal text-slate-700 dark:text-slate-300 text-sm sm:text-base"
+                  start={block.start}
+                  className="my-2.5 ml-4 sm:ml-5 space-y-1.5 list-decimal text-slate-700 dark:text-slate-300 text-sm sm:text-base"
                 >
                   {block.items.map((item, idx) => (
-                    <li key={idx} className="leading-relaxed">
+                    <li key={idx} value={block.start + idx} className="leading-relaxed">
                       {renderInlineText(item, chunks, onSelectCitation)}
                     </li>
                   ))}
@@ -660,7 +730,7 @@ export function AssistantMessage({
         )}
 
         {/* Statutory Section 949A GAW banner rendered at bottom of completed assistant response */}
-        {!isStreaming && message.trim().length > 0 && (
+        {showGaw && !isStreaming && message.trim().length > 0 && (
           <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
             <StatutoryGaw />
           </div>

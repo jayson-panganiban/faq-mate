@@ -106,7 +106,7 @@ stateDiagram-v2
   4. Product name match
 * Slide-over drawer displays:
   * Insurer brand & statutory underwriter (e.g. `AAI Limited (ABN 48 005 297 807, AFSL 230859)`)
-  * Document classification (`PDS`, `SPDS`, `TMD`, `FAQ`) and effective date
+  * Document classification (`PDS`, `SPDS`, `TMD`, `FAQ`, `GUIDE`) and effective date
   * Retrieval relevance score badge (e.g. `94% match`)
   * Full operative section excerpt rendered as formatted Markdown with tables
 
@@ -125,7 +125,13 @@ stateDiagram-v2
 ### 4.4 Regulatory & Life-Safety Cards
 * **ASIC RG 244 Safe-Harbor Card (`RefusalCard.tsx`):** Triggered when `ADVICE_BOUNDARY_VIOLATION` is received; renders safe-harbor advice refusal, explains the statutory boundary, and presents factual inquiry suggestions.
 * **COP Emergency Banner (`EmergencyBanner.tsx`):** Triggered when `EMERGENCY_INTERCEPTION` is received; renders high-contrast red banner with one-tap `tel:000`, `tel:132500`, and `tel:1800018444` buttons.
-* **Statutory GAW Footer (`StatutoryGaw.tsx`):** Persistent, non-dismissible Section 949A disclaimer in the application footer and at the end of every generated answer.
+* **Statutory GAW Footer & Multi-Layer Deduplication (`StatutoryGaw.tsx`, `src/constants/statutory.ts`, `AssistantMessage.tsx`, `RefusalCard.tsx`, `AppShell.tsx`):**
+  * Persistent, non-dismissible Section 949A disclaimer rendered via `<StatutoryGaw />`.
+  * `stripStatutoryGaw()` and `isGawDisclaimerText()` in `src/constants/statutory.ts` strip raw LLM-emitted GAW boilerplate (exact copy, headings, bold/italic, blockquotes, bullets, numbered items, quotes, and partial streaming tails) from `AssistantMessage`, `RefusalCard`, and `useChatStream` multi-turn history, while preserving educational explanations of Section 949A.
+  * Viewport-level coordination between `AppShell`, `ChatContainer`, `AssistantMessage`, and `RefusalCard` ensures only a single `<StatutoryGaw />` banner is displayed on screen at any time.
+* **Known Policy Exclusion vs. Silent PDS Notice Demarcation (`AssistantMessage.tsx`):**
+  * Standard insurance specialist answers routinely state what is excluded (*"Storm surge and actions of the sea are not covered"* or *"The policy does not cover damage during the first 72 hours"*). These are **known contractual exclusions**, not missing policy data.
+  * `SILENT_PDS_REGEX` in [`src/frontend/components/AssistantMessage.tsx`](../../src/frontend/components/AssistantMessage.tsx) must strictly match genuine **Policy Silence / Unlisted Hazard** admissions (`does not specify`, `silent on`, `policy is silent`, `pds is silent`, `unlisted domestic hazard`, `not named in the insured events`, e.g., AFCA TC-10 `pet chimpanzee`) and must **never** match ordinary exclusion statements (`not covered`, `does not cover`, `is excluded`).
 
 ---
 

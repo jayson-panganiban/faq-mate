@@ -35,7 +35,7 @@ A multi-turn conversational comprehension and deterministic intent expansion lay
 2. **Client-Managed Multi-Turn Window with Zero-Persistence Privacy:** The browser manages an ephemeral conversation history (last 2–3 turns) and passes it in the request payload. The edge Worker scrubs PII across all inbound turns under Australian Privacy Principles (APPs 3 & 11) while logging only the daily-salted hash of the active prompt for k-anonymity.
 3. **ASIC RG 244 Conversational Decision-Factor Framing:** Prompts and edge gatekeepers explicitly intercept conversational recommendation traps (*"Should I claim or pay myself?"*, *"Which insurer is better for me?"*) and reframe responses to objective decision factors (e.g. comparing basic excess, no-claim bonus impacts, and gradual deterioration carve-outs) with zero personal advice leakage.
 4. **Product-Line Disambiguation Engine:** When a conversational inquiry touches ambiguous product boundaries (Building vs. Contents vs. Landlord vs. Motor), the synthesis engine structures answers with explicit product-line demarcations.
-5. **Dual-Tier Hybrid Retrieval Activation:** Active Cloudflare AI Search (`env.AI_SEARCH`) integration leveraging dense vector embeddings (`@cf/baai/bge-large-en-v1.5`) and cross-encoder reranking over the 331-document R2 corpus, backed seamlessly by the local in-isolate AST index.
+5. **Dual-Tier Hybrid Retrieval Activation:** Active Cloudflare AI Search (`env.AI_SEARCH`) integration leveraging dense vector embeddings (`@cf/baai/bge-large-en-v1.5`) and cross-encoder reranking over the 1,268-document R2 tripartite corpus (`292` PDS/SPDS, `39` FAQ, and `937` Curated Guides), backed seamlessly by the local in-isolate AST index.
 6. **Dynamic Follow-Up Suggestions:** Each completed response emits 2–3 structured statutory follow-up chips (e.g. `["What is the 72-hour flood embargo?", "How does escape of liquid differ from storm run-off?"]`) in the SSE stream to guide user discovery.
 
 ---
@@ -77,11 +77,12 @@ export const ChatMessageHistorySchema = z.object({
 export const ChatRequestSchema = z.object({
   query: z.string().trim().min(2).max(500),
   conversationId: z.string().uuid(),
-  history: z.array(ChatMessageHistorySchema).max(4).optional(),
+  history: z.array(ChatMessageHistorySchema).max(6).optional(),
+  turnstileToken: z.string().optional(),
   filters: z.object({
     insurer: z.string().trim().optional(),
     product: z.string().trim().optional(),
-    docType: z.enum(["PDS", "TMD", "SPDS", "FSG", "FAQ"]).default("PDS"),
+    docType: z.enum(["PDS", "TMD", "SPDS", "FSG", "FAQ", "GUIDE"]).default("PDS"),
   }).optional(),
 });
 ```
@@ -105,13 +106,14 @@ export const ChatRequestSchema = z.object({
   - **Conversational Dilemma Inquiries:** Reframing questions like *"Should I claim or pay myself?"* into objective decision criteria (deductible vs cost of repairs, no-claim discount impacts, gradual wear exclusions) without advising on the action to take.
   - **Prohibited Personal Advice:** Explicit switching or recommendation requests (*"Which policy is best for my budget?"*) trigger deterministic safe-harbor refusals (`STATUTORY_SAFE_HARBOR_REFUSAL`).
 
-### 5. Product Line Delineation & Structured Disambiguation
-- When an inquiry is broad or crosses policy lines (e.g. *"water damage"* or *"storm damage"*), the synthesis prompt instructs the LLM to:
-  1. Delineate between Building, Contents, Landlord, and Motor policies.
-  2. Structure responses using dedicated Markdown headings for each applicable insured event.
-  3. Include critical carve-outs (e.g. 72-hour embargo, high tide exclusions, unforced theft exclusions).
-  4. Attach inline citations (`[Source: Insurer Product (Section)]`) to each section.
-  5. Close with `STATUTORY_GAW`.
+### 5. Product Line Delineation, Structured Disambiguation & Insurance Specialist Persona
+- All conversational answers adopt the **Australian Insurance Product & Claims Specialist Persona** and follow the **5-Part Specialist Response Anatomy** ([`GLOSSARY.md § 2`](../../GLOSSARY.md#2-regulatory--compliance-invariants)):
+  1. **Direct Definition or Coverage Position:** State the operative contractual/statutory rule immediately and delineate between Building, Contents, Landlord, Motor, Travel, and Life policies when an inquiry is broad.
+  2. **Related Event & Policy Structure Demarcation:** Structure responses using dedicated Markdown headings or bulleted groups comparing related insured events (*Flood* vs. *Rainwater Run-off* vs. *Storm Surge / Actions of the Sea* vs. *Escape of Liquid*).
+  3. **Critical Exclusions, Waiting Periods & Sub-Limits:** Call out 48h/72h embargoes, high tide / actions of the sea exclusions, unforced theft exclusions, gradual deterioration, and monetary sub-limits.
+  4. **Certificate of Insurance (Policy Schedule) Context:** Explain where optional cover elections, specified portable valuables, and Excess tiers appear on the customer's *Certificate of Insurance*.
+  5. **Dual-Provenance Citations & Verbatim `STATUTORY_GAW`:** Attach inline citations (`[Source: Insurer Product (Section)]`) to each section and close with `STATUTORY_GAW`.
+- **Zero Meta-Language Invariant:** Never emit internal RAG meta-talk (`"in the provided context"`, `"based on the provided passages"`). Address the policyholder directly with authoritative policy precision (*"Under the {Insurer} {Product} PDS..."*).
 
 ### 6. Dynamic Follow-Up Prompt Suggestions
 - In the SSE stream, the `metadata` or final `done` event emits an array of 2–3 contextual follow-up chips based on the retrieved policy chunks:

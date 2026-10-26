@@ -42,4 +42,43 @@ describe("Colloquial Retrieval via Local Hybrid Search (Spec 07)", () => {
     );
     expect(hasTheft).toBe(true);
   });
+
+  it("returns relevant definition and coverage chunks as top results across Home, Motor, Travel, and Life queries (Spec 08 § 4)", () => {
+    const homeChunks = localHybridSearch({
+      query: "What is flood definition for NRMA?",
+      topK: 3,
+      filter: { insurer: "NRMA" },
+    });
+    expect(homeChunks.length).toBeGreaterThan(0);
+    expect(homeChunks[0].source.section).toMatch(/Definitions\s*—\s*Flood/i);
+    expect(homeChunks[0].content.toLowerCase()).toContain("normally dry land");
+
+    const motorChunks = localHybridSearch({
+      query: "What does agreed value vs market value mean for Youi?",
+      topK: 3,
+      filter: { insurer: "Youi" },
+    });
+    expect(motorChunks.length).toBeGreaterThan(0);
+    expect(motorChunks[0].content.toLowerCase()).toMatch(/agreed value|market value/);
+
+    const travelChunks = localHybridSearch({
+      query: "What is pre-existing medical condition definition for Cover-More?",
+      topK: 3,
+      filter: { insurer: "Cover-More" },
+    });
+    expect(travelChunks.length).toBeGreaterThan(0);
+
+    const lifeChunks = localHybridSearch({
+      query: "What is TPD definition and waiting period for TAL?",
+      topK: 3,
+      filter: { insurer: "TAL" },
+    });
+    expect(lifeChunks.length).toBeGreaterThan(0);
+
+    const unrelatedChunks = localHybridSearch({
+      query: "What is adobo?",
+      topK: 5,
+    });
+    expect(unrelatedChunks).toHaveLength(0);
+  });
 });

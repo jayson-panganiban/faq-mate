@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "./components/AppShell";
 import { ChatContainer } from "./components/ChatContainer";
 import { CitationDrawer } from "./components/CitationDrawer";
@@ -165,12 +165,28 @@ export function App() {
     status === "CONNECTING" || status === "METADATA_RECEIVED" || status === "STREAMING";
   const isThrottled = status === "THROTTLED" || rateLimit.remaining <= 0;
 
+  // Hide the footer GAW when an inline StatutoryGaw is already rendered on a completed message
+  // or refusal card in the active chat view, preventing duplicate GAW banners on screen.
+  const hasInlineGaw =
+    !isComparisonMode &&
+    messages.some((msg, idx) => {
+      if (msg.role === "user") return false;
+      if (msg.refusal?.code === "ADVICE_BOUNDARY_VIOLATION") return true;
+      if (msg.refusal?.code === "EMERGENCY_INTERCEPTION") return false;
+      const isLast = idx === messages.length - 1;
+      const isMsgStreaming =
+        isLast &&
+        (status === "CONNECTING" || status === "METADATA_RECEIVED" || status === "STREAMING");
+      return !isMsgStreaming && msg.content.trim().length > 0;
+    });
+
   return (
     <AppShell
       telemetry={telemetry}
       rateLimit={rateLimit}
       isThrottled={isThrottled}
       isComparisonMode={isComparisonMode}
+      hideFooterGaw={hasInlineGaw}
       onToggleComparison={() => setIsComparisonMode((prev) => !prev)}
       onReset={handleReset}
     >

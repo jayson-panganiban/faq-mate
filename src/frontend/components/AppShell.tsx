@@ -10,6 +10,7 @@ export interface AppShellProps {
   rateLimit?: RateLimitInfo;
   isThrottled?: boolean;
   isComparisonMode?: boolean;
+  hideFooterGaw?: boolean;
   onToggleComparison?: () => void;
   onReset?: () => void;
   children: React.ReactNode;
@@ -25,6 +26,7 @@ export function AppShell({
   rateLimit,
   isThrottled = false,
   isComparisonMode = false,
+  hideFooterGaw = false,
   onToggleComparison,
   onReset,
   children,
@@ -147,10 +149,12 @@ export function AppShell({
         className="border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 py-3 px-4 shadow-2xs"
       >
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
-          <div className="w-full md:flex-1">
-            <StatutoryGaw variant="footer" compact />
-          </div>
-          <div className="shrink-0 flex items-center justify-center md:justify-end">
+          {!hideFooterGaw && (
+            <div className="w-full md:flex-1">
+              <StatutoryGaw variant="footer" compact />
+            </div>
+          )}
+          <div className="shrink-0 flex items-center justify-center md:justify-end ml-auto">
             <PiiAssuranceBadge />
           </div>
         </div>

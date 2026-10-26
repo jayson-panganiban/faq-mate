@@ -19,7 +19,8 @@ export type InsurancePeril =
   | "ACTIONS_OF_THE_SEA"
   | "JEWELRY_SUBLIMIT"
   | "EMBARGO_72_HOUR"
-  | "UNLICENSED_DRIVER";
+  | "UNLICENSED_DRIVER"
+  | "DEFINITION_INQUIRY";
 
 export interface NormalizedIntent {
   rawQuery: string;
@@ -168,7 +169,140 @@ const COLLOQUIAL_RULES: readonly ColloquialRule[] = [
     expandedTerms: ["unlicensed driver", "licence cancelled or suspended", "authorized driver"],
     peril: "UNLICENSED_DRIVER",
   },
+  {
+    id: "definition-inquiry",
+    pattern:
+      /\b(?:what\s+is\s+(?:the\s+)?(?:definition\s+of\s+)?|what's\s+(?:the\s+)?(?:definition\s+of\s+)?|what\s+does\s+.+\s+mean|what\s+counts\s+as\s+|define\s+|definition\s+(?:of|for)\s+|meaning\s+of\s+|how\s+(?:does|do)\s+.+\s+define|flood\s+definition|storm\s+definition|agreed\s+value\s+vs\s+market\s+value|own\s+occupation\s+vs\s+any\s+occupation)\b/i,
+    canonicalTokens: [
+      "Definitions",
+      "Words with Special Meanings",
+      "Defined Terms",
+      "Prescribed Definition",
+    ],
+    expandedTerms: [
+      "definition",
+      "definitions",
+      "means",
+      "prescribed definition",
+      "words with special meanings",
+      "defined terms",
+    ],
+    peril: "DEFINITION_INQUIRY",
+  },
 ];
+
+const QUERY_STOPWORDS = new Set([
+  "what",
+  "whats",
+  "is",
+  "are",
+  "was",
+  "were",
+  "do",
+  "does",
+  "did",
+  "can",
+  "could",
+  "would",
+  "should",
+  "will",
+  "shall",
+  "may",
+  "might",
+  "the",
+  "and",
+  "for",
+  "with",
+  "from",
+  "that",
+  "this",
+  "how",
+  "why",
+  "who",
+  "when",
+  "where",
+  "which",
+  "in",
+  "on",
+  "at",
+  "to",
+  "of",
+  "by",
+  "or",
+  "as",
+  "be",
+  "if",
+  "it",
+  "its",
+  "my",
+  "me",
+  "we",
+  "us",
+  "so",
+  "an",
+  "about",
+  "tell",
+  "explain",
+]);
+
+const INSURANCE_DOMAIN_PATTERN =
+  /\b(?:insur(?:ance|er|ed|ing)|polic(?:y|ies)|pds|spds|tmd|claim(?:s|ing)?|cover(?:s|ed|age|ing)?|exclusion(?:s|ed)?|excess(?:es)?|sub-?limit(?:s)?|embargo(?:es)?|waiting\s+period|cooling-?off|premium(?:s)?|underwrit(?:er|ing)|certificate|schedule|endorsement|payout|settlement|indemnity|liability|peril(?:s)?|flood(?:ing)?|storm(?:s)?|bushfire(?:s)?|cyclone|hail|rainwater|run-?off|escape\s+of\s+liquid|pipe(?:s)?|plumbing|leak(?:s|ing)?|theft|stolen|burglary|break-?in|forcible|vandalism|malicious|fire|lightning|earthquake|tsunami|tide|sea|surge|fence(?:s)?|retaining\s+wall|roof|floorboard(?:s)?|carpet(?:s)?|building|contents|home|house|dwelling|landlord|tenant|strata|renter(?:s)?|motor|car|vehicle(?:s)?|auto|driver(?:s)?|licen[cs]e|windscreen|repairer|total\s+loss|agreed\s+value|market\s+value|no-?claim|ncb|hire\s+car|towing|caravan|trailer|motorcycle|moped|scooter|boat|watercraft|travel|trip|journey|luggage|baggage|cancellation|curtailment|medical|hospital|repatriation|pre-?existing|life|tpd|disablement|disability|trauma|income\s+protection|death\s+benefit|terminal\s+illness|beneficiar(?:y|ies)|occupation|pet(?:s)?|vet(?:erinary)?|business|commercial|afca|asic|apra|general\s+advice|damage(?:d)?|loss|accident(?:al)?|incident|repair(?:s)?|replace(?:ment)?|valuables|jewell?ery|watch(?:es)?|ring(?:s)?|laptop|phone|bicycle|blackout|fridge|spoilage|chimpanzee|exotic\s+animal)\b/i;
+
+function hasKnownInsurerMention(query: string): boolean {
+  const rawWords = query
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+
+  for (let i = 0; i < rawWords.length - 1; i++) {
+    const w1 = rawWords[i];
+    const w2 = rawWords[i + 1];
+    if (INSURER_QUERY_STOPWORDS.has(w1) && INSURER_QUERY_STOPWORDS.has(w2)) continue;
+    if (resolveInsurer(`${w1} ${w2}`)) return true;
+  }
+
+  for (const word of rawWords) {
+    if (INSURER_QUERY_STOPWORDS.has(word)) continue;
+    if (resolveInsurer(word)) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Determines whether a user query (and optional conversation history) relates to
+ * insurance, policies, perils, insured assets, or Australian insurers.
+ * Prevents off-topic queries (e.g., "What is adobo?") from triggering insurance peril/definition boosts.
+ */
+export function isInsuranceRelatedQuery(
+  query: string,
+  history?: Array<{ role: "user" | "assistant"; content: string }>
+): boolean {
+  if (INSURANCE_DOMAIN_PATTERN.test(query)) return true;
+  if (hasKnownInsurerMention(query)) return true;
+
+  for (const rule of COLLOQUIAL_RULES) {
+    if (rule.id !== "definition-inquiry" && rule.pattern.test(query)) {
+      return true;
+    }
+  }
+
+  if (history && history.length > 0) {
+    const isShortFollowUp =
+      /\b(what about|what if|how about|does that|does it|is that|is it|what if it|and if|second day|also)\b/i.test(
+        query.toLowerCase()
+      ) || query.trim().split(/\s+/).length <= 5;
+    if (isShortFollowUp && /\b(it|that|this|they|there|second\s+day|then|also)\b/i.test(query)) {
+      return history.some(
+        (turn) =>
+          INSURANCE_DOMAIN_PATTERN.test(turn.content) || hasKnownInsurerMention(turn.content)
+      );
+    }
+  }
+
+  return false;
+}
 
 /**
  * Normalizes speech-to-text filler tokens and colloquial insurance phrases
@@ -189,9 +323,13 @@ export function normalizeIntent(rawQuery: string): NormalizedIntent {
   const canonicalTokens = new Set<string>();
   const expandedTerms = new Set<string>();
   const detectedPerils = new Set<InsurancePeril>();
+  const insuranceRelated = isInsuranceRelatedQuery(rawQuery) || isInsuranceRelatedQuery(cleaned);
 
   // 3. Match colloquial patterns across both raw and cleaned query
   for (const rule of COLLOQUIAL_RULES) {
+    if (rule.id === "definition-inquiry" && !insuranceRelated) {
+      continue;
+    }
     if (rule.pattern.test(rawQuery) || rule.pattern.test(cleaned)) {
       for (const token of rule.canonicalTokens) canonicalTokens.add(token);
       for (const term of rule.expandedTerms) expandedTerms.add(term);
@@ -205,7 +343,7 @@ export function normalizeIntent(rawQuery: string): NormalizedIntent {
     .toLowerCase()
     .replace(/[^a-z0-9\s$]/g, " ")
     .split(/\s+/)
-    .filter((t) => t.length > 1);
+    .filter((t) => t.length > 1 && !QUERY_STOPWORDS.has(t));
   for (const t of cleanedTokens) searchTokensSet.add(t);
 
   for (const exp of expandedTerms) {
@@ -214,7 +352,7 @@ export function normalizeIntent(rawQuery: string): NormalizedIntent {
       .replace(/[^a-z0-9\s$]/g, " ")
       .split(/\s+/);
     for (const term of expSplit) {
-      if (term.length > 2) searchTokensSet.add(term);
+      if (term.length > 2 && !QUERY_STOPWORDS.has(term)) searchTokensSet.add(term);
     }
   }
 

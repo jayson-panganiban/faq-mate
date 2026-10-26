@@ -51,14 +51,37 @@ This glossary establishes the canonical, non-negotiable domain language for FAQ-
 * **Canonical Copy:**
   > *"This information is general product information only and does not take into account your personal objectives, financial situation, or needs. Before making any financial decision, you should read the relevant Product Disclosure Statement (PDS) and Target Market Determination (TMD) and seek independent professional advice."*
 
+### Insurance Specialist Persona & 5-Part Response Anatomy
+* **Definition:** The authoritative, structured, plain-English communication standard of an experienced Australian general and life insurance product and claims specialist operating within the statutory *Factual Information & General Advice* boundary (*Corporations Act 2001* s.766B(4) & s.949A; *General Insurance Code of Practice* & *Life Insurance Code of Practice*).
+* **5-Part Response Structure:**
+  1. **Direct Definition or Coverage Position:** Open immediately with the exact policy definition, statutory meaning, or core coverage rule.
+  2. **Related Event & Policy Structure Demarcation:** Group and distinguish adjacent policy concepts that consumers commonly conflate (e.g., *Flood* vs. *Rainwater Run-off* vs. *Storm Surge* vs. *Escape of Liquid*; *Agreed Value* vs. *Market Value*; *Own Occupation* vs. *Any Occupation TPD*).
+  3. **Critical Exclusions, Waiting Periods & Sub-Limits:** Explicitly state applicable exclusions (actions of the sea, gradual wear and tear, unforced entry, unlicensed driving), waiting/embargo windows (48–72 hours), and monetary sub-limits.
+  4. **Certificate of Insurance (Policy Schedule) Context:** Note where optional cover selections, opt-outs, and specific Excess tiers appear on the policyholder's *Certificate of Insurance*.
+  5. **Provenance Citations & Verbatim `STATUTORY_GAW`:** Attribute every factual claim inline (`[Source: {Insurer} {Product} {DocType} ({Section})]`) and conclude with `STATUTORY_GAW`.
+* **Anti-Meta-Language Invariant:** The system must **never** refer to internal retrieval mechanics (e.g., *"in the provided context"*, *"based on the provided passages"*, or *"the context does not explicitly state"*). Speak directly from published policy disclosures and statutory baselines.
+* **Known Exclusion vs. Silent PDS Demarcation:** Documented exclusions (`"is not covered"`, `"does not cover"`) are affirmative contractual terms and must never trigger a `Silent PDS Notice`. The `Silent PDS Notice` is reserved strictly for genuinely unlisted hazards on which the policy disclosure is silent (e.g., AFCA TC-10 exotic pet damage).
+
 ---
 
 ## 3. Insurance Coverage Concepts & Prescribed Perils
 
 ### Prescribed Flood Definition
-* **Definition:** A uniform statutory definition mandated under the *Insurance Contracts Act 1984 (Cth)* and *Insurance Contracts Amendment (Prescribed Flood Definition) Regulations 2012*:
+* **Definition:** A uniform statutory definition mandated under the *Insurance Contracts Act 1984 (Cth)* s.37B and *Insurance Contracts Amendment (Prescribed Flood Definition) Regulations 2012* Reg 29D:
   > *"The covering of normally dry land by water that has escaped or been released from the normal confines of: (a) any lake, or any natural channel, whether or not it has been altered; (b) any reservoir, canal, or dam."*
-* **Domain Seam:** Must be distinguished from **Rainwater Run-off** (water pooling on surface during rain) and **Action of the Sea / Storm Surge** (ocean swells/high tides). Policies that cover Storm often exclude Flood unless an explicit Flood cover option is selected.
+* **Domain Seam:** Must be distinguished from **Rainwater Run-off** (water moving across the ground or backing up when heavy rain overwhelms local drainage) and **Action of the Sea / Storm Surge** (wind- and wave-driven increases in sea level vs. routine high/king tides).
+
+### Agreed Value vs. Market Value (Motor)
+* **Definition:** **Agreed Value** is a fixed dollar amount the insurer and policyholder agree to insure a vehicle for at the start of each policy period. **Market Value** is the reasonable pre-incident retail value of the vehicle immediately before the loss, factoring in age, make, model, condition, and kilometres travelled.
+
+### Pre-Existing Medical Condition (Travel & Life)
+* **Definition:** Any medical, dental, or mental health condition, symptom, or injury of which the insured person was aware, or for which they received medication, surgery, consultations, or diagnostic tests within the policy's specified lookback window prior to policy issuance.
+
+### Total and Permanent Disablement — Any vs. Own Occupation (Life)
+* **Definition:** Under an **Own Occupation TPD** definition, the insured is unable ever again to work in the specific occupation they held immediately prior to disablement. Under an **Any Occupation TPD** definition (the mandatory standard inside superannuation under SIS Regulations), the insured is unable ever again to work in any occupation for which they are reasonably suited by education, training, or experience.
+
+### Waiting Period vs. Benefit Period / Indemnity Period (Income Protection & Commercial)
+* **Definition:** The **Waiting Period** (or Embargo) is the initial timeframe following disablement or policy inception before benefit entitlements accrue. The **Benefit Period** (or **Indemnity Period** in Business Interruption) is the maximum duration for which monthly benefits or operating loss indemnities are payable for a single claim event.
 
 ### Bushfire Embargo Period
 * **Definition:** A statutory/contractual exclusion window (typically 48 to 72 hours immediately following policy inception) during which no cover is provided for bushfire, grassfire, or named cyclone damage.

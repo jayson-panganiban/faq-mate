@@ -26,13 +26,15 @@ The Worker exposes one default `fetch(request, env, ctx)` handler. Retrieval, pr
 
 ```typescript
 export const ChatRequestSchema = z.object({
-  query: z.string().trim().min(3).max(500),
+  query: z.string().trim().min(2).max(500),
   conversationId: z.string().uuid(),
+  history: z.array(ChatMessageHistorySchema).max(6).optional(),
+  turnstileToken: z.string().optional(),
   filters: z.object({
     // Any primary insurer name/slug/code or bancassurance alias (ADR-0004)
     insurer: z.string().trim().refine((v) => resolveInsurer(v) !== null).optional(),
     product: z.string().optional(),
-    docType: z.enum(["PDS", "TMD", "SPDS", "FSG", "FAQ"]).default("PDS"),
+    docType: z.enum(["PDS", "TMD", "SPDS", "FSG", "FAQ", "GUIDE"]).default("PDS"),
   }).optional(),
 });
 ```
@@ -83,7 +85,7 @@ interface GroundedChunk {
 | Binding | Required | Use |
 | :--- | :--- | :--- |
 | `AI_SEARCH` | Optional | `search({ query, topK: 5, rerank: true, filter: { insurer } })`. Absent or throwing → local fallback. |
-| `AI` | Yes | `run("@cf/meta/llama-3.3-70b-instruct", { messages, stream: true, max_tokens: 512 })` |
+| `AI` | Yes | `run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", { messages, stream: true, max_tokens: 512 })` (secondary fallback: `@cf/meta/llama-3.1-8b-instruct`) |
 | `DB` | Yes | D1 `rag_telemetry_audit` ([PRD § 6.4](../PRD.md#64-d1-telemetry--audit-schema)) |
 | `CORPUS_BUCKET` | Yes | R2 corpus (written by `scripts/upload-to-r2.ts`; not read by the Worker) |
 | `CONFIG_KV` | Yes | Reserved; not read at runtime |
@@ -99,8 +101,14 @@ interface GroundedChunk {
 5. **Retrieval:** `retrievePolicyChunks(sanitizedQuery, filters.insurer, env.AI_SEARCH)`:
    * AI Search bound → map results to `GroundedChunk` (defaults: insurer `General`, product `Insurance`, docType `PDS`, section `General Terms`).
    * Unbound or throws → `localHybridSearch({ query, topK: 5, filter: { insurer } })` over `STATIC_CORPUS_CHUNKS` ([ADR-0003](../adr/0003-static-ast-corpus-edge-fallback.md)).
-6. **Prompt synthesis:** `synthesizePrompt(query, chunks)` returns `[system, user]` messages. Chunks are wrapped as `<context id="…" source="{insurer} {product} {docType} ({section})">…</context>`; the system prompt carries negative constraints, plain-language and citation rules, and `STATUTORY_GAW`.
-7. **Streaming inference:** Emit `metadata`, then re-encode each Workers AI delta (`response` or `text`) as a `token` event. If `env.AI.run()` throws or returns no stream, emit one `token` carrying `generateFallbackResponse(query, chunks)`, a deterministic answer that cites `[Source: {insurer} {product} ({section})]` and ends with `STATUTORY_GAW`. Then emit `done`.
+6. **Prompt synthesis (`synthesizePrompt()` in [`src/rag/prompt-synthesizer.ts`](../../src/rag/prompt-synthesizer.ts)):** Returns `[system, user]` messages. Chunks are wrapped as `<context id="…" source="{insurer} {product} {docType} ({section})">…</context>`; the system prompt enforces the **Australian Insurance Product & Claims Specialist Persona** and the **5-Part Specialist Response Anatomy** ([`GLOSSARY.md § 2`](../../GLOSSARY.md#2-regulatory--compliance-invariants)):
+   1. **Direct Definition or Coverage Position:** State the operative PDS or statutory rule immediately (e.g., *Insurance Contracts Regulations 2012 (Cth)* Reg 29D prescribed flood definition).
+   2. **Related Event & Policy Structure Demarcation:** Group and distinguish adjacent perils and cover structures (*Flood* vs. *Rainwater Run-off* vs. *Storm Surge / Actions of the Sea* vs. *Escape of Liquid*; *Agreed Value* vs. *Market Value*; *Own Occupation* vs. *Any Occupation TPD*).
+   3. **Critical Exclusions, Waiting Periods & Sub-Limits:** Call out 48h/72h embargoes, wear & tear, actions of the sea, retaining walls, unforced entry, unlicensed drivers, and monetary sub-limits.
+   4. **Certificate of Insurance (Policy Schedule) Context:** Clarify where optional cover elections, flood opt-outs, specified portable valuables, and Excess tiers appear on the customer's *Certificate of Insurance*.
+   5. **Dual-Provenance Citations & Verbatim `STATUTORY_GAW`:** Cite `[Source: {insurer} {product} ({section})]` inline (pairing contractual `PDS`/`SPDS` clauses with `FAQ`/`GUIDE` summaries when both are retrieved) and end with `STATUTORY_GAW`.
+   * **Anti-Meta-Language Invariant:** Strictly prohibits internal RAG meta-talk (`"in the provided context"`, `"based on the provided passages"`, `"the context does not state"`). Address the policyholder directly as an authoritative insurance specialist: *"Under the {Insurer} {Product} PDS..."*.
+7. **Streaming inference:** Emit `metadata`, then re-encode each Workers AI delta (`response` or `text`) as a `token` event. If `env.AI.run()` throws or returns no stream, emit one `token` carrying `generateFallbackResponse(query, chunks)`, a deterministic specialist answer that cites `[Source: {insurer} {product} ({section})]` and ends with `STATUTORY_GAW`. Then emit `done`.
 8. **Telemetry:** `recordTelemetry(env.DB, record)` via `ctx.waitUntil()` with `hybridRetrievalLatencyMs`, `inferenceTtftMs`, `totalMs`, chunk IDs, and `queryHash` (never the raw query).
 
 ---
@@ -109,16 +117,16 @@ interface GroundedChunk {
 
 | Query Signal | Answer Shape |
 | :--- | :--- |
-| Silent peril (`chimpanzee`, `exotic pet`) | Explicit "does not specify or cover" (AFCA TC-10) |
+| Silent peril (`chimpanzee`, `exotic pet`) | Explicit silent-peril abstention: *"Under the {Insurer} {Product} PDS, accidental damage caused by an unlisted domestic animal or exotic pet is not named in the insured events — the policy is silent on exotic animal hazards."* (AFCA TC-10) |
 | TMD eligibility (`eligible`, `target market`, `who is this policy for`) | "According to the Target Market Determination dated …" framing, no eligibility certification (PRD § 5.3) |
-| `flood` | Statutory flood definition + 72-hour embargo + action-of-the-sea exclusion |
-| `unlicensed` / `driver` | Unlicensed/suspended driver exclusion |
-| `ring` / `jewelry` / `jewellery` | \$2,500 total / \$1,000 per item sub-limit |
-| `garage` / `theft` / `open` | Forcible and violent entry requirement |
-| Other with chunks | Top chunk excerpt (300 chars) + citation |
-| No chunks | "does not specify this information" |
+| `flood` | 5-part specialist breakdown: Statutory flood definition (*Insurance Contracts Regulations 2012* Reg 29D) + Rainwater run-off vs. Storm surge / Actions of the sea demarcation + 72-hour embargo & retaining wall exclusions + Certificate of Insurance context |
+| `unlicensed` / `driver` | Unlicensed/suspended driver exclusion + owner knowledge caveat |
+| `ring` / `jewelry` / `jewellery` | \$2,500 total / \$1,000 per item sub-limit + Certificate of Insurance specified item listing requirement |
+| `garage` / `theft` / `open` | Forcible and violent entry requirement + unforced entry exclusion |
+| Other with chunks | Top chunk specialist synthesis + `[Source: {insurer} {product} ({section})]` citation (zero `"in the provided context"` phrasing) |
+| No chunks | Explicit policy silence notice (*"The {Insurer} {Product} PDS is silent on this specific event..."*) |
 
-All branches end with `STATUTORY_GAW`.
+All branches end with `STATUTORY_GAW` and never emit robotic meta-RAG language (`"in the provided context"`).
 
 ---
 

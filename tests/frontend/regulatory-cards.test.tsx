@@ -84,6 +84,31 @@ describe("Regulatory & Safety Guardrail Cards (Ticket 3)", () => {
       expect(card).toHaveTextContent(STATUTORY_GAW);
     });
 
+    it("deduplicates statutory GAW copy from default safe harbor refusal message without duplication", () => {
+      render(<RefusalCard code="ADVICE_BOUNDARY_VIOLATION" />);
+
+      const card = screen.getByTestId("refusal-card");
+      const text = card.textContent ?? "";
+      // Must contain statutory GAW
+      expect(text).toContain(STATUTORY_GAW);
+      // General Advice Warning must only appear once in total within the card
+      const gawCount = (text.match(/General Advice Warning/g) || []).length;
+      expect(gawCount).toBe(1);
+    });
+
+    it("deduplicates statutory GAW copy when custom message contains unformatted GAW", () => {
+      const customMessage =
+        "Custom refusal: I cannot provide personal financial product advice.\n\nGeneral Advice Warning: This information is general product information only and does not take into account your personal objectives, financial situation, or needs.";
+      render(<RefusalCard code="ADVICE_BOUNDARY_VIOLATION" message={customMessage} />);
+
+      const card = screen.getByTestId("refusal-card");
+      const text = card.textContent ?? "";
+      expect(text).toContain("Custom refusal: I cannot provide personal financial product advice.");
+      expect(text).toContain(STATUTORY_GAW);
+      const gawCount = (text.match(/General Advice Warning/g) || []).length;
+      expect(gawCount).toBe(1);
+    });
+
     it("applies amber warning styling and contains warning icon", () => {
       render(<RefusalCard code="ADVICE_BOUNDARY_VIOLATION" />);
 

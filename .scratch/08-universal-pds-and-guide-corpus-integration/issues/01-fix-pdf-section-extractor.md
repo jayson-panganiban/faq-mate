@@ -1,6 +1,6 @@
 # Issue 01: Universal Multi-Line PDF Section Extractor & Term-Level Glossary Parsing
 
-Status: ready-for-agent
+Status: resolved
 Type: task
 
 ## Description
@@ -17,5 +17,5 @@ Upgrade `src/ingest/pds-normalizer.ts` to properly extract policy glossaries and
 - Write unit tests in `tests/ingest/pds-normalizer.test.ts` verifying discrete section parsing from sample PDF text across multiple lines.
 
 ## Acceptance Criteria
-- [ ] `extractSectionsFromRawPdfText()` extracts discrete `Definitions — [Term]` sections across Home, Motor, Travel, and Life PDS text without swallowing subsequent sections.
-- [ ] Unit tests pass via `npm test tests/ingest/pds-normalizer.test.ts`.
+- [x] `extractSectionsFromRawPdfText()` extracts discrete `Definitions — [Term]` sections across Home, Motor, Travel, and Life PDS text without swallowing subsequent sections.
+- [x] Unit tests pass via `npm test tests/ingest/pds-normalizer.test.ts`.

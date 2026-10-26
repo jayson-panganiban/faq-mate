@@ -13,6 +13,7 @@ import { normalizeFaqDocument, parseRawFaqMarkdown } from "../../src/ingest/faq-
 import { parseManifestCsv, selectManifestEntries } from "../../src/ingest/manifest-selector";
 import {
   buildR2PathKey,
+  extractSectionsFromRawPdfText,
   generateBreadcrumbHeader,
   normalizePdsDocument,
   type PdsMetadata,
@@ -278,6 +279,57 @@ describe("Spec 01 & Spec 06: Ground-Up Ingestion, Linter & Edge AST Compiler (v2
 
       const v3 = evaluateAdviceBoundary("Is Cover-More better than 1Cover for ski travel?");
       expect(v3.allowed).toBe(false);
+    });
+  });
+
+  describe("8. Universal Multi-Line PDF Section Extractor & Term-Level Glossary Parsing (Spec 08 Issue 01)", () => {
+    it("extracts discrete Definitions — [Term] sections across Home, Motor, Travel, Life, and Commercial PDS text without swallowing subsequent definitions into Excess (Part N)", () => {
+      const sampleMultiLinePdfText = [
+        "Words with special meaning",
+        "Cryptocurrency means any form of currency that only exists in digital form.",
+        "Excess means the amount(s) You must contribute to the cost of a claim. The amount and types of Excess that apply to Your Policy will be shown on Your Certificate of Insurance.",
+        "Flood means the covering of normally dry land by water that has escaped or been released from the normal confines of any of the following:",
+        "–",
+        "a lake (whether or not it has been altered or modified);",
+        "–",
+        "a river (whether or not it has been altered or modified);",
+        "–",
+        "a creek, canal, reservoir, or dam.",
+        "Storm means violent wind, cyclone, tornado, hail, rain, or snow.",
+        "Rainwater run-off means rainwater that flows over the ground following a storm event without escaping from a natural watercourse.",
+        "Agreed Value means the fixed retail dollar amount we agree to insure your vehicle for as shown on your Certificate of Insurance.",
+        "Market Value means the reasonable cost to replace your vehicle with one of the same make, model, age, kilometres, and condition immediately prior to the incident.",
+        "Pre-existing Condition means any medical or dental condition of which you were aware or a reasonable person would have been aware prior to policy purchase.",
+        "Total and Permanent Disablement (TPD) means you are absent from employment solely through injury or illness for an uninterrupted period of 3 consecutive months and are incapacitated to such an extent as to render you unlikely ever to engage in any gainful occupation.",
+        "Waiting Period means the number of consecutive days you must wait after total disability begins before your monthly Income Protection benefit starts accruing.",
+        "Indemnity Period means the period beginning with the occurrence of the insured damage during which the results of the business are affected in consequence of the damage.",
+        "What is not covered",
+        "We do not cover loss or damage caused by actions of the sea, high tide, or storm surge, or any flood occurring within the first 72 hours of policy inception.",
+      ].join("\n");
+
+      const sections = extractSectionsFromRawPdfText(sampleMultiLinePdfText, "Home Insurance PDS");
+      const titles = sections.map((s) => s.title);
+
+      expect(titles).toContain("Definitions — Excess");
+      expect(titles).toContain("Definitions — Flood");
+      expect(titles).toContain("Definitions — Storm");
+      expect(titles).toContain("Definitions — Rainwater run-off");
+      expect(titles).toContain("Definitions — Agreed Value");
+      expect(titles).toContain("Definitions — Market Value");
+      expect(titles).toContain("Definitions — Pre-existing Condition");
+      expect(titles).toContain("Definitions — Total and Permanent Disablement (TPD)");
+      expect(titles).toContain("Definitions — Waiting Period");
+      expect(titles).toContain("Definitions — Indemnity Period");
+
+      // Verify Flood was NOT swallowed into an "Excess means (Part N)" block
+      expect(titles.some((t) => /Excess means/i.test(t))).toBe(false);
+
+      const floodSec = sections.find((s) => s.title === "Definitions — Flood");
+      expect(floodSec?.clauseType).toBe("Definition");
+      expect(floodSec?.content).toContain("covering of normally dry land by water");
+      expect(floodSec?.content).toContain(
+        "- a lake (whether or not it has been altered or modified);"
+      );
     });
   });
 });

@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { stripStatutoryGaw } from "../../constants/statutory";
 import type {
   ChatMessage,
   GroundedChunk,
@@ -96,7 +97,10 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
         .slice(-4)
         .map((m) => ({
           role: m.role,
-          content: m.content.slice(0, 1000),
+          content: (m.role === "assistant" ? stripStatutoryGaw(m.content) : m.content).slice(
+            0,
+            1000
+          ),
         }));
 
       const bodyPayload: Record<string, unknown> = {

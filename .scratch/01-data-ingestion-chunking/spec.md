@@ -23,12 +23,14 @@ It guarantees that retrieval inputs to Cloudflare AI Search (R2) and the Cloudfl
       ▼
   data/raw/
     ├── all_manifest.csv (1,277 PDFs across 39 insurers)
-    └── FAQs/ (5,416 Q&As across 39 insurers)
+    ├── FAQs/ (5,416 Q&As across 39 insurers)
+    └── guide_seeds/ & guides_manifest.csv (937 official guide pages across 39 insurers)
       │
       ▼
 [ Stage 2: Semantic Normalization ]
   scripts/normalize-corpus.ts (`npm run normalize`)
     • Current edition filtering (or `--all-historical` for all 1,277)
+    • Term-level glossary extraction (`Definitions — [Term]`)
     • Markdown frontmatter injection (<!-- BREADCRUMB -->)
     • GFM table serialization & sub-limit preservation
     • Peril-exclusion & embargo co-location
@@ -36,18 +38,19 @@ It guarantees that retrieval inputs to Cloudflare AI Search (R2) and the Cloudfl
       │
       ▼
   data/corpus/
-    ├── pds/{insurer_code}/{product_slug}/{doc_type}_{effective_date}.md
-    └── faqs/{insurer_code}.md
+    ├── pds/{insurer_code}/{product_slug}/{doc_type}_{effective_date}.md (Committed)
+    ├── faqs/{insurer_code}.md                                           (Committed)
+    └── guides/{insurer_code}/{page_slug}/GUIDE_{effective_date}.md      (R2-Only, Gitignored)
       │
       ├─────────────────────────────────────────┐
       ▼                                         ▼
 [ Stage 3: Edge AST Compilation & Linting ]    [ Stage 4: Cloudflare R2 Sync ]
   scripts/compile-corpus.ts (`npm run compile:corpus`)  scripts/upload-to-r2.ts (`npm run upload:r2`)
   src/ingest/corpus-linter.ts (`npm run lint:corpus`)           │
-    • AST chunk tree generation                                 ▼
-    • Heading-only chunk elimination                    Cloudflare R2 (faq-mate-corpus)
-    • BM25 keyword generation                                   │
-    • V8 isolate bundle budgeting                               ▼
+    • Lints PDS, FAQ, and locally generated GUIDE files         ▼
+    • Compiles committed PDS/FAQ into AST chunk tree    Cloudflare R2 (faq-mate-corpus)
+    • Heading-only chunk elimination                            │
+    • BM25 keyword generation & V8 isolate budgeting            ▼
       │                                                 Cloudflare AI Search Index
       ▼
   src/rag/corpus-data.ts
@@ -144,6 +147,16 @@ corpus/faqs/{insurer_code}.md
 
 *Example:* `corpus/faqs/allianz.md`
 
+### 4.3 Curated Insurer Guides (GUIDE)
+```
+corpus/guides/{insurer_code}/{page_slug}/GUIDE_{effective_date}.md
+```
+- `{insurer_code}`: Lowercase slug matching the underwriter registry.
+- `{page_slug}`: Lowercase kebab-case guide topic identifier (e.g., `home-insurance-storm-and-flood-insurance`).
+- `{effective_date}`: ISO 8601 retrieval/publication date (`YYYY-MM-DD`).
+
+*Example:* `corpus/guides/nrma/home-insurance-storm-and-flood-insurance/GUIDE_2026-10-25.md`
+
 ---
 
 ## 5. Hierarchical Header Injection Schema
@@ -173,9 +186,9 @@ sub_section: Flood
 - `insurer_code`: Uppercase unique filter identifier matching `PRIMARY_INSURERS` code.
 - `category`: Primary classification (`suncorp-group`, `major-insurers`, `challengers-auto-clubs`, `travel-specialists`, `life-insurers`).
 - `product`: Exact product title.
-- `doc_type`: Classification (`PDS`, `SPDS`, `TMD`, `FAQ`).
+- `doc_type`: Classification (`PDS`, `SPDS`, `TMD`, `FSG`, `FAQ`, `GUIDE`).
 - `effective_date`: Operative policy effective date (`YYYY-MM-DD`).
-- `jurisdiction`: Mandatory regulatory jurisdiction (`Commonwealth of Australia`).
+- `jurisdiction`: Mandatory regulatory jurisdiction (`Commonwealth of Australia` / `Australia (Cth)`).
 
 ---
 

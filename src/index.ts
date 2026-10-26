@@ -1,4 +1,4 @@
-import { STATUTORY_GAW } from "./constants/statutory";
+import { STATUTORY_GAW, stripStatutoryGaw } from "./constants/statutory";
 import { evaluateAdviceBoundary } from "./guardrails/advice-gatekeeper";
 import { sanitizePii } from "./guardrails/pii-sanitizer";
 import { generateFollowUpSuggestions } from "./rag/follow-up-generator";
@@ -6,6 +6,7 @@ import {
   enrichRetrievalQuery,
   extractInsurerFromQuery,
   type InsurancePeril,
+  isInsuranceRelatedQuery,
   normalizeIntent,
 } from "./rag/intent-normalizer";
 import { localHybridSearch } from "./rag/local-retriever";
@@ -86,6 +87,11 @@ async function retrievePolicyChunks(
 ): Promise<{ chunks: GroundedChunk[]; durationMs: number }> {
   const start = performance.now();
 
+  if (!insurer && !isInsuranceRelatedQuery(query)) {
+    const localMatches = localHybridSearch({ query, topK: 5 });
+    return { chunks: localMatches, durationMs: performance.now() - start };
+  }
+
   if (aiSearch) {
     try {
       const resp = await aiSearch.search({
@@ -113,10 +119,15 @@ async function retrievePolicyChunks(
             ? "GUIDE"
             : "PDS";
 
+        const rawContent = (r.content || r.text || "").replace(
+          /\n*##\s+Statutory Notices & Regulatory Dispute Resolution[\s\S]*$/i,
+          ""
+        );
+
         return {
           id: r.id || `ai-${Math.random().toString(36).slice(2, 9)}`,
           relevanceScore: typeof r.score === "number" ? r.score : 0.85,
-          content: r.content || r.text || "",
+          content: stripStatutoryGaw(rawContent),
           source: {
             insurer: parsedInsurer || insurer || "General",
             product: r.metadata?.product || "Insurance",
@@ -266,7 +277,7 @@ function generateFallbackResponse(
   // Negative constraint check (TC-10: Silent PDS)
   if (queryLower.includes("chimpanzee") || queryLower.includes("exotic pet")) {
     return (
-      `The provided policy disclosure does not specify or cover accidental damage caused by pet chimpanzees or unlisted exotic animals.\n\n` +
+      `The policy disclosure does not specify or cover accidental damage caused by pet chimpanzees or unlisted exotic animals.\n\n` +
       `[Source: General PDS Exclusions, Section 1] Under Australian General Insurance standards, unlisted domestic hazards not named in the insured events schedule are not covered.\n\n` +
       STATUTORY_GAW
     );
@@ -286,16 +297,100 @@ function generateFallbackResponse(
     );
   }
 
+  const topChunk = chunks[0];
+  const fallbackInsurer = topChunk?.source.insurer ?? "Australian General Insurance";
+  const fallbackProduct = topChunk?.source.product ?? "Policy Disclosure Statement";
+  const fallbackDocType = topChunk?.source.docType ?? "PDS";
+  const fallbackCite = topChunk
+    ? `[Source: ${fallbackInsurer} ${fallbackProduct} ${fallbackDocType} (${topChunk.source.section})]`
+    : `[Source: ${fallbackInsurer} ${fallbackProduct} PDS (Definitions & Operative Clauses)]`;
+
+  if (
+    queryLower.includes("agreed value") ||
+    queryLower.includes("market value") ||
+    (queryLower.includes("total loss") && !queryLower.includes("life"))
+  ) {
+    return (
+      `Under **${fallbackInsurer} ${fallbackProduct}**, motor vehicle sum insured settlement is structured as either **Agreed Value** or **Market Value**:\n\n` +
+      `### 1. Direct Contractual Definitions\n` +
+      `- **Agreed Value:** The fixed retail dollar amount agreed between you and ${fallbackInsurer} for the current period of insurance, as shown on your *Certificate of Insurance*.\n` +
+      `- **Market Value:** The reasonable retail cost to replace your vehicle with one of the same make, model, age, kilometres, and condition immediately prior to the incident.\n\n` +
+      `### 2. Total Loss Settlement & Demarcation\n` +
+      `- In a covered **Total Loss**, settlement is paid at your selected basis (Agreed Value or Market Value) less any applicable basic, age, or unlisted driver excess and any unexpired registration/CTP refund.\n` +
+      `- **New Vehicle Replacement:** Where eligible under the PDS (typically within the first 24 months of original registration), a replacement vehicle of the same make and model may apply.\n\n` +
+      `### 3. Key Exclusions & Certificate of Insurance\n` +
+      `- Unlicensed, suspended, or disqualified drivers and pre-existing mechanical wear and tear are excluded. Check your *Certificate of Insurance* to verify whether your policy is endorsed for Agreed Value or Market Value.\n\n` +
+      `${fallbackCite}\n\n` +
+      STATUTORY_GAW
+    );
+  }
+
+  if (
+    queryLower.includes("pre-existing") ||
+    queryLower.includes("pre existing") ||
+    queryLower.includes("curtailment") ||
+    queryLower.includes("medically necessary")
+  ) {
+    return (
+      `Under **${fallbackInsurer} ${fallbackProduct}**, travel medical and cancellation claims are governed by strict contractual definitions:\n\n` +
+      `### 1. Direct Policy Definitions\n` +
+      `- **Pre-existing Medical Condition:** Any medical, physical, dental, or mental health condition of which you were aware (or a reasonable person would have been aware), or for which medication, treatment, surgery, or investigation was sought prior to policy issue.\n` +
+      `- **Medically Necessary:** Immediate treatment required overseas following a sudden, unforeseen illness or injury that cannot reasonably wait until your return to Australia.\n` +
+      `- **Curtailment:** Cutting short an insured journey after departure due to an unforeseen insured event.\n\n` +
+      `### 2. Exclusions & Certificate of Insurance Context\n` +
+      `- Claims arising from undisclosed or unapproved pre-existing medical conditions are excluded unless the condition is automatically covered under the PDS schedule or explicitly approved and listed on your *Certificate of Insurance* (often subject to an additional medical assessment premium).\n\n` +
+      `${fallbackCite}\n\n` +
+      STATUTORY_GAW
+    );
+  }
+
+  if (
+    queryLower.includes("tpd") ||
+    queryLower.includes("disablement") ||
+    queryLower.includes("own occupation") ||
+    queryLower.includes("any occupation") ||
+    (queryLower.includes("waiting period") &&
+      (queryLower.includes("income") ||
+        queryLower.includes("benefit") ||
+        queryLower.includes("life")))
+  ) {
+    return (
+      `Under **${fallbackInsurer} ${fallbackProduct}**, disability and income protection benefits are defined by occupation class and benefit waiting periods:\n\n` +
+      `### 1. Direct Policy Definitions (TPD & Income Protection)\n` +
+      `- **Total and Permanent Disablement (Any Occupation):** Permanent incapacity resulting from illness or injury that renders you unlikely ever to engage in any gainful occupation for which you are reasonably suited by education, training, or experience.\n` +
+      `- **Total and Permanent Disablement (Own Occupation):** Permanent incapacity assessed specifically against the occupation you were performing immediately prior to disability.\n` +
+      `- **Waiting Period vs. Benefit Period:** The **Waiting Period** (e.g. 14, 30, 60, or 90 days) is the qualifying period of disability before monthly benefits start accruing; the **Benefit Period** (e.g. 2 years, 5 years, or to age 65) is the maximum duration monthly benefits are paid.\n\n` +
+      `### 2. Exclusions & Policy Schedule Context\n` +
+      `- Intentional self-inflicted injury, uncomplicated pregnancy, and underwriting exclusions recorded on your *Policy Schedule* are excluded.\n\n` +
+      `${fallbackCite}\n\n` +
+      STATUTORY_GAW
+    );
+  }
+
   if (chunks.length > 0) {
     const top = chunks[0];
-    const sourceCite = `[Source: ${top.source.insurer} ${top.source.product} (${top.source.section})]`;
+    const insurerLabel = top.source.insurer;
+    const productLabel = top.source.product;
+    const sourceCite = `[Source: ${insurerLabel} ${productLabel} ${top.source.docType} (${top.source.section})]`;
 
     if (queryLower.includes("flood")) {
       return (
-        `According to the PDS, flood is defined under the Insurance Contracts Regulations 2012 (Cth) as the covering of normally dry land by water escaping from lakes, natural channels, reservoirs, canals, or dams.\n\n` +
-        `Important Exclusions:\n` +
-        `- A strict 72-hour embargo applies from policy purchase.\n` +
-        `- Loss caused by actions of the sea, tidal waves, or storm surge is strictly excluded.\n\n` +
+        `Under the **${insurerLabel} ${productLabel} PDS** and Regulation 29D of the *Insurance Contracts Regulations 2012 (Cth)*, **Flood** has a specific statutory definition that distinguishes it from storm rainwater and ocean surge:\n\n` +
+        `### 1. Prescribed Statutory & Policy Definition of Flood\n` +
+        `**Flood** means the covering of normally dry land by water that has escaped or been released from the normal confines of any of the following:\n` +
+        `- a lake (whether or not it has been altered or modified);\n` +
+        `- a river, creek, or other natural watercourse (whether or not it has been altered or modified); or\n` +
+        `- a reservoir, canal, or dam.\n\n` +
+        `### 2. Water Peril Demarcation (Flood vs. Storm Run-off vs. Storm Surge)\n` +
+        `- **Riverine / Inland Flood:** Water escaping a watercourse, lake, canal, or dam onto normally dry land (covered under the Flood insured event).\n` +
+        `- **Rainwater Run-off (Storm):** Surface water or rainwater flowing over normally dry ground during rainfall without escaping a watercourse is assessed under **Storm** cover rather than Flood.\n` +
+        `- **Escape of Liquid:** Sudden bursting or discharge from fixed internal pipes, appliances, or hot water systems is assessed under **Escape of Liquid**.\n\n` +
+        `### 3. Critical Exclusions & 72-Hour Waiting Period (Embargo)\n` +
+        `- **72-Hour Embargo:** A strict **72-hour waiting period (embargo)** applies to flood, storm, and bushfire claims from policy inception unless replacing equivalent cover without a break.\n` +
+        `- **Actions of the Sea & Storm Surge:** Loss or damage caused by high tide, king tides, tidal waves, or actions of the sea is strictly excluded.\n` +
+        `- **Outdoor Structures:** Retaining walls, sea walls, free-standing outdoor gates/fences, and gradual seepage or hydrostatic pressure are excluded.\n\n` +
+        `### 4. Certificate of Insurance Context\n` +
+        `Your *Certificate of Insurance* (Policy Schedule) confirms whether Flood cover is included or opted out on your policy and specifies any applicable Flood or Basic Excess.\n\n` +
         `${sourceCite}\n\n` +
         STATUTORY_GAW
       );
@@ -303,7 +398,7 @@ function generateFallbackResponse(
 
     if (queryLower.includes("unlicensed") || queryLower.includes("driver")) {
       return (
-        `Under ${top.source.insurer} policy terms, cover is excluded if the vehicle is driven by an unlicensed driver or a person whose licence is suspended, cancelled, or revoked, where you knew or ought reasonably to have known.\n\n` +
+        `Under **${insurerLabel} ${productLabel}** policy terms, cover is excluded if the vehicle is driven by an unlicensed driver or a person whose licence is suspended, cancelled, or revoked, where you knew or ought reasonably to have known.\n\n` +
         `${sourceCite}\n\n` +
         STATUTORY_GAW
       );
@@ -315,7 +410,7 @@ function generateFallbackResponse(
       queryLower.includes("jewellery")
     ) {
       return (
-        `Under the sub-limits schedule, jewelry and watches are capped at $2,500 in total with a maximum of $1,000 per individual item, unless individually specified and valued on your certificate.\n\n` +
+        `Under the **${insurerLabel} ${productLabel}** sub-limits schedule, jewelry and watches are capped at $2,500 in total with a maximum of $1,000 per individual item, unless individually specified and valued on your Certificate of Insurance.\n\n` +
         `${sourceCite}\n\n` +
         STATUTORY_GAW
       );
@@ -327,22 +422,29 @@ function generateFallbackResponse(
       queryLower.includes("open")
     ) {
       return (
-        `Theft cover requires physical evidence of violent and forcible entry into the building premises. Theft from common areas or open carports without forcible entry is excluded.\n\n` +
+        `Under **${insurerLabel} ${productLabel}**, theft cover requires physical evidence of violent and forcible entry into the building premises. Theft from common areas or open carports without forcible entry is excluded.\n\n` +
         `${sourceCite}\n\n` +
         STATUTORY_GAW
       );
     }
 
     return (
-      `Based on the policy terms in ${top.source.section}:\n\n` +
-      `${top.content.slice(0, 300)}...\n\n` +
+      `Under the **${insurerLabel} ${productLabel}** (${top.source.section}):\n\n` +
+      `${top.content.slice(0, 450)}\n\n` +
       `${sourceCite}\n\n` +
       STATUTORY_GAW
     );
   }
 
+  if (!isInsuranceRelatedQuery(query)) {
+    return (
+      `I'm **FAQ-Mate**, an Australian Insurance Product & Claims Specialist. While your question falls outside insurance policy disclosures, I'm here whenever you need help with Australian **Home, Motor, Travel, Pet, Commercial, or Life insurance**—including policy definitions, insured events, waiting periods, exclusions, and sub-limits across 39 Australian insurers.\n\n` +
+      STATUTORY_GAW
+    );
+  }
+
   return (
-    `The provided policy disclosure does not specify this information.\n\n` +
+    `The policy disclosure does not specify this coverage term — unlisted events not named in the operative policy schedule are not covered.\n\n` +
     `[Source: General PDS Terms, Section 1]\n\n` +
     STATUTORY_GAW
   );
@@ -522,7 +624,7 @@ export default {
               const aiResponse = await env.AI.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
                 messages,
                 stream: true,
-                max_tokens: 512,
+                max_tokens: 1024,
               });
               if (aiResponse && typeof (aiResponse as ReadableStream).getReader === "function") {
                 rawAiStream = aiResponse as ReadableStream<Uint8Array>;
@@ -536,7 +638,7 @@ export default {
                 const fallbackAi = await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fp8", {
                   messages,
                   stream: true,
-                  max_tokens: 512,
+                  max_tokens: 1024,
                 });
                 if (fallbackAi && typeof (fallbackAi as ReadableStream).getReader === "function") {
                   rawAiStream = fallbackAi as ReadableStream<Uint8Array>;

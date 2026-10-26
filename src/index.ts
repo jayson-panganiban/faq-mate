@@ -773,7 +773,7 @@ export default {
 
             let tokenCount = 0;
             let rawAiStream: ReadableStream<Uint8Array> | null = null;
-            const aiModel = env?.AI_MODEL || "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+            const aiModel = env?.AI_MODEL || "@cf/meta/llama-4-scout-17b-16e-instruct";
             const aiFallbackModel = env?.AI_FALLBACK_MODEL || "@cf/meta/llama-3.1-8b-instruct-fp8";
             const maxTokens = Number.parseInt(env?.AI_MAX_TOKENS || "1024", 10);
 
@@ -829,7 +829,8 @@ export default {
 
                   try {
                     const parsed = JSON.parse(dataStr);
-                    const tokenText = parsed.response || parsed.text || "";
+                    const tokenText =
+                      parsed.response || parsed.text || parsed.choices?.[0]?.delta?.content || "";
                     if (tokenText) {
                       tokenCount++;
                       controller.enqueue(

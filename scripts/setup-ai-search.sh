@@ -54,7 +54,7 @@ echo -e "  1. Click ${GREEN}'Create Search Instance'${NC} (or 'Create')"
 echo -e "  2. Select Data Source: ${BOLD}R2${NC}"
 echo -e "  3. Select Bucket:      ${GREEN}${BUCKET_NAME}${NC}"
 echo -e "  4. Set Instance Name:  ${GREEN}${INSTANCE_NAME}${NC}"
-echo -e "  5. Embedding Model:    ${GREEN}@cf/baai/bge-large-en-v1.5${NC}"
+echo -e "  5. Embedding Model:    ${GREEN}@cf/qwen/qwen3-embedding-0.6b${NC}"
 echo -e "  6. Click ${GREEN}'Create'${NC}"
 echo ""
 read -r -p "Press [ENTER] once you have clicked 'Create' in the dashboard to verify: " _unused
@@ -87,6 +87,6 @@ echo "Deploying via Wrangler v4 with active 'env.AI_SEARCH' binding..."
 npx wrangler@4 deploy
 
 echo -e "\n${BOLD}${GREEN}=== AI Search Successfully Activated and Deployed! ===${NC}"
-echo -e "• Primary Retriever: Cloudflare AI Search (BM25 + BGE Large Embeddings + Cross-Encoder)"
+echo -e "• Primary Retriever: Cloudflare AI Search (BM25 + Qwen3 0.6B Embeddings + Cross-Encoder)"
 echo -e "• Fallback Engine:   In-Isolate AST Retriever (480 compiled chunks)"
 echo -e "• Live Edge API:     https://faq-mate-api.json-panganiban.workers.dev\n"

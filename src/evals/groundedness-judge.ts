@@ -184,7 +184,7 @@ Respond ONLY with valid JSON:
   "violations": []
 }`;
 
-    const judgeResult = await ai.run("@cf/meta/llama-3.3-70b-instruct-fp8-fast", {
+    const judgeResult = await ai.run("@cf/meta/llama-4-scout-17b-16e-instruct", {
       messages: [{ role: "user", content: judgePrompt }],
       max_tokens: 256,
     });

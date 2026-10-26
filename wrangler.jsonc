@@ -5,7 +5,7 @@
   "compatibility_date": "2024-11-01",
   "compatibility_flags": ["nodejs_compat"],
   
-  // Workers AI Binding (Llama 3.3 70B & BGE Large Embeddings)
+  // Workers AI Binding (Llama 4 Scout 17B & Qwen3 0.6B Embeddings)
   "ai": {
     "binding": "AI"
   },
@@ -51,7 +51,7 @@
 
   // Environment Variables & Runtime Defaults (Override via Cloudflare Dashboard or .dev.vars)
   "vars": {
-    "AI_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct",
     "AI_FALLBACK_MODEL": "@cf/meta/llama-3.1-8b-instruct-fp8",
     "AI_MAX_TOKENS": "1024",
     "RETRIEVAL_TOP_K": "5",

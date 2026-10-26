@@ -26,7 +26,7 @@
   - **General Insurance Code of Practice (COP):** Emergency life-safety interception providing Triple Zero (`000`), SES (`132 500`), and Disaster Welfare (`1800 018 444`).
   - **Privacy Act 1988 (Cth) / APP 3 & 11:** Edge and client-side PII redactor (Driver Licences, TFNs, Medicare, Credit Cards) with rotating daily salt k-anonymity.
 - **Hybrid Retrieval:** Cloudflare AI Search (BM25 + BGE Large Vector + Reranking) backed by Cloudflare R2 (`faq-mate-corpus`), with in-isolate local AST hybrid search fallback (`src/rag/corpus-data.ts`).
-- **Streaming Workers AI:** Streaming inference via Llama 3.3 70B Instruct (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) with automated failover to Llama 3.1 8B.
+- **Streaming Workers AI:** Streaming inference via Llama 4 Scout 17B MoE (`@cf/meta/llama-4-scout-17b-16e-instruct`) with automated failover to Llama 3.1 8B.
 - **OWASP Edge Security:** Dynamic CORS origin validation, strict security headers (CSP, HSTS, X-Frame-Options, Permissions-Policy), and configurable Turnstile bot verification.
 
 ---

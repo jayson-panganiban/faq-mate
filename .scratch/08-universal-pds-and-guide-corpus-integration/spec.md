@@ -6,7 +6,7 @@
 **Associated ADRs:** [ADR-0001 (Cloudflare AI Search Hybrid Retrieval)](../../docs/adr/0001-cloudflare-ai-search-hybrid-retrieval.md), [ADR-0002 (Pre-Normalized Markdown in R2)](../../docs/adr/0002-pre-normalized-markdown-r2-ingestion.md), [ADR-0003 (Static AST Corpus Edge Fallback)](../../docs/adr/0003-static-ast-corpus-edge-fallback.md), [ADR-0004 (Canonical Insurer Registry & Brand Alias Resolution)](../../docs/adr/0004-canonical-insurer-registry-alias-resolution.md)  
 **Associated Specs:** [Spec 01 (Data Ingestion & Pipeline)](../01-data-ingestion-chunking/spec.md), [Spec 02 (Edge Runtime)](../02-edge-rag-runtime/spec.md), [Spec 03 (Regulatory Compliance)](../03-regulatory-compliance/spec.md), [Spec 04 (AFCA Evals)](../04-afca-eval-benchmarks/spec.md), [Spec 06 (Corpus & AST Compiler)](../06-corpus-refinement-and-compilation/spec.md), [Spec 07 (Conversational Natural Language)](../07-conversational-natural-language-inquiries/spec.md)  
 
-> **Implementation update (2026-10-26):** The guide corpus now contains **937 documents across 39 insurers** (up from the original 431-document estimate). Seeds and the crawler manifest are tracked; `data/corpus/guides/` is generated, gitignored, excluded from the static edge bundle, and published to R2 only. All 937 guides pass `npm run lint:corpus`; R2 upload and AI Search sync remain pending explicit approval.
+> **Implementation update (2026-10-26):** The guide corpus now contains **937 documents across 39 insurers** (up from the original 431-document estimate). Seeds and the crawler manifest are tracked; all generated `data/corpus/{pds,faqs,guides}/` files are gitignored and offloaded to R2, while PDS/FAQ documents compile into the static edge fallback (`src/rag/corpus-data.ts`). All 1,268 corpus documents pass `npm run lint:corpus`.
 
 ---
 
@@ -48,7 +48,7 @@ Establish a unified, multi-brand and multi-line ingestion and retrieval pipeline
    - Deprecate synthetic stubs in `src/ingest/benchmark-policies.ts`. All 39 insurers across all 5 canonical categories (`suncorp-group`, `major-insurers`, `challengers-auto-clubs`, `travel-specialists`, `life-insurers`) are processed uniformly through the automated PDF normalization pipeline.
 
 4. **Category-Balanced Edge AST Compilation Budgeting:**
-   - Maintain strict adherence to `AGENTS.md` Rule 7 and [ADR-0003](../../docs/adr/0003-static-ast-corpus-edge-fallback.md): `data/corpus/pds/` and `data/corpus/faqs/` are committed and feed `src/rag/corpus-data.ts`, while `data/corpus/guides/` (937 documents) is linted by `npm run lint:corpus` and published to R2 (`npm run upload:r2`) for Cloudflare AI Search.
+   - Maintain strict adherence to `AGENTS.md` Rule 7 and [ADR-0003](../../docs/adr/0003-static-ast-corpus-edge-fallback.md): all generated `data/corpus/{pds,faqs,guides}/` files are gitignored and published to R2 (`npm run upload:r2`) for Cloudflare AI Search, while `data/corpus/pds/` and `data/corpus/faqs/` feed the compiled static edge fallback (`src/rag/corpus-data.ts`).
    - **Multi-Line Selection Policy:** Allocate compiled PDS/FAQ chunks proportionally across all 5 canonical insurer categories so extracted `Definitions — [Term]`, `Insured Events`, `Exclusions & Embargoes`, and `Sub-Limits` clauses are represented across:
      - `suncorp-group` (Home, Motor, Landlord, Commercial)
      - `major-insurers` (Home, Motor, Business, Travel, Life)

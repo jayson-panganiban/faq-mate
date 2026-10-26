@@ -57,7 +57,7 @@ data/raw/**/*.pdf
 data/raw/**/*.html
 *.log
 
-# Generated Guide Corpus (R2-only)
-# Rebuilt by `npm run normalize`; excluded from the static edge bundle.
-# Published to R2 via `npm run upload:r2`; do not commit generated guides.
-data/corpus/guides/
+# Generated Corpus (R2-offloaded)
+# Rebuilt locally by `npm run normalize` (pds, faqs, guides); published to R2 via `npm run upload:r2`.
+# Only the compiled static edge fallback bundle (`src/rag/corpus-data.ts`) is tracked in Git.
+data/corpus/

@@ -219,8 +219,31 @@ def key(q):
     return re.sub(r"\W+", "", (q or "").lower())[:160]
 
 
+def repair_mailto(m):
+    """Repair source-side broken mailto anchors, e.g. ``mailto:c<a href=``."""
+    text = m.group(1)
+    address = text.rstrip(".,;:")
+    trailing = text[len(address) :]
+    return f"[{address}](mailto:{address}){trailing}"
+
+
 def clean_answer(a, base_url=""):
     a = a or ""
+    # Some source pages emit malformed mailto anchors; recover the address from
+    # the link text before the HTML check below treats the fragment as markup.
+    # Prefer the complete trailing link when the source duplicated the anchor.
+    a = re.sub(
+        r"\[[^\]]+\]\(mailto:[^)\s]*<a\s+href=\)[^\[\]\n]{0,80}\[([^\]]+)\]\((mailto:[^)]+)\)",
+        lambda m: f"[{m.group(1)}]({m.group(2)})",
+        a,
+        flags=re.I,
+    )
+    a = re.sub(
+        r"\[([^\]]+)\]\(mailto:[^)\s]*<a\s+href=[^)]*\)",
+        repair_mailto,
+        a,
+        flags=re.I,
+    )
     if re.search(r"<(p|br|ul|ol|li|a|strong|b|em|i|span|div)\b", a, re.I):
         soup = BeautifulSoup(a, "html.parser")
         a = markdownify(str(soup), heading_style="ATX", bullets="-")

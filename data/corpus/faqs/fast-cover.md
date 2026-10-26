@@ -3679,9 +3679,11 @@ Any advice is general advice only and does not take into account your individual
 ### Can I get SMS updates on the status of my claim?
 
 Not at this stage. SMS updates aren’t available for claim progress.
+
 If you’d like to check the status of your claim, you can:
-- Email: [laims@fastcover.com.au](mailto:c[c[laims@fastcover.com.au](mailto:laims@fastcover.com.au)
-- Call: \*\*1300 409 322\*\* and press \*\*3\*\* for Claims]()")
+
+- Email: [laims@fastcover.com.au](mailto:laims@fastcover.com.au)
+- Call: **1300 409 322** and press **3** for Claims
 
 *Canonical Source:* [https://fastcover.com.au/faq/can-i-get-sms-updates-on-the-status-of-my-claim](https://fastcover.com.au/faq/can-i-get-sms-updates-on-the-status-of-my-claim)
 
@@ -10209,9 +10211,10 @@ If you prefer, you can also request a quote by emailing [**info@fastcover.com.au
 ### How can I get a copy of the Fast Cover Product Disclosure Statement (PDS)?
 
 There are a few easy ways to access the Fast Cover PDS so you can review all the terms, conditions, limits, and exclusions before you buy or travel:
-1. \*\*Download online\*\*: Visit [fastcover.com.au/pds](https://fastcover.com.au/pds) to instantly download the latest version.
-2. \*\*Email request\*\*: Send an email to [nfo@fastcover.com.au](mailto:i[i[nfo@fastcover.com.au](mailto:nfo@fastcover.com.au) and a copy will be provided to you.
-3. \*\*Phone request\*\*: Call 1300 409 322 and the team can arrange to send you a copy.]()")
+
+1. **Download online**: Visit [fastcover.com.au/pds](https://fastcover.com.au/pds) to instantly download the latest version.
+2. **Email request**: Send an email to [nfo@fastcover.com.au](mailto:nfo@fastcover.com.au) and a copy will be provided to you.
+3. **Phone request**: Call 1300 409 322 and the team can arrange to send you a copy.
 
 *Canonical Source:* [https://fastcover.com.au/faq/how-can-i-get-a-copy-of-the-fast-cover-product-disclosure-statement-pds](https://fastcover.com.au/faq/how-can-i-get-a-copy-of-the-fast-cover-product-disclosure-statement-pds)
 
@@ -10242,19 +10245,26 @@ Every claim is reviewed individually on a case-by-case basis and will only be pa
 ### How can I make changes to my travel insurance claim after it has been submitted?
 
 If you need to update or change details on your travel insurance claim, the easiest way is to contact the Fast Cover Claims team directly. You can do this by phone or email, and the team will guide you through what information is required to update your claim.
+
 It helps to have your claim number ready when you get in touch so your details can be located quickly.
+
 Fast Cover Claims contact details:
+
 • Phone: 1300 409 322 press number 3 for claims
-• Email: [laims@fastcover.com.au](mailto:c[c[laims@fastcover.com.au](mailto:laims@fastcover.com.au)
+
+• Email: [laims@fastcover.com.au](mailto:laims@fastcover.com.au)
+
 Every claim is reviewed individually on a case-by-case basis and will only be paid if it meets the terms, conditions, limits, and exclusions in your policy. Always check the PDS carefully so you know exactly what’s included before you travel.
+
 #### Related Articles
+
 - How can I check the progress of my travel insurance claim?
 - After I put a claim in, will I need to do anything else?
 - How do I make a travel insurance claim online?
 - Can I make a claim if I don’t have proof of purchase for my items?
 - How long does it take for a claim to be processed?
 - Do I have to pay anything if I make a claim?
-- How am I assured of a fair decision when making a claim?]()")
+- How am I assured of a fair decision when making a claim?
 
 *Canonical Source:* [https://fastcover.com.au/faq/how-can-i-make-changes-to-my-travel-insurance-claim-after-it-has-been-submitted](https://fastcover.com.au/faq/how-can-i-make-changes-to-my-travel-insurance-claim-after-it-has-been-submitted)
 
@@ -10552,14 +10562,19 @@ You can get a 12-month quote by entering your trip details on the **Fast Cover w
 ### How can I make a travel insurance claim if my group policy has the organiser’s contact details instead of mine?
 
 If your travel insurance was purchased as part of a group booking, the contact details on your policy (such as the email address and phone number) may belong to other people instead of you. That doesn’t stop you from making a claim, you still have two ways to do it:
-1. \*\*Online claim\*\*: To lodge a claim online, you’ll need a verification code which is sent to the email address listed on your Certificate of Insurance. You can either:
+
+1. **Online claim**: To lodge a claim online, you’ll need a verification code which is sent to the email address listed on your Certificate of Insurance. You can either:
+
 • Call 1300 409 322 to update the email address to your own, or
+
 • Ask the main policy holder to share the verification code with you.
+
 (A new verification code is required each time you log in to the claims system.)
-2. \*\*Paper or email claim\*\*: If online claiming isn’t convenient, you can download a claim form and send it to us by email, post, or fax.
-- Email: [laims@fastcover.com.au](mailto:c[c[laims@fastcover.com.au](mailto:laims@fastcover.com.au)
+2. **Paper or email claim**: If online claiming isn’t convenient, you can download a claim form and send it to us by email, post, or fax.
+
+- Email: [laims@fastcover.com.au](mailto:laims@fastcover.com.au)
 - Post: Fast Cover Claims, PO Box R1384 Royal Exchange NSW 1225
-- Fax: 02 8883 7002]()")
+- Fax: 02 8883 7002
 
 *Canonical Source:* [https://fastcover.com.au/faq/how-can-i-make-a-travel-insurance-claim-if-my-group-policy-has-the-organiser-s-contact-details-instead-of-mine](https://fastcover.com.au/faq/how-can-i-make-a-travel-insurance-claim-if-my-group-policy-has-the-organiser-s-contact-details-instead-of-mine)
 
@@ -10728,7 +10743,18 @@ To remove a traveller from your policy, please contact our team by emailing [**i
 
 ### How do I send my travel insurance claim form and supporting documents?
 
-You can submit your travel insurance claim paperwork in the way that works best for you. The quickest and easiest option is to email your completed form and supporting documents directly to [claims@fastcover.com.au.](mailto:c
+You can submit your travel insurance claim paperwork in the way that works best for you. The quickest and easiest option is to email your completed form and supporting documents directly to [claims@fastcover.com.au](mailto:claims@fastcover.com.au).
+
+If you prefer to post your paperwork, you can mail copies of them to:
+
+Fast Cover Claims
+PO Box R1384
+
+Royal Exchange NSW 1225
+
+Whichever option you choose, make sure you keep a copy of your documents for your own records.
+
+Every claim is reviewed individually on a case-by-case basis and will only be paid if it meets the terms, conditions, limits, and exclusions in your policy. Always check the PDS carefully so you know exactly what’s included before you travel.
 
 *Canonical Source:* [https://fastcover.com.au/faq/how-do-i-send-my-travel-insurance-claim-form-and-supporting-documents](https://fastcover.com.au/faq/how-do-i-send-my-travel-insurance-claim-form-and-supporting-documents)
 
@@ -21100,7 +21126,8 @@ Every claim is reviewed individually on a case-by-case basis and will only be pa
 ### What should I do if there is a terrorist attack while I am travelling?
 
 If there is a terrorist attack while you are travelling, your first priority should always be your safety. Follow the instructions of local emergency services and authorities, move to a safe location if you can, and get urgent medical help straight away if you are injured.
-If you are overseas and need emergency help, contact Fast Cover’s 24/7 Emergency Assistance team as soon as possible. The emergency team may help with locating the nearest medical facilities if needed. The emergency contact numbers are (02) 8320 7999 in Australia and +61 2 8320 7999 from overseas, or [mergency@fastcover.com.au](mailto:e[e[mergency@fastcover.com.au](mailto:mergency@fastcover.com.au).]()")
+
+If you are overseas and need emergency help, contact Fast Cover’s 24/7 Emergency Assistance team as soon as possible. The emergency team may help with locating the nearest medical facilities if needed. The emergency contact numbers are (02) 8320 7999 in Australia and +61 2 8320 7999 from overseas, or [mergency@fastcover.com.au](mailto:mergency@fastcover.com.au).
 
 *Canonical Source:* [https://fastcover.com.au/faq/what-should-i-do-if-there-is-a-terrorist-attack-while-i-am-travelling](https://fastcover.com.au/faq/what-should-i-do-if-there-is-a-terrorist-attack-while-i-am-travelling)
 

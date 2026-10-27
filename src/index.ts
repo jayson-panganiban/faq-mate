@@ -7,9 +7,10 @@ import {
   extractInsurerFromQuery,
   type InsurancePeril,
   isInsuranceRelatedQuery,
+  type NormalizedIntent,
   normalizeIntent,
 } from "./rag/intent-normalizer";
-import { localHybridSearch } from "./rag/local-retriever";
+import { localHybridSearch, matchesInsurerFilter } from "./rag/local-retriever";
 import { synthesizePrompt } from "./rag/prompt-synthesizer";
 import { recordTelemetry } from "./telemetry/d1-logger";
 import type { AiSearchChunkItem, Env } from "./types/bindings";
@@ -180,26 +181,35 @@ function evaluateRateLimit(
   };
 }
 
+interface RetrievePolicyChunksOptions {
+  query: string;
+  insurer?: string;
+  aiSearch?: Env["AI_SEARCH"];
+  topK?: number;
+  aiSearchTimeoutMs?: number;
+  normalizedIntent?: NormalizedIntent;
+}
+
 /**
  * Unified Edge Retrieval Helper
- * Queries Cloudflare AI Search if available; falls back to edge-compiled local retriever.
+ * Queries Cloudflare AI Search if available (bounded by latency budget);
+ * falls back or backfills via edge-compiled in-isolate local retriever.
  */
 async function retrievePolicyChunks(
-  query: string,
-  insurer?: string,
-  aiSearch?: Env["AI_SEARCH"],
-  topK = 5
+  options: RetrievePolicyChunksOptions
 ): Promise<{ chunks: GroundedChunk[]; durationMs: number }> {
+  const { query, insurer, aiSearch, topK = 5, aiSearchTimeoutMs = 500, normalizedIntent } = options;
   const start = performance.now();
+  const normalized = normalizedIntent ?? normalizeIntent(query);
 
-  if (!insurer && !isInsuranceRelatedQuery(query)) {
-    const localMatches = localHybridSearch({ query, topK });
-    return { chunks: localMatches, durationMs: performance.now() - start };
+  if (!insurer && normalized.detectedPerils.length === 0 && !isInsuranceRelatedQuery(query)) {
+    return { chunks: [], durationMs: performance.now() - start };
   }
 
   if (aiSearch) {
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     try {
-      const resp = await aiSearch.search({
+      const searchPromise = aiSearch.search({
         query,
         ai_search_options: {
           retrieval: {
@@ -208,6 +218,14 @@ async function retrievePolicyChunks(
           },
         },
       });
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          reject(new Error(`AI_SEARCH exceeded ${aiSearchTimeoutMs}ms latency budget`));
+        }, aiSearchTimeoutMs);
+      });
+
+      const resp = await Promise.race([searchPromise, timeoutPromise]);
 
       const rawItems = resp.chunks || resp.results || [];
       const chunks: GroundedChunk[] = rawItems.map((r: AiSearchChunkItem) => {
@@ -234,7 +252,7 @@ async function retrievePolicyChunks(
           relevanceScore: typeof r.score === "number" ? r.score : 0.85,
           content: stripStatutoryGaw(rawContent),
           source: {
-            insurer: parsedInsurer || insurer || "General",
+            insurer: parsedInsurer || "General",
             product: r.metadata?.product || "Insurance",
             docType: r.metadata?.docType || fallbackDocType,
             section: r.metadata?.section || itemKey || "General Terms",
@@ -244,19 +262,39 @@ async function retrievePolicyChunks(
       });
 
       if (chunks.length > 0) {
-        let filteredChunks = chunks;
-        if (insurer) {
-          const matched = chunks.filter(
-            (c) => c.source.insurer.toLowerCase() === insurer.toLowerCase()
-          );
-          if (matched.length > 0) {
-            filteredChunks = matched;
+        if (!insurer) {
+          return { chunks: chunks.slice(0, topK), durationMs: performance.now() - start };
+        }
+
+        const matched = chunks.filter((c) => matchesInsurerFilter(c.source.insurer, insurer));
+
+        if (matched.length >= topK) {
+          return { chunks: matched.slice(0, topK), durationMs: performance.now() - start };
+        }
+
+        const localBackfill = localHybridSearch({
+          query,
+          topK,
+          filter: { insurer },
+          normalizedIntent: normalized,
+        });
+        const seenIds = new Set(matched.map((c) => c.id));
+        const merged = [...matched];
+        for (const localChunk of localBackfill) {
+          if (merged.length >= topK) break;
+          if (!seenIds.has(localChunk.id)) {
+            seenIds.add(localChunk.id);
+            merged.push(localChunk);
           }
         }
-        return { chunks: filteredChunks, durationMs: performance.now() - start };
+        return { chunks: merged, durationMs: performance.now() - start };
       }
     } catch (err) {
       console.warn("[AI_SEARCH::Failure]", err instanceof Error ? err.message : String(err));
+    } finally {
+      if (timeoutHandle !== undefined) {
+        clearTimeout(timeoutHandle);
+      }
     }
   }
 
@@ -264,6 +302,7 @@ async function retrievePolicyChunks(
     query,
     topK,
     filter: insurer ? { insurer } : undefined,
+    normalizedIntent: normalized,
   });
 
   return { chunks, durationMs: performance.now() - start };
@@ -732,12 +771,19 @@ export default {
 
       // Hybrid Retrieval (Spec 02 Section 2 & PRD § 2.1)
       const topK = Number.parseInt(env?.RETRIEVAL_TOP_K || "5", 10);
-      const { chunks, durationMs: searchDurationMs } = await retrievePolicyChunks(
-        retrievalQuery,
-        detectedInsurer,
-        env.AI_SEARCH,
-        topK
-      );
+      const parsedTimeout = Number.parseInt(env?.AI_SEARCH_TIMEOUT_MS || "500", 10);
+      const aiSearchTimeoutMs =
+        Number.isFinite(parsedTimeout) && parsedTimeout > 0 ? parsedTimeout : 500;
+      const retrievalNormalized =
+        retrievalQuery === verdict.sanitizedQuery ? normalized : normalizeIntent(retrievalQuery);
+      const { chunks, durationMs: searchDurationMs } = await retrievePolicyChunks({
+        query: retrievalQuery,
+        insurer: detectedInsurer,
+        aiSearch: env.AI_SEARCH,
+        topK,
+        aiSearchTimeoutMs,
+        normalizedIntent: retrievalNormalized,
+      });
 
       // Context Assembly (Spec 07 Section 4 & 5)
       const messages = synthesizePrompt(verdict.sanitizedQuery, chunks, {

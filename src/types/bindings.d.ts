@@ -62,6 +62,7 @@ export interface Env {
   AI_FALLBACK_MODEL?: string;
   AI_MAX_TOKENS?: string;
   RETRIEVAL_TOP_K?: string;
+  AI_SEARCH_TIMEOUT_MS?: string;
   RATE_LIMIT_MAX?: string;
   RATE_LIMIT_WINDOW_SECONDS?: string;
   ALLOWED_ORIGINS?: string;

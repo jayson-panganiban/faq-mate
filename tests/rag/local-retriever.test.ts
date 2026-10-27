@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { normalizeIntent } from "../../src/rag/intent-normalizer";
 import { localHybridSearch } from "../../src/rag/local-retriever";
 
 describe("Colloquial Retrieval via Local Hybrid Search (Spec 07)", () => {
@@ -80,5 +81,41 @@ describe("Colloquial Retrieval via Local Hybrid Search (Spec 07)", () => {
       topK: 5,
     });
     expect(unrelatedChunks).toHaveLength(0);
+  });
+
+  it("executes pre-indexed hybrid search in sub-millisecond average latency and accepts pre-normalized intent", () => {
+    const benchmarkQueries = [
+      "Does Suncorp cover flood damage for my home?",
+      "What is the definition of flood under NRMA home insurance?",
+      "Is water damage from a burst pipe covered by AAMI?",
+      "Can I claim for broken fence from storm?",
+      "What happens if unlicensed driver crashes car under Allianz?",
+      "Does travel insurance cover motorcycle rental in Bali?",
+      "My fridge stopped working during blackout and food spoiled",
+      "Is engagement ring covered away from home?",
+      "What is the difference between agreed value and market value?",
+      "What is the 72 hour embargo for bushfire?",
+    ];
+
+    // Warm up JIT
+    for (const q of benchmarkQueries) {
+      localHybridSearch({ query: q, topK: 5 });
+    }
+
+    const iterations = 20;
+    const start = performance.now();
+    for (let i = 0; i < iterations; i++) {
+      for (const q of benchmarkQueries) {
+        const preNormalized = normalizeIntent(q);
+        const chunks = localHybridSearch({
+          query: q,
+          topK: 5,
+          normalizedIntent: preNormalized,
+        });
+        expect(chunks.length).toBeGreaterThan(0);
+      }
+    }
+    const avgMsPerQuery = (performance.now() - start) / (iterations * benchmarkQueries.length);
+    expect(avgMsPerQuery).toBeLessThan(1.0);
   });
 });

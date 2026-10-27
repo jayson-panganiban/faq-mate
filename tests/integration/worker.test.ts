@@ -496,4 +496,95 @@ describe("Worker End-to-End Integration Suite (Spec 02 & Spec 03)", () => {
     const body = (await resNoToken.json()) as { error: string; message: string };
     expect(body.message).toContain("Turnstile bot verification required");
   });
+
+  it("16. Enforces AI_SEARCH_TIMEOUT_MS latency budget and falls back to localHybridSearch when AI_SEARCH stalls", async () => {
+    const slowSearchMock = vi.fn().mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                chunks: [
+                  {
+                    id: "slow-chunk",
+                    score: 0.99,
+                    content: "Too late response from stalled AI Search.",
+                    metadata: { insurer: "suncorp" },
+                  },
+                ],
+              }),
+            600
+          )
+        )
+    );
+
+    const envWithSlowSearch: Env = {
+      ...mockEnv,
+      AI_SEARCH_TIMEOUT_MS: "40",
+      AI_SEARCH: {
+        search: slowSearchMock,
+      },
+    };
+
+    const start = performance.now();
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "cf-connecting-ip": "192.168.1.210" },
+      body: JSON.stringify({
+        query: "Does Suncorp cover flood damage?",
+        conversationId: "550e8400-e29b-41d4-a716-446655440010",
+        filters: { insurer: "suncorp" },
+      }),
+    });
+
+    const res = await worker.fetch(req, envWithSlowSearch, mockCtx);
+    const text = await res.text();
+    const elapsed = performance.now() - start;
+
+    expect(res.status).toBe(200);
+    expect(elapsed).toBeLessThan(250);
+    expect(text).toContain("event: metadata");
+    expect(text).not.toContain("Too late response from stalled AI Search.");
+    expect(text.toLowerCase()).toContain("suncorp");
+  });
+
+  it("17. Never leaks wrong-insurer chunks when AI_SEARCH returns global non-matching results, backfilling from localHybridSearch", async () => {
+    const mismatchedSearchMock = vi.fn().mockResolvedValue({
+      chunks: [
+        {
+          id: "wrong-insurer-chunk",
+          score: 0.95,
+          content: "Suncorp Landlord flood clause from unfiltered global vector search.",
+          metadata: {
+            insurer: "suncorp",
+            filename: "corpus/guides/suncorp/landlord/GUIDE.md",
+          },
+        },
+      ],
+    });
+
+    const envWithMismatchedSearch: Env = {
+      ...mockEnv,
+      AI_SEARCH: {
+        search: mismatchedSearchMock,
+      },
+    };
+
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "cf-connecting-ip": "192.168.1.211" },
+      body: JSON.stringify({
+        query: "What happens if an unlicensed driver crashes my car under Allianz?",
+        conversationId: "550e8400-e29b-41d4-a716-446655440011",
+        filters: { insurer: "allianz" },
+      }),
+    });
+
+    const res = await worker.fetch(req, envWithMismatchedSearch, mockCtx);
+    const text = await res.text();
+
+    expect(res.status).toBe(200);
+    expect(text).not.toContain("wrong-insurer-chunk");
+    expect(text.toLowerCase()).toContain("allianz");
+  });
 });

@@ -323,18 +323,27 @@ export function normalizeIntent(rawQuery: string): NormalizedIntent {
   const canonicalTokens = new Set<string>();
   const expandedTerms = new Set<string>();
   const detectedPerils = new Set<InsurancePeril>();
-  const insuranceRelated = isInsuranceRelatedQuery(rawQuery) || isInsuranceRelatedQuery(cleaned);
+  const isSameQuery = rawQuery === cleaned;
+  let insuranceRelatedCache: boolean | undefined;
 
   // 3. Match colloquial patterns across both raw and cleaned query
   for (const rule of COLLOQUIAL_RULES) {
-    if (rule.id === "definition-inquiry" && !insuranceRelated) {
+    const matched = rule.pattern.test(rawQuery) || (!isSameQuery && rule.pattern.test(cleaned));
+    if (!matched) {
       continue;
     }
-    if (rule.pattern.test(rawQuery) || rule.pattern.test(cleaned)) {
-      for (const token of rule.canonicalTokens) canonicalTokens.add(token);
-      for (const term of rule.expandedTerms) expandedTerms.add(term);
-      detectedPerils.add(rule.peril);
+    if (rule.id === "definition-inquiry") {
+      if (insuranceRelatedCache === undefined) {
+        insuranceRelatedCache =
+          isInsuranceRelatedQuery(rawQuery) || (!isSameQuery && isInsuranceRelatedQuery(cleaned));
+      }
+      if (!insuranceRelatedCache) {
+        continue;
+      }
     }
+    for (const token of rule.canonicalTokens) canonicalTokens.add(token);
+    for (const term of rule.expandedTerms) expandedTerms.add(term);
+    detectedPerils.add(rule.peril);
   }
 
   // Pre-tokenize search tokens for retriever to prevent feature envy

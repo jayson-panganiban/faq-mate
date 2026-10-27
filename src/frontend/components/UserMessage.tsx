@@ -1,5 +1,4 @@
 import { Shield, ShieldCheck, User } from "lucide-react";
-import React from "react";
 import { sanitizeClientPii } from "../utils/client-pii-scrubber";
 
 export interface UserMessageProps {
@@ -39,7 +38,7 @@ export function UserMessage({ query, insurer, timestamp, className = "" }: UserM
       aria-label="User message"
       className={`flex items-start justify-end gap-3 my-4 group ${className}`}
     >
-      <div className="flex flex-col items-end max-w-[85%] sm:max-w-[75%] space-y-1.5">
+      <div className="flex flex-col items-end max-w-[calc(100%-2.75rem)] sm:max-w-[75%] space-y-1.5">
         {/* Header metadata: Insurer badge + timestamp */}
         <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
           {wasRedacted && (

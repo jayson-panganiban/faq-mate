@@ -212,7 +212,7 @@ export function App() {
           />
 
           {/* User Input Bar & Insurer Filter */}
-          <div className="pt-2 pb-1 shrink-0 bg-transparent">
+          <div className="pt-2.5 pb-1 sm:pt-3.5 sm:pb-2 shrink-0 bg-transparent">
             <InputBar
               onSend={handleSend}
               isLoading={isLoading}

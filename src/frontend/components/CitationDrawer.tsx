@@ -145,7 +145,7 @@ export function CitationDrawer({
           className="w-screen max-w-full sm:max-w-md md:max-w-lg lg:max-w-xl bg-white dark:bg-slate-900 shadow-2xl flex flex-col h-full transform transition-transform duration-300 ease-in-out border-l border-slate-200 dark:border-slate-800"
         >
           {/* Drawer Top Navigation Bar */}
-          <div className="p-4 sm:px-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80">
+          <div className="p-4 sm:px-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80 pt-[max(1rem,env(safe-area-inset-top))]">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-lg bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300">
                 <BookOpen className="w-5 h-5" aria-hidden="true" />
@@ -376,7 +376,7 @@ export function CitationDrawer({
           </div>
 
           {/* Drawer Footer */}
-          <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 flex items-center justify-between">
+          <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 flex items-center justify-between pb-[max(1rem,env(safe-area-inset-bottom))]">
             <span className="text-[11px] text-slate-500 dark:text-slate-400">
               {chunks.length} {chunks.length === 1 ? "retrieved chunk" : "retrieved chunks"}
             </span>

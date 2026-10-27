@@ -1,9 +1,10 @@
-import { ArrowDown, Bot, ChevronRight, Compass, Shield, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUpRight, Bot, Search, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage, GroundedChunk, StreamState } from "../types/chat-ui";
 import { AssistantMessage } from "./AssistantMessage";
 import { EmergencyBanner } from "./EmergencyBanner";
 import { RefusalCard } from "./RefusalCard";
+import { SourceCardGrid } from "./SourceCardGrid";
 import { UserMessage } from "./UserMessage";
 
 export interface StarterPrompt {
@@ -17,8 +18,14 @@ export const STARTER_PROMPTS: StarterPrompt[] = [
   {
     query: "What is Suncorp's flood definition?",
     insurer: "SUNCORP",
-    tag: "Flood & Storm",
+    tag: "Flood Cover",
     description: "Inspect standard flood definitions and rainwater run-off exclusions.",
+  },
+  {
+    query: "NRMA vs Allianz comprehensive motor comparison",
+    insurer: "NRMA",
+    tag: "Motor",
+    description: "Compare accidental damage, agreed value, and choice of repairer.",
   },
   {
     query: "Explain jewelry sub-limits under Allianz",
@@ -27,16 +34,16 @@ export const STARTER_PROMPTS: StarterPrompt[] = [
     description: "Review per-item and total collection monetary limits for high-value items.",
   },
   {
-    query: "Does NRMA cover rainwater run-off?",
-    insurer: "NRMA",
-    tag: "Water Damage",
-    description: "Compare escape of liquid vs storm surge and surface water run-off.",
-  },
-  {
     query: "What is QBE's accidental damage cover for glass?",
     insurer: "QBE",
     tag: "Accidental Damage",
     description: "Examine fixed glass, skylights, and solar panel breakage terms.",
+  },
+  {
+    query: "Does NRMA cover rainwater run-off?",
+    insurer: "NRMA",
+    tag: "Water Damage",
+    description: "Compare escape of liquid vs storm surge and surface water run-off.",
   },
 ];
 
@@ -148,61 +155,103 @@ export function ChatContainer({
         className="flex-1 overflow-y-auto px-2 sm:px-4 py-4 space-y-4 scroll-smooth focus:outline-hidden"
         tabIndex={0}
       >
-        {/* Empty State: Starter Prompt Cards */}
+        {/* Empty State: Clean Search-First Canvas & Vertical Quick Prompts */}
         {isEmpty && (
-          <div className="max-w-3xl mx-auto my-auto py-8 px-4 flex flex-col items-center text-center space-y-6">
-            <div className="p-3.5 rounded-2xl bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 ring-1 ring-sky-100 dark:ring-sky-900 shadow-xs">
-              <Compass className="w-8 h-8" aria-hidden="true" />
+          <div className="relative max-w-2xl mx-auto my-auto py-1 sm:py-2 px-2 sm:px-4 flex flex-col items-start w-full space-y-2.5 sm:space-y-3.5">
+            {/* Faint Vector Compass Watermark in Background */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden opacity-[0.03] dark:opacity-[0.04]"
+            >
+              <svg
+                aria-hidden="true"
+                focusable="false"
+                className="w-72 h-72 sm:w-96 sm:h-96 text-slate-900 dark:text-slate-100"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="0.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <title>Australian General Insurance Radar</title>
+                <circle cx="12" cy="12" r="10" />
+                <polygon
+                  points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"
+                  fill="currentColor"
+                  fillOpacity="0.15"
+                />
+                <circle cx="12" cy="12" r="2" />
+                <line x1="12" y1="2" x2="12" y2="4" />
+                <line x1="12" y1="20" x2="12" y2="22" />
+                <line x1="2" y1="12" x2="4" y2="12" />
+                <line x1="20" y1="12" x2="22" y2="12" />
+              </svg>
             </div>
 
-            <div className="space-y-2 max-w-lg">
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-                Explore Australian General Insurance Policies
-              </h2>
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Ask specific questions about home, contents, and motor policies across NRMA,
-                Suncorp, Allianz, QBE, and Youi. Answers are grounded in operative Product
-                Disclosure Statements.
+            {/* Header: Search-first typography without marketing bloat */}
+            <div className="relative z-10 space-y-1 text-left w-full">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                Where would you like to start?
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                Grounded in operative Product Disclosure Statements across 39 licensed Australian
+                insurers.
               </p>
             </div>
 
-            {/* Prompt Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full pt-2 text-left">
-              {STARTER_PROMPTS.map((prompt, idx) => (
-                <button
-                  key={prompt.query}
-                  type="button"
-                  data-testid={`starter-prompt-${idx}`}
-                  onClick={() => onSelectStarterQuery?.(prompt.query, prompt.insurer)}
-                  className="group p-4 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-sky-400 dark:hover:border-sky-500 hover:shadow-md transition-[border-color,box-shadow,transform] duration-200 ease-out active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:outline-hidden text-left flex flex-col justify-between cursor-pointer"
-                >
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                        <Shield
-                          className="w-3 h-3 text-sky-600 dark:text-sky-400"
+            {/* Quick Prompts: Compact Vertical List */}
+            <div className="relative z-10 w-full space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1">
+                <span>Quick Prompts</span>
+                <span className="font-normal lowercase text-slate-400 dark:text-slate-500">
+                  pds verified
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-1.5 sm:gap-2 w-full">
+                {STARTER_PROMPTS.map((prompt, idx) => (
+                  <button
+                    key={prompt.query}
+                    type="button"
+                    data-testid={`starter-prompt-${idx}`}
+                    onClick={() => onSelectStarterQuery?.(prompt.query, prompt.insurer)}
+                    className="group w-full flex items-center justify-between gap-3 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800/90 bg-white/80 dark:bg-slate-900/70 backdrop-blur-xs hover:border-teal-500/50 dark:hover:border-teal-400/50 hover:bg-white dark:hover:bg-slate-800/90 shadow-2xs hover:shadow-xs transition-[border-color,background-color,box-shadow,transform] text-left cursor-pointer active:scale-[0.995] focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:outline-hidden"
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800/90 flex items-center justify-center shrink-0 group-hover:bg-teal-50 dark:group-hover:bg-teal-950/50 transition-colors">
+                        <Search
+                          className="w-3.5 h-3.5 text-slate-400 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors"
                           aria-hidden="true"
                         />
-                        {prompt.insurer}
-                      </span>
-                      <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200 line-clamp-2 sm:truncate group-hover:text-teal-700 dark:group-hover:text-teal-300 transition-colors">
+                          {prompt.query}
+                        </p>
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate hidden sm:block">
+                          {prompt.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {prompt.insurer && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
+                          {prompt.insurer}
+                        </span>
+                      )}
+                      <span className="hidden md:inline-block text-[11px] font-medium text-slate-400 dark:text-slate-500">
                         {prompt.tag}
                       </span>
+                      <ArrowUpRight
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-300 dark:text-slate-600 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors shrink-0"
+                        aria-hidden="true"
+                      />
                     </div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
-                      {prompt.query}
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-                      {prompt.description}
-                    </p>
-                  </div>
-
-                  <div className="pt-2 flex items-center justify-end text-xs font-medium text-sky-600 dark:text-sky-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span>Ask this query</span>
-                    <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
-                  </div>
-                </button>
-              ))}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -277,6 +326,11 @@ export function ChatContainer({
                           : "Retrieving operative PDS terms via hybrid search..."}
                       </span>
                     </div>
+                    {status === "METADATA_RECEIVED" && citations.length > 0 && (
+                      <div className="pt-1">
+                        <SourceCardGrid chunks={citations} onSelectCitation={onSelectCitation} />
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <div className="h-3.5 bg-slate-200 dark:bg-slate-800 rounded-full w-3/4 motion-safe:animate-pulse" />
                       <div className="h-3.5 bg-slate-200 dark:bg-slate-800 rounded-full w-1/2 motion-safe:animate-pulse" />

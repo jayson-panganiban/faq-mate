@@ -99,4 +99,11 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
 
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
+
+  it("configures table with min-width for responsive mobile scrolling", () => {
+    render(<PolicyComparisonView />);
+
+    const table = screen.getByRole("table");
+    expect(table.className).toContain("min-w-[560px]");
+  });
 });

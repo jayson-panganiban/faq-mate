@@ -417,5 +417,23 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
       fireEvent.change(textarea, { target: { value: "Query while throttled" } });
       expect(sendButton).toBeDisabled();
     });
+
+    it("enforces mobile touch targets and iOS auto-zoom prevention classes", () => {
+      render(<InputBar onSend={vi.fn()} isLoading={false} isThrottled={false} />);
+
+      const textarea = screen.getByTestId("chat-input-textarea");
+      const select = screen.getByTestId("insurer-select");
+      const sendButton = screen.getByTestId("send-button");
+
+      // Verify text-base on mobile to prevent iOS Safari auto-zoom (<16px triggers zoom)
+      expect(textarea.className).toContain("text-base");
+      expect(textarea.className).toContain("sm:text-sm");
+      expect(select.className).toContain("text-base");
+      expect(select.className).toContain("sm:text-xs");
+
+      // Verify 44x44px minimum tap target for finger tap
+      expect(sendButton.className).toContain("min-h-[44px]");
+      expect(sendButton.className).toContain("min-w-[44px]");
+    });
   });
 });

@@ -243,9 +243,9 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
     // Drawer opens
     const drawer = await screen.findByRole("dialog", { name: /grounding inspector/i });
     expect(drawer).toBeInTheDocument();
-    expect(screen.getByText("Grounding Inspector")).toBeInTheDocument();
-    expect(screen.getByText(/94% Match/i)).toBeInTheDocument();
-    expect(screen.getByText(SAMPLE_CHUNK.content)).toBeInTheDocument();
+    expect(within(drawer).getByText("Grounding Inspector")).toBeInTheDocument();
+    expect(within(drawer).getByText(/94% Match/i)).toBeInTheDocument();
+    expect(within(drawer).getByText(SAMPLE_CHUNK.content)).toBeInTheDocument();
 
     // Close via backdrop click
     const backdrop = screen.getByTestId("citation-drawer-backdrop");

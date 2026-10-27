@@ -258,6 +258,89 @@ describe("AssistantMessage Component (Ticket 5)", () => {
       fireEvent.click(citationButton);
       expect(onSelectCitation).toHaveBeenCalledWith("[Source: Unknown Policy PDS, Section 99]");
     });
+
+    it("renders citation index badge on inline pill when matching chunk exists in chunks list", () => {
+      const message =
+        "Jewellery sub-limit is $2,500 [Source: Suncorp Classic Home PDS, Section 3: Sub-limits].";
+
+      render(<AssistantMessage message={message} chunks={mockChunks} isStreaming={false} />);
+
+      const indexBadge = screen.getByTestId("citation-index-badge");
+      expect(indexBadge).toBeInTheDocument();
+      expect(indexBadge).toHaveTextContent("1");
+    });
+
+    it("binds trailing full stop directly to the citation pill without floating space", () => {
+      const message =
+        "Flood is covered under standard policy terms [Source: Suncorp Classic Home PDS, Section 1: Insured Events] . Next sentence.";
+
+      render(<AssistantMessage message={message} chunks={mockChunks} isStreaming={false} />);
+
+      const citationButton = screen.getByTestId("citation-pill");
+      expect(citationButton).toBeInTheDocument();
+
+      // Parent wrapper has whitespace-nowrap and binds the dot directly
+      const wrapper = citationButton.closest("span");
+      expect(wrapper).toHaveClass("whitespace-nowrap");
+      expect(wrapper).toHaveTextContent(/\./);
+      expect(wrapper?.textContent).not.toMatch(/\s+\./);
+    });
+  });
+
+  describe("Operative Sources Shelf (Answer Engine Dossier)", () => {
+    it("renders Sources Shelf at the top of the dossier when grounded chunks are provided", () => {
+      const onSelectCitation = vi.fn();
+      render(
+        <AssistantMessage
+          message="Policy response body."
+          chunks={mockChunks}
+          onSelectCitation={onSelectCitation}
+          isStreaming={false}
+        />
+      );
+
+      const shelf = screen.getByTestId("sources-shelf");
+      expect(shelf).toBeInTheDocument();
+      expect(shelf).toHaveAttribute("aria-label", "Operative Policy Sources");
+      expect(within(shelf).getByText(/Operative Sources/i)).toBeInTheDocument();
+      expect(screen.getByTestId("sources-count-badge")).toHaveTextContent("2");
+
+      // Source Card 0 (Suncorp)
+      const card0 = screen.getByTestId("source-card-0");
+      expect(card0).toBeInTheDocument();
+      expect(within(card0).getByText("SUNCORP")).toBeInTheDocument();
+      expect(within(card0).getByText("Suncorp Classic Home PDS")).toBeInTheDocument();
+      expect(within(card0).getByText("Section 3: Sub-limits")).toBeInTheDocument();
+      expect(within(card0).getByText("95% match")).toBeInTheDocument();
+
+      // Source Card 1 (NRMA)
+      const card1 = screen.getByTestId("source-card-1");
+      expect(card1).toBeInTheDocument();
+      expect(within(card1).getByText("NRMA")).toBeInTheDocument();
+      expect(within(card1).getByText("NRMA Home Building PDS")).toBeInTheDocument();
+      expect(within(card1).getByText("Section 1: Insured Events")).toBeInTheDocument();
+      expect(within(card1).getByText("91% match")).toBeInTheDocument();
+
+      // Clicking a source card invokes onSelectCitation
+      fireEvent.click(card0);
+      expect(onSelectCitation).toHaveBeenCalledWith(mockChunks[0]);
+    });
+
+    it("does not render Sources Shelf when chunks is undefined or empty", () => {
+      const { rerender } = render(
+        <AssistantMessage message="Policy response body without chunks." isStreaming={false} />
+      );
+      expect(screen.queryByTestId("sources-shelf")).not.toBeInTheDocument();
+
+      rerender(
+        <AssistantMessage
+          message="Policy response with empty chunks."
+          chunks={[]}
+          isStreaming={false}
+        />
+      );
+      expect(screen.queryByTestId("sources-shelf")).not.toBeInTheDocument();
+    });
   });
 
   describe("Streaming State & Blinking Cursor", () => {

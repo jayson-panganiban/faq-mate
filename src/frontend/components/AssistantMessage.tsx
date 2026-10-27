@@ -9,6 +9,7 @@ import {
 import type { GroundedChunk } from "../../types/chat";
 import { findMatchingChunk } from "../utils/citations";
 import { CitationPill } from "./CitationPill";
+import { SourceCardGrid } from "./SourceCardGrid";
 import { StatutoryGaw } from "./StatutoryGaw";
 
 export interface AssistantMessageProps {
@@ -182,13 +183,37 @@ function renderInlineText(
 
           if (isCitation) {
             const matchedChunk = findMatchingChunk(part, chunks);
+            const chunkIndex =
+              matchedChunk && chunks ? chunks.indexOf(matchedChunk) + 1 : undefined;
+
+            // Check if immediately following part starts with punctuation (e.g. '.', ',', ';', '?', '!')
+            let trailingPunctuation = "";
+            if (index + 1 < parts.length && typeof parts[index + 1] === "string") {
+              const punctMatch = parts[index + 1].match(/^\s*([.,;:!?])/);
+              if (punctMatch) {
+                trailingPunctuation = punctMatch[1];
+                // Strip the matched punctuation and any leading whitespace from the next segment
+                parts[index + 1] = parts[index + 1].replace(/^\s*[.,;:!?]/, "");
+              }
+            }
+
             return (
-              <CitationPill
-                key={`cit-${index}`}
-                chunk={matchedChunk}
-                label={part}
-                onClick={() => onSelectCitation?.(matchedChunk ?? part)}
-              />
+              <span
+                key={`cit-wrap-${index}`}
+                className="inline-flex items-baseline whitespace-nowrap align-baseline"
+              >
+                <CitationPill
+                  index={chunkIndex && chunkIndex > 0 ? chunkIndex : undefined}
+                  chunk={matchedChunk}
+                  label={part}
+                  onClick={() => onSelectCitation?.(matchedChunk ?? part)}
+                />
+                {trailingPunctuation && (
+                  <span className="text-slate-800 dark:text-slate-200 select-text">
+                    {trailingPunctuation}
+                  </span>
+                )}
+              </span>
             );
           }
         }
@@ -598,6 +623,11 @@ export function AssistantMessage({
             </button>
           </div>
         </div>
+
+        {/* Operative Sources Shelf (Answer Engine Dossier) */}
+        {chunks && chunks.length > 0 && (
+          <SourceCardGrid chunks={chunks} onSelectCitation={onSelectCitation} />
+        )}
 
         {/* Structured Rendered Blocks */}
         <div className="space-y-3 text-slate-800 dark:text-slate-200 leading-relaxed text-sm sm:text-base">

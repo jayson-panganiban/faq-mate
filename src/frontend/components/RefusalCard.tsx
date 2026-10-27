@@ -1,5 +1,4 @@
 import { AlertTriangle, UserCheck } from "lucide-react";
-import React from "react";
 import { STATUTORY_SAFE_HARBOR_REFUSAL, stripStatutoryGaw } from "../../constants/statutory";
 import { StatutoryGaw } from "./StatutoryGaw";
 

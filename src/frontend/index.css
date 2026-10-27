@@ -7,17 +7,49 @@
   --color-cf-orange: #f38020;
 }
 
+html {
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+
 body {
   margin: 0;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  overscroll-behavior-y: contain;
+}
+
+/* Fast touch response without 300ms delay or double-tap zoom on buttons */
+button,
+a,
+select,
+textarea,
+[role="button"],
+[role="tab"] {
+  touch-action: manipulation;
 }
 
 /* Tabular figures for data metrics */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* Clean subtle scrollbar styling */
+[data-testid="chat-scroll-container"] {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.2) transparent;
+}
+[data-testid="chat-scroll-container"]::-webkit-scrollbar {
+  width: 5px;
+}
+[data-testid="chat-scroll-container"]::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}
+[data-testid="chat-scroll-container"]::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* Reduced motion preference honoring (ui-craft finish-bar Pass 7) */

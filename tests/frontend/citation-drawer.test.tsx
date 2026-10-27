@@ -275,4 +275,26 @@ describe("Pill and Drawer Integration Flow", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(mockChunk1.content)).toBeInTheDocument();
   });
+
+  it("applies mobile safe-area insets and 44px tap targets to drawer controls", () => {
+    render(
+      <CitationDrawer
+        isOpen={true}
+        onClose={vi.fn()}
+        chunks={[mockChunk1]}
+        selectedChunkId={mockChunk1.id}
+      />
+    );
+
+    const closeBtn = screen.getByRole("button", { name: /close citations/i });
+    expect(closeBtn.className).toContain("min-h-[44px]");
+    expect(closeBtn.className).toContain("min-w-[44px]");
+
+    const doneBtn = screen.getByRole("button", { name: /done/i });
+    expect(doneBtn.className).toContain("min-h-[44px]");
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.innerHTML).toContain("pt-[max(1rem,env(safe-area-inset-top))]");
+    expect(dialog.innerHTML).toContain("pb-[max(1rem,env(safe-area-inset-bottom))]");
+  });
 });

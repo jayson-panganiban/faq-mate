@@ -69,7 +69,8 @@ export function PiiAssuranceBadge({
           className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0"
           aria-hidden="true"
         />
-        <span className="font-medium">APP 3/11 Privacy Shield</span>
+        <span className="font-medium hidden sm:inline">APP 3/11 Privacy Shield</span>
+        <span className="font-medium sm:hidden">APP 3/11 Shield</span>
       </button>
 
       {isOpen && (
@@ -80,7 +81,7 @@ export function PiiAssuranceBadge({
           data-testid="pii-assurance-popover"
           tabIndex={-1}
           onKeyDown={handleKeyDown}
-          className="absolute bottom-full right-0 mb-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-3.5 shadow-xl dark:border-slate-800 dark:bg-slate-900 z-50 animate-in fade-in zoom-in-95 duration-150"
+          className="absolute bottom-full left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 mb-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-3.5 shadow-xl dark:border-slate-800 dark:bg-slate-900 z-50 animate-in fade-in zoom-in-95 duration-150"
         >
           <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2 dark:border-slate-800">
             <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-100">

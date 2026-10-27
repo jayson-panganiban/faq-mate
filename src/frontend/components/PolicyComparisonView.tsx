@@ -121,7 +121,7 @@ export function PolicyComparisonView({
             data-testid="insurer-a-select"
             value={insurerA}
             onChange={(e) => setInsurerA(e.target.value as PrimaryInsurerCode)}
-            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 transition-[border-color,background-color] duration-150 cursor-pointer"
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-base sm:text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 transition-[border-color,background-color] duration-150 cursor-pointer"
           >
             {GROUPED_INSURER_OPTIONS.map((group) => (
               <optgroup key={group.category} label={group.label}>
@@ -147,7 +147,7 @@ export function PolicyComparisonView({
             data-testid="insurer-b-select"
             value={insurerB}
             onChange={(e) => setInsurerB(e.target.value as PrimaryInsurerCode)}
-            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 transition-[border-color,background-color] duration-150 cursor-pointer"
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-base sm:text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-500 transition-[border-color,background-color] duration-150 cursor-pointer"
           >
             {GROUPED_INSURER_OPTIONS.map((group) => (
               <optgroup key={group.category} label={group.label}>
@@ -258,7 +258,7 @@ export function PolicyComparisonView({
         </h3>
 
         <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-xs sm:text-sm">
+          <table className="min-w-[560px] w-full divide-y divide-slate-200 dark:divide-slate-800 text-xs sm:text-sm">
             <thead className="bg-slate-50 dark:bg-slate-800/80">
               <tr>
                 <th

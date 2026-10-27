@@ -91,7 +91,8 @@ export function RateLimitBadge({
         </span>
       ) : (
         <span className="font-mono tabular-nums">
-          {remaining}/{limit} requests
+          {remaining}/{limit}
+          <span className="sr-only sm:not-sr-only"> requests</span>
         </span>
       )}
     </div>

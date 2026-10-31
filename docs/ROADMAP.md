@@ -16,7 +16,7 @@
 | **Phase 3** | **Data Ingestion & R2 Normalizer**       | **DONE** | PDF/Markdown normalizer script, table serializer, seed corpus & R2 upload utility.  |
 | **Phase 4** | **Cloudflare AI Search Binding**         | **DONE** | `AI_SEARCH` binding in `wrangler.jsonc`, hybrid search + local retriever fallback. |
 | **Phase 5** | **AFCA Evals & Groundedness Benchmarks** | **DONE** | Full AFCA-10 red-teaming test suite, LLM-as-a-Judge groundedness gate ($\ge 0.98$). |
-| **Phase 6** | **Frontend Chat Interface (Pages)**      | **DONE** | High-density UI, citation drawers, latency badges, Turnstile abuse shield, 154 tests. |
+| **Phase 6** | **Frontend Chat Interface (Pages)**      | **DONE** | High-density UI, unified `GlobalFilterDropdown` system, sanitized Sources UI + debug mode, markdown pipeline, iOS keyboard anchoring, Turnstile abuse shield, 210 tests. |
 | **Phase 7** | **Multi-Insurer Archive & Edge AST Compiler** | **DONE** | 39 insurers across 5 categories, 1,277 PDF archive, 5,416 FAQs, AST heading-clean compiler, corpus linter. |
 | **Phase 8** | **Runtime Hardening & Known Gaps**       | **PLANNED** | Server Turnstile verify, 8B secondary LLM fallback, true TTFT timing, feedback API, durable rate limit. |
 
@@ -78,13 +78,18 @@
 - [x] Scaffold Vite + React 19 UI in `src/frontend/` with Tailwind CSS & Lucide React
 - [x] Stream state machine & custom `useChatStream` hook with full SSE protocol
 - [x] Citation preview drawer (`CitationDrawer`) & inline citation chips (`CitationPill`)
+- [x] Unified responsive dropdown system (`GlobalFilterDropdown` chip + field variants) owning the approved palette/bottom-sheet menu across the app — composer "All Insurers" filter and both `PolicyComparisonView` pickers; no native `<select>` remains
+- [x] Standard Markdown pipeline for derived corpus text (`react-markdown` + `utils/markdown.ts` pre-processor → `MarkdownText`): internal backend tags (e.g. `**Clause Classification:**`) stripped, raw URLs rewritten into clean labelled anchors, raw HTML never mounted; the citation drawer's Copy keeps the verbatim original chunk
+- [x] Consumer-sanitized Sources UI: source-location trail instead of "Operative Breadcrumb", all score/confidence badges and chunk IDs hidden by default, multi-chunk tab strip with a muted non-shrinking active tab
+- [x] Developer Debug Mode: persisted footer switch (`localStorage`) revealing a monospace amber diagnostic overlay in the drawer with chunk ID, similarity, hybrid-retrieval latency, inference TTFT, total latency and edge POP from live `TelemetryInfo`
+- [x] iOS keyboard anchoring: shell follows `visualViewport` (height + `offsetTop` translation, pinch ignored), `sticky bottom-0` composer row, centralized `100dvh` shell contract with a `100vh` fallback, safe-area insets on every bottom surface
 - [x] Edge latency meter (Anycast PoP pill, hybrid retrieval latency, TTFT badge)
 - [x] Regulatory guardrail cards (ASIC RG 244 `RefusalCard`, COP `EmergencyBanner`, Section 949A `StatutoryGaw`)
-- [x] Markdown tabular sub-limits renderer & negative constraint silent PDS notices
+- [x] Markdown tabular sub-limits renderer (chat body) & negative constraint silent PDS notices
 - [x] Side-by-side policy comparison matrix (`PolicyComparisonView`)
 - [x] Client-side APP 3/11 PII redaction and `RateLimitBadge`
 - [x] Cloudflare Turnstile bot protection support
-- [x] Complete frontend unit and E2E integration test suite (154/154 tests passing)
+- [x] Complete frontend unit and E2E integration test suite (210/210 frontend tests passing; full `npm run verify` = 346/346 + 23 AFCA evals)
 
 ### Phase 7: Ground-Up Multi-Insurer Ingestion & Edge AST Compiler ([`.scratch/06-corpus-refinement-and-compilation/spec.md`](../.scratch/06-corpus-refinement-and-compilation/spec.md))
 

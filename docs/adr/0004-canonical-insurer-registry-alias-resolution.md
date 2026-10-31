@@ -19,7 +19,7 @@ The v1 system hard-coded five insurers (`NRMA`, `SUNCORP`, `ALLIANZ`, `QBE`, `YO
 4. **Derived consumers:**
    * `ChatRequestSchema.filters.insurer` (`src/types/chat.ts`) validates via `resolveInsurer() !== null`.
    * `BRAND_COMPARISON_ADVICE_REGEX` is built from the registry and used by `evaluateAdviceBoundary()`.
-   * `getGroupedInsurerOptions()` feeds the `InputBar` selector; `POLICY_COMPARISON_DIMENSIONS` / `resolvePolicyComparisonCell()` feed `PolicyComparisonView`.
+   * `getGroupedInsurerOptions()` feeds the `GlobalFilterDropdown` roster (composer chip filter via the `InsurerFilterMenu` composition and the two `field`-variant comparison pickers); `POLICY_COMPARISON_DIMENSIONS` / `resolvePolicyComparisonCell()` feed `PolicyComparisonView` (cells rendered through the `MarkdownText` sanitized pipeline).
    * `toInsurerSlug()` produces `insurer_code` values used in breadcrumbs and R2 keys (`src/ingest/corpus-codec.ts`).
 
 ## Consequences

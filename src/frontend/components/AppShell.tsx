@@ -26,6 +26,21 @@ export interface AppShellProps {
 const actionClass =
   "inline-flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-lg px-3 text-sm font-medium cursor-pointer text-slate-700 hover:bg-teal-50 hover:text-teal-800 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500";
 
+/**
+ * Sidebar primary action: a distinct bordered container with a faint surface
+ * so it reads as a button, not a static navigation list row.
+ */
+const primaryActionClass =
+  "inline-flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium cursor-pointer text-slate-900 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-600 dark:hover:bg-slate-700/70";
+
+/**
+ * Sidebar navigation row: neutral gray hover/active states keep the tabs
+ * quiet — the active view is marked by a subtle gray block with bolder
+ * primary-colored text rather than a tinted wedge.
+ */
+const navItemClass =
+  "inline-flex min-h-[44px] min-w-[44px] w-full items-center gap-2 rounded-lg px-3 text-sm font-medium cursor-pointer text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500";
+
 export function AppShell({
   rateLimit,
   isThrottled = false,
@@ -107,7 +122,9 @@ export function AppShell({
     const compact = !mobile && collapsed;
     return (
       <>
-        <div className="flex items-start gap-1 px-2 pt-4 pb-3">
+        {/* Drawer/mobile header: justified so the close control pins to the
+            right edge on every width; the close glyph is a solid 44x44 target. */}
+        <div className="flex items-start justify-between gap-2 px-2 pt-4 pb-3">
           <button
             type="button"
             data-testid={mobile ? undefined : "reset-chat-button"}
@@ -117,7 +134,9 @@ export function AppShell({
               onReset?.();
               if (mobile) closeDrawer();
             }}
-            className={`${actionClass} ${compact ? "justify-center px-0" : "flex-1 justify-start"}`}
+            className={`${primaryActionClass} ${
+              compact ? "justify-center px-0" : mobile ? "justify-start" : "flex-1 justify-start"
+            }`}
           >
             <Plus size={20} aria-hidden="true" />
             {!compact && "New Chat"}
@@ -126,8 +145,11 @@ export function AppShell({
             <button
               type="button"
               aria-label="Close navigation"
+              title="Close navigation"
               onClick={closeDrawer}
-              className={actionClass}
+              // Exact 44x44 target with the glyph centered, shrunk to nothing
+              // and separated from "New Chat" by the row's gap.
+              className={`${actionClass} h-11 w-11 shrink-0 justify-center px-0`}
             >
               <X size={20} />
             </button>
@@ -142,7 +164,7 @@ export function AppShell({
             aria-label="Chat"
             title="Chat"
             aria-current={!isComparisonMode ? "page" : undefined}
-            className={`${actionClass} w-full ${compact ? "justify-center px-0" : "justify-start"} ${!isComparisonMode ? "bg-teal-50 text-teal-800 dark:bg-teal-950" : ""}`}
+            className={`${navItemClass} ${compact ? "justify-center px-0" : "justify-start"} ${!isComparisonMode ? "bg-slate-100 font-semibold text-slate-900 dark:bg-slate-800 dark:text-white" : ""}`}
             onClick={() => {
               if (isComparisonMode) onToggleComparison?.();
               if (mobile) closeDrawer();
@@ -161,7 +183,7 @@ export function AppShell({
               title="Compare policies"
               aria-pressed={isComparisonMode}
               aria-current={isComparisonMode ? "page" : undefined}
-              className={`${actionClass} w-full ${compact ? "justify-center px-0" : "justify-start"} ${isComparisonMode ? "bg-teal-50 text-teal-800 dark:bg-teal-950" : ""}`}
+              className={`${navItemClass} ${compact ? "justify-center px-0" : "justify-start"} ${isComparisonMode ? "bg-slate-100 font-semibold text-slate-900 dark:bg-slate-800 dark:text-white" : ""}`}
               onClick={() => {
                 if (!isComparisonMode) onToggleComparison();
                 if (mobile) closeDrawer();
@@ -199,7 +221,7 @@ export function AppShell({
                 This conversation
               </p>
               {historyItems.length === 0 ? (
-                <p className="px-3 text-sm text-slate-500 dark:text-slate-400">
+                <p className="px-3 pb-2 text-sm text-slate-400 italic dark:text-slate-500">
                   Your questions will appear here.
                 </p>
               ) : (

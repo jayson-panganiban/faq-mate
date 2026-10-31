@@ -81,7 +81,7 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
 
     // Input bar ready
     expect(screen.getByTestId("chat-input-textarea")).toBeInTheDocument();
-    expect(screen.getByTestId("insurer-select")).toBeInTheDocument();
+    expect(screen.getByTestId("insurer-filter-trigger")).toBeInTheDocument();
     expect(screen.getByTestId("send-button")).toBeDisabled();
 
     // Persistent Section 949A GAW in footer
@@ -430,9 +430,11 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
 
     render(<App />);
 
-    const insurerSelect = screen.getByTestId("insurer-select");
-    fireEvent.change(insurerSelect, { target: { value: "NRMA" } });
-    expect(insurerSelect).toHaveValue("NRMA");
+    fireEvent.click(screen.getByTestId("insurer-filter-trigger"));
+    fireEvent.click(screen.getByRole("option", { name: "NRMA" }));
+    expect(screen.getByTestId("insurer-filter-trigger")).toHaveAccessibleDescription(
+      "Selected insurer: NRMA"
+    );
 
     const input = screen.getByTestId("chat-input-textarea");
     fireEvent.change(input, { target: { value: "Does NRMA cover rainwater run-off?" } });

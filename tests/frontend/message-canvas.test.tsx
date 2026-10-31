@@ -530,6 +530,76 @@ describe("AssistantMessage Component (Ticket 5)", () => {
     });
   });
 
+  describe("Loading Skeleton Alignment", () => {
+    it("renders the loading skeleton inside the assistant shell so the final layout lands without a shift", () => {
+      render(
+        <AssistantMessage
+          dataTestId="loading-indicator"
+          message=""
+          isLoading
+          loadingLabel="Retrieving policy documents"
+          chunks={mockChunks}
+          showGaw={false}
+          onSelectCitation={vi.fn()}
+        />
+      );
+
+      // The loading render is the final component's own shell
+      const shell = screen.getByTestId("loading-indicator");
+      expect(shell).toHaveAttribute("aria-label", "Assistant message");
+      expect(shell).toHaveAttribute("aria-busy", "true");
+
+      // Status microcopy rides the header action slot; no buttons while loading
+      expect(screen.getByTestId("assistant-loading-status").textContent).toContain(
+        "Retrieving policy documents"
+      );
+      expect(screen.queryByTestId("assistant-feedback-controls")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Copy answer" })).not.toBeInTheDocument();
+      expect(screen.queryByTestId("streaming-cursor")).not.toBeInTheDocument();
+
+      // Skeleton bars sit in the body typography container, after the sources
+      // shelf — the exact slot the streamed answer body occupies.
+      const skeleton = screen.getByTestId("assistant-loading-skeleton");
+      expect(skeleton.children).toHaveLength(3);
+      expect(skeleton.children[0].className).toContain("animate-pulse");
+      const shelf = screen.getByRole("region", { name: "Sources" });
+      expect(
+        shelf.compareDocumentPosition(skeleton) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    });
+
+    it("retires the skeleton in place and breaks into the final layout at the first token", () => {
+      const { rerender } = render(
+        <AssistantMessage
+          dataTestId="loading-indicator"
+          message=""
+          isLoading
+          loadingLabel="Preparing your answer..."
+          chunks={mockChunks}
+          showGaw={false}
+        />
+      );
+
+      rerender(
+        <AssistantMessage
+          message="Here is your response text."
+          isStreaming
+          chunks={mockChunks}
+          showGaw={false}
+        />
+      );
+
+      // Skeleton, status chip and its testid are gone; the streaming cursor
+      // and sources shelf stay in their established slots.
+      expect(screen.queryByTestId("loading-indicator")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("assistant-loading-skeleton")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("assistant-loading-status")).not.toBeInTheDocument();
+      expect(screen.getByTestId("streaming-cursor")).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Sources" })).toBeInTheDocument();
+      expect(screen.getByText("Here is your response text.")).toBeInTheDocument();
+    });
+  });
+
   describe("Statutory Section 949A GAW Invariant", () => {
     it("renders StatutoryGaw banner at the bottom of completed assistant response", () => {
       render(<AssistantMessage message="Flood cover is standard." isStreaming={false} />);

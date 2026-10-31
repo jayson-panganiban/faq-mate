@@ -1,4 +1,4 @@
-import { AlertCircle, Check, Copy, ThumbsDown, ThumbsUp } from "lucide-react";
+import { AlertCircle, Check, Copy, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
 import React, { useState } from "react";
 import {
   isGawDisclaimerText,
@@ -49,6 +49,20 @@ export interface AssistantMessageProps {
    * Whether to render the inline StatutoryGaw banner at the bottom of the card.
    */
   showGaw?: boolean;
+  /**
+   * True while the first token is awaited: renders the skeleton body and
+   * status microcopy inside this component's article shell so the streaming
+   * and final layouts land without any structural layout shift.
+   */
+  isLoading?: boolean;
+  /**
+   * Status microcopy shown in the header action slot while `isLoading`.
+   */
+  loadingLabel?: string;
+  /**
+   * Optional `data-testid` hook for the rendered article (test-only).
+   */
+  dataTestId?: string;
   /**
    * Optional custom styling classes.
    */
@@ -449,6 +463,9 @@ export function AssistantMessage({
   onSelectFollowUp,
   onFeedback,
   showGaw = true,
+  isLoading = false,
+  loadingLabel,
+  dataTestId,
   className = "",
 }: AssistantMessageProps) {
   const [copied, setCopied] = useState(false);
@@ -644,6 +661,8 @@ export function AssistantMessage({
     <article
       role="article"
       aria-label="Assistant message"
+      aria-busy={isLoading || undefined}
+      data-testid={dataTestId}
       className={`my-4 flex items-start gap-3 group max-w-full ${className}`}
     >
       <div className="flex-1 min-w-0">
@@ -651,69 +670,90 @@ export function AssistantMessage({
           <span className="font-medium text-slate-700 dark:text-slate-300">FAQ-Mate</span>
 
           <div className="flex items-center gap-1.5">
-            {/* Feedback Affordance Controls (Spec 05 G6 & ui-craft ai-chat pattern) */}
-            {!isStreaming && message.trim().length > 0 && (
-              <div className="flex items-center gap-0.5" data-testid="assistant-feedback-controls">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = feedback === "positive" ? null : "positive";
-                    setFeedback(next);
-                    if (next) onFeedback?.("positive");
-                  }}
-                  aria-label="Helpful response"
-                  title="Mark response as helpful"
-                  className={`p-1 rounded-md text-xs transition-[color,background-color] duration-150 cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-hidden ${
-                    feedback === "positive"
-                      ? "text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 font-semibold"
-                      : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-                  }`}
-                >
-                  <ThumbsUp className="w-3.5 h-3.5" aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = feedback === "negative" ? null : "negative";
-                    setFeedback(next);
-                    if (next) onFeedback?.("negative");
-                  }}
-                  aria-label="Unhelpful response"
-                  title="Mark response as unhelpful"
-                  className={`p-1 rounded-md text-xs transition-[color,background-color] duration-150 cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-hidden ${
-                    feedback === "negative"
-                      ? "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 font-semibold"
-                      : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-                  }`}
-                >
-                  <ThumbsDown className="w-3.5 h-3.5" aria-hidden="true" />
-                </button>
-              </div>
-            )}
+            {/* Loading status rides the action slot so the header never reflows */}
+            {isLoading ? (
+              <span
+                data-testid="assistant-loading-status"
+                role="status"
+                aria-label={loadingLabel}
+                className="inline-flex items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400"
+              >
+                <Sparkles
+                  className="w-3.5 h-3.5 text-sky-500 motion-safe:animate-pulse"
+                  aria-hidden="true"
+                />
+                <span>{loadingLabel}</span>
+              </span>
+            ) : (
+              <>
+                {/* Feedback Affordance Controls (Spec 05 G6 & ui-craft ai-chat pattern) */}
+                {!isStreaming && message.trim().length > 0 && (
+                  <div
+                    className="flex items-center gap-0.5"
+                    data-testid="assistant-feedback-controls"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = feedback === "positive" ? null : "positive";
+                        setFeedback(next);
+                        if (next) onFeedback?.("positive");
+                      }}
+                      aria-label="Helpful response"
+                      title="Mark response as helpful"
+                      className={`p-1 rounded-md text-xs transition-[color,background-color] duration-150 cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-hidden ${
+                        feedback === "positive"
+                          ? "text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 font-semibold"
+                          : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      <ThumbsUp className="w-3.5 h-3.5" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = feedback === "negative" ? null : "negative";
+                        setFeedback(next);
+                        if (next) onFeedback?.("negative");
+                      }}
+                      aria-label="Unhelpful response"
+                      title="Mark response as unhelpful"
+                      className={`p-1 rounded-md text-xs transition-[color,background-color] duration-150 cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-hidden ${
+                        feedback === "negative"
+                          ? "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 font-semibold"
+                          : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      <ThumbsDown className="w-3.5 h-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
 
-            <button
-              type="button"
-              onClick={handleCopy}
-              aria-label="Copy answer"
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-[color,background-color] duration-150 cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-hidden"
-            >
-              {copied ? (
-                <>
-                  <Check
-                    className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"
-                    aria-hidden="true"
-                  />
-                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                    Copied!
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>Copy</span>
-                </>
-              )}
-            </button>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  aria-label="Copy answer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-[color,background-color] duration-150 cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-hidden"
+                >
+                  {copied ? (
+                    <>
+                      <Check
+                        className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"
+                        aria-hidden="true"
+                      />
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                        Copied!
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -722,146 +762,161 @@ export function AssistantMessage({
           <SourceCardGrid chunks={chunks} onSelectCitation={onSelectCitation} />
         )}
 
-        {/* Structured Rendered Blocks */}
+        {/* Structured Rendered Blocks — while loading, the same typography
+            container holds placeholder bars so the first token lands in place */}
         <div className="space-y-3 text-slate-800 dark:text-slate-200 leading-relaxed text-sm sm:text-base">
-          {blocks.map((block, bIdx) => {
-            if (block.type === "header") {
-              const Tag = `h${Math.min(block.level, 6)}` as "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
-              const classes: Record<number, string> = {
-                1: "text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 mt-4 mb-2",
-                2: "text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 mt-3 mb-2",
-                3: "text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100 mt-3 mb-1.5",
-                4: "text-sm sm:text-base font-semibold text-slate-800 dark:text-slate-200 mt-2 mb-1",
-                5: "text-sm font-semibold text-slate-800 dark:text-slate-200 mt-2 mb-1",
-                6: "text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mt-2 mb-1",
-              };
-              return (
-                <Tag key={bIdx} className={classes[block.level] ?? classes[3]}>
-                  {renderInlineText(block.text, chunks, onSelectCitation)}
-                </Tag>
-              );
-            }
+          {isLoading ? (
+            <div data-testid="assistant-loading-skeleton" className="space-y-2.5">
+              <div className="h-4 w-3/4 rounded-full bg-slate-200 motion-safe:animate-pulse dark:bg-slate-800" />
+              <div className="h-4 w-[55%] rounded-full bg-slate-200 motion-safe:animate-pulse dark:bg-slate-800" />
+              <div className="h-4 w-2/5 rounded-full bg-slate-200 motion-safe:animate-pulse dark:bg-slate-800" />
+            </div>
+          ) : (
+            blocks.map((block, bIdx) => {
+              if (block.type === "header") {
+                const Tag = `h${Math.min(block.level, 6)}` as
+                  | "h1"
+                  | "h2"
+                  | "h3"
+                  | "h4"
+                  | "h5"
+                  | "h6";
+                const classes: Record<number, string> = {
+                  1: "text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 mt-4 mb-2",
+                  2: "text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 mt-3 mb-2",
+                  3: "text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100 mt-3 mb-1.5",
+                  4: "text-sm sm:text-base font-semibold text-slate-800 dark:text-slate-200 mt-2 mb-1",
+                  5: "text-sm font-semibold text-slate-800 dark:text-slate-200 mt-2 mb-1",
+                  6: "text-xs font-semibold uppercase text-slate-700 dark:text-slate-300 mt-2 mb-1",
+                };
+                return (
+                  <Tag key={bIdx} className={classes[block.level] ?? classes[3]}>
+                    {renderInlineText(block.text, chunks, onSelectCitation)}
+                  </Tag>
+                );
+              }
 
-            if (block.type === "table") {
-              return (
-                <div key={bIdx} data-testid="table-container" className="my-4 overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
-                    <thead>
-                      <tr>
-                        {block.headers.map((h, i) => (
-                          <th
-                            key={i}
-                            scope="col"
-                            className={`px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 tracking-wider uppercase ${
-                              block.alignments[i] === "center"
-                                ? "text-center"
-                                : block.alignments[i] === "right"
-                                  ? "text-right"
-                                  : "text-left"
-                            }`}
-                          >
-                            {renderInlineText(h, chunks, onSelectCitation)}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800 tabular-nums">
-                      {block.rows.map((row, rIdx) => (
-                        <tr key={rIdx}>
-                          {row.map((cell, cIdx) => (
-                            <td
-                              key={cIdx}
-                              className={`px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 ${
-                                block.alignments[cIdx] === "center"
+              if (block.type === "table") {
+                return (
+                  <div key={bIdx} data-testid="table-container" className="my-4 overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+                      <thead>
+                        <tr>
+                          {block.headers.map((h, i) => (
+                            <th
+                              key={i}
+                              scope="col"
+                              className={`px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 tracking-wider uppercase ${
+                                block.alignments[i] === "center"
                                   ? "text-center"
-                                  : block.alignments[cIdx] === "right"
+                                  : block.alignments[i] === "right"
                                     ? "text-right"
                                     : "text-left"
                               }`}
                             >
-                              {renderInlineText(cell, chunks, onSelectCitation)}
-                            </td>
+                              {renderInlineText(h, chunks, onSelectCitation)}
+                            </th>
                           ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            }
-
-            if (block.type === "code") {
-              return <CodeBlock key={bIdx} code={block.code} language={block.language} />;
-            }
-
-            if (block.type === "ul") {
-              return (
-                <ul
-                  key={bIdx}
-                  className="my-2.5 ml-4 sm:ml-5 space-y-1 list-disc text-slate-700 dark:text-slate-300 text-sm sm:text-base"
-                >
-                  {block.items.map((item, idx) => (
-                    <li key={idx} className="leading-relaxed">
-                      {renderInlineText(item, chunks, onSelectCitation)}
-                    </li>
-                  ))}
-                </ul>
-              );
-            }
-
-            if (block.type === "ol") {
-              return (
-                <ol
-                  key={bIdx}
-                  start={block.start}
-                  className="my-2.5 ml-4 sm:ml-5 space-y-1.5 list-decimal text-slate-700 dark:text-slate-300 text-sm sm:text-base"
-                >
-                  {block.items.map((item, idx) => (
-                    <li key={idx} value={block.start + idx} className="leading-relaxed">
-                      {renderInlineText(item, chunks, onSelectCitation)}
-                    </li>
-                  ))}
-                </ol>
-              );
-            }
-
-            if (block.type === "silent-notice") {
-              return (
-                <div
-                  key={bIdx}
-                  role="alert"
-                  aria-label="Silent PDS Notice"
-                  data-testid="silent-pds-notice"
-                  className="my-3 rounded-lg border border-amber-200 dark:border-amber-800/70 bg-amber-50/90 dark:bg-amber-950/40 p-4 text-amber-950 dark:text-amber-200 shadow-xs"
-                >
-                  <div className="flex items-start gap-3">
-                    <AlertCircle
-                      className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5"
-                      aria-hidden="true"
-                    />
-                    <div className="space-y-1.5 flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-200/80 dark:bg-amber-900/80 text-amber-900 dark:text-amber-100">
-                          Silent PDS Notice
-                        </span>
-                      </div>
-                      <div className="space-y-2 text-sm font-medium leading-relaxed">
-                        {block.text.split("\n\n").map((para, pIdx) => (
-                          <p key={pIdx}>{renderInlineText(para, chunks, onSelectCitation)}</p>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800 tabular-nums">
+                        {block.rows.map((row, rIdx) => (
+                          <tr key={rIdx}>
+                            {row.map((cell, cIdx) => (
+                              <td
+                                key={cIdx}
+                                className={`px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 ${
+                                  block.alignments[cIdx] === "center"
+                                    ? "text-center"
+                                    : block.alignments[cIdx] === "right"
+                                      ? "text-right"
+                                      : "text-left"
+                                }`}
+                              >
+                                {renderInlineText(cell, chunks, onSelectCitation)}
+                              </td>
+                            ))}
+                          </tr>
                         ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              }
+
+              if (block.type === "code") {
+                return <CodeBlock key={bIdx} code={block.code} language={block.language} />;
+              }
+
+              if (block.type === "ul") {
+                return (
+                  <ul
+                    key={bIdx}
+                    className="my-2.5 ml-4 sm:ml-5 space-y-1 list-disc text-slate-700 dark:text-slate-300 text-sm sm:text-base"
+                  >
+                    {block.items.map((item, idx) => (
+                      <li key={idx} className="leading-relaxed">
+                        {renderInlineText(item, chunks, onSelectCitation)}
+                      </li>
+                    ))}
+                  </ul>
+                );
+              }
+
+              if (block.type === "ol") {
+                return (
+                  <ol
+                    key={bIdx}
+                    start={block.start}
+                    className="my-2.5 ml-4 sm:ml-5 space-y-1.5 list-decimal text-slate-700 dark:text-slate-300 text-sm sm:text-base"
+                  >
+                    {block.items.map((item, idx) => (
+                      <li key={idx} value={block.start + idx} className="leading-relaxed">
+                        {renderInlineText(item, chunks, onSelectCitation)}
+                      </li>
+                    ))}
+                  </ol>
+                );
+              }
+
+              if (block.type === "silent-notice") {
+                return (
+                  <div
+                    key={bIdx}
+                    role="alert"
+                    aria-label="Silent PDS Notice"
+                    data-testid="silent-pds-notice"
+                    className="my-3 rounded-lg border border-amber-200 dark:border-amber-800/70 bg-amber-50/90 dark:bg-amber-950/40 p-4 text-amber-950 dark:text-amber-200 shadow-xs"
+                  >
+                    <div className="flex items-start gap-3">
+                      <AlertCircle
+                        className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5"
+                        aria-hidden="true"
+                      />
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-200/80 dark:bg-amber-900/80 text-amber-900 dark:text-amber-100">
+                            Silent PDS Notice
+                          </span>
+                        </div>
+                        <div className="space-y-2 text-sm font-medium leading-relaxed">
+                          {block.text.split("\n\n").map((para, pIdx) => (
+                            <p key={pIdx}>{renderInlineText(para, chunks, onSelectCitation)}</p>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            }
+                );
+              }
 
-            return (
-              <p key={bIdx} className="leading-relaxed whitespace-pre-wrap break-words">
-                {renderInlineText(block.text, chunks, onSelectCitation)}
-              </p>
-            );
-          })}
+              return (
+                <p key={bIdx} className="leading-relaxed whitespace-pre-wrap break-words">
+                  {renderInlineText(block.text, chunks, onSelectCitation)}
+                </p>
+              );
+            })
+          )}
 
           {/* Streaming Cursor */}
           {isStreaming && (

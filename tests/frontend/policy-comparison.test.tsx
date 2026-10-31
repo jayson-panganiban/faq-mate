@@ -36,8 +36,13 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
 
     expect(screen.getByTestId("policy-comparison-view")).toBeInTheDocument();
     expect(screen.getByText("Compare Policies")).toBeInTheDocument();
-    expect(screen.getByTestId("insurer-a-select")).toBeInTheDocument();
-    expect(screen.getByTestId("insurer-b-select")).toBeInTheDocument();
+
+    // Legacy native selects are purged: every dropdown in the app composes
+    // GlobalFilterDropdown, so the OS "heavy blue selection" list is gone.
+    expect(document.querySelector("select")).toBeNull();
+    expect(document.querySelector("option")).toBeNull();
+    expect(screen.getByTestId("insurer-a-trigger")).toBeInTheDocument();
+    expect(screen.getByTestId("insurer-b-trigger")).toBeInTheDocument();
   });
 
   it("renders stacked coverage comparisons", () => {
@@ -52,17 +57,36 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
   it("updates insurer labels and terms in each comparison when the selection changes", () => {
     render(<PolicyComparisonView />);
 
-    const selectB = screen.getByTestId("insurer-b-select");
-    fireEvent.change(selectB, { target: { value: "ALLIANZ" } });
+    const openMenu = (triggerId: string) => {
+      fireEvent.click(screen.getByTestId(triggerId));
+      return screen.getByRole("dialog");
+    };
+
+    const menuB = openMenu("insurer-b-trigger");
+    // The approved shared internal UI is present on the comparison picker too.
+    expect(menuB.querySelector("[data-testid='insurer-b-search']")).not.toBeNull();
+    fireEvent.click(screen.getByRole("option", { name: "Allianz" }));
     expect(
       within(screen.getByRole("region", { name: "Flood Definition" })).getByText("Allianz")
     ).toBeInTheDocument();
 
-    fireEvent.change(selectB, { target: { value: "AAMI" } });
+    openMenu("insurer-b-trigger");
+    fireEvent.click(screen.getByRole("option", { name: "AAMI" }));
     expect(
       within(screen.getByRole("region", { name: "Flood Definition" })).getByText("AAMI")
     ).toBeInTheDocument();
     expect(screen.getAllByText(/AAI Limited/i).length).toBeGreaterThan(0);
+  });
+
+  it("disables the counterpart insurer so the two pickers cannot collide", () => {
+    render(<PolicyComparisonView />);
+
+    fireEvent.click(screen.getByTestId("insurer-a-trigger"));
+    const counterpart = screen.getByRole("option", { name: "NRMA" });
+    expect(counterpart).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(counterpart);
+    // The disabled row never commits; the menu stays open and the pairing is intact.
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it("renders retrieved session disclosures when matching chunks are provided", () => {

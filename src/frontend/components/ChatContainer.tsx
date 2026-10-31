@@ -1,10 +1,9 @@
-import { ArrowDown, ArrowUpRight, Bot, Search, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUpRight, Search } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChatMessage, GroundedChunk, StreamState } from "../types/chat-ui";
 import { AssistantMessage } from "./AssistantMessage";
 import { EmergencyBanner } from "./EmergencyBanner";
 import { RefusalCard } from "./RefusalCard";
-import { SourceCardGrid } from "./SourceCardGrid";
 import { UserMessage } from "./UserMessage";
 
 export interface StarterPrompt {
@@ -75,9 +74,10 @@ function formatTime(timestamp?: number): string | undefined {
 /**
  * ChatContainer Component (Spec 05 Section 3)
  *
- * Manages the message feed, auto-scrolling, stream anchoring, loading skeletons,
- * empty state starter prompt cards, and connects UserMessage, AssistantMessage,
- * RefusalCard, and EmergencyBanner.
+ * Manages the message feed, auto-scrolling, stream anchoring, empty state
+ * starter prompt cards, and connects UserMessage, AssistantMessage (which
+ * renders the loading skeleton inside its own shell), RefusalCard, and
+ * EmergencyBanner.
  */
 export function ChatContainer({
   messages,
@@ -273,49 +273,32 @@ export function ChatContainer({
               (status === "CONNECTING" || status === "METADATA_RECEIVED") &&
               !msg.content;
 
-            // Loading indicator / skeleton when waiting for first token
-            if (isConnecting) {
-              return (
-                <div
-                  key={msg.id}
-                  data-testid="loading-indicator"
-                  role="status"
-                  aria-label="Retrieving policy documents"
-                  className="flex items-start gap-3 my-4 group animate-fade-in"
-                >
-                  <div
-                    className="w-8 h-8 rounded-full bg-sky-100 dark:bg-sky-900/60 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 mt-1 shadow-xs ring-2 ring-white dark:ring-slate-900"
-                    aria-hidden="true"
-                  >
-                    <Bot className="w-4 h-4 motion-safe:animate-spin" />
-                  </div>
-                  <div className="flex-1 max-w-[85%] sm:max-w-[80%] rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 shadow-xs space-y-3">
-                    <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                      <Sparkles className="w-3.5 h-3.5 text-sky-500 motion-safe:animate-pulse" />
-                      <span>
-                        {status === "METADATA_RECEIVED"
-                          ? "Preparing your answer..."
-                          : "Looking for relevant policy wording..."}
-                      </span>
-                    </div>
-                    {status === "METADATA_RECEIVED" && citations.length > 0 && (
-                      <div className="pt-1">
-                        <SourceCardGrid chunks={citations} onSelectCitation={onSelectCitation} />
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      <div className="h-3.5 bg-slate-200 dark:bg-slate-800 rounded-full w-3/4 motion-safe:animate-pulse" />
-                      <div className="h-3.5 bg-slate-200 dark:bg-slate-800 rounded-full w-1/2 motion-safe:animate-pulse" />
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
             // Associate grounded chunks: from message metadata or active stream citations
             const chunks = msg.metadata?.retrievedChunks || (isLastMessage ? citations : undefined);
 
             const isStreaming = isLastMessage && status === "STREAMING";
+
+            // Loading state: the skeleton renders inside the AssistantMessage
+            // shell itself (same header row, sources-shelf slot and body
+            // typography), so the streamed/final layout lands with no shift.
+            if (isConnecting) {
+              return (
+                <AssistantMessage
+                  key={msg.id}
+                  dataTestId="loading-indicator"
+                  message=""
+                  isLoading
+                  loadingLabel={
+                    status === "METADATA_RECEIVED"
+                      ? "Preparing your answer..."
+                      : "Looking for relevant policy wording..."
+                  }
+                  chunks={chunks}
+                  onSelectCitation={onSelectCitation}
+                  showGaw={false}
+                />
+              );
+            }
 
             return (
               <AssistantMessage

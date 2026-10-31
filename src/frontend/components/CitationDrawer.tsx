@@ -9,9 +9,10 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import type { GroundedChunk } from "../../types/chat";
 import { formatProductDoc } from "../utils/citations";
+import { MarkdownText } from "./MarkdownText";
 
 export interface CitationDrawerProps {
   /**
@@ -315,7 +316,9 @@ export function CitationDrawer({
                   )}
                 </div>
 
-                {/* Operative Markdown/Text Excerpt Viewer */}
+                {/* Operative Excerpt Viewer — displayed through the standard
+                    Markdown parser + sanitizer (backend tags stripped, clean
+                    anchors); Copy keeps the verbatim original chunk. */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
@@ -349,9 +352,12 @@ export function CitationDrawer({
                     </button>
                   </div>
 
-                  <pre className="p-4 rounded-lg bg-slate-900 text-slate-100 font-mono text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words select-text overflow-y-auto max-h-[46vh] border border-slate-800 shadow-inner">
-                    {currentChunk.content}
-                  </pre>
+                  <div className="overflow-y-auto max-h-[46vh]">
+                    <MarkdownText
+                      markdown={currentChunk.content}
+                      label="Operative policy excerpt"
+                    />
+                  </div>
                 </div>
 
                 {/* Statutory Grounding Guarantee Card */}

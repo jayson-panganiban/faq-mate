@@ -36,20 +36,38 @@ textarea,
   font-variant-numeric: tabular-nums;
 }
 
-/* Clean subtle scrollbar styling */
+/* macOS-style overlay scrollbar for the main chat feed: a floating pill
+   thumb over a fully transparent track. Never display: none on this surface —
+   Chromium renders the styled pseudo-element scrollbar as an overlay bar, so
+   the track never eats layout space and the thumb stays grabbable. */
 [data-testid="chat-scroll-container"] {
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.2) transparent;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
 }
 [data-testid="chat-scroll-container"]::-webkit-scrollbar {
-  width: 5px;
-}
-[data-testid="chat-scroll-container"]::-webkit-scrollbar-thumb {
-  background-color: rgba(148, 163, 184, 0.25);
-  border-radius: 9999px;
+  width: 6px;
+  height: 6px;
 }
 [data-testid="chat-scroll-container"]::-webkit-scrollbar-track {
   background: transparent;
+}
+[data-testid="chat-scroll-container"]::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 9999px;
+}
+[data-testid="chat-scroll-container"]::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(100, 116, 139, 0.65);
+}
+@media (prefers-color-scheme: dark) {
+  [data-testid="chat-scroll-container"] {
+    scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+  }
+  [data-testid="chat-scroll-container"]::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.4);
+  }
+  [data-testid="chat-scroll-container"]::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(203, 213, 225, 0.6);
+  }
 }
 
 /* Reduced motion preference honoring (ui-craft finish-bar Pass 7) */
@@ -80,6 +98,17 @@ textarea,
   background: rgba(100, 116, 139, 0.6);
 }
 
+/* Only the mobile filter bottom sheet hides its scrollbar entirely (it rides
+   the viewport edge like a native sheet). Every other surface — including the
+   main chat feed above — keeps the styled overlay pill scrollbar. */
+[data-testid="insurer-filter-scroll"] {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+[data-testid="insurer-filter-scroll"]::-webkit-scrollbar {
+  display: none;
+}
+
 /* Keep secondary chat controls as easy to tap as the composer and navigation. */
 @media (max-width: 1023px) {
   .chat-app button {
@@ -100,4 +129,144 @@ button.citation-inline,
   font-size: 11px;
   line-height: 1;
   vertical-align: super;
+}
+
+/* Standard-parsed derived markdown (MarkdownText): headers, tables, anchors.
+   Scoped so the chat's citation-aware renderer keeps its own presentation. */
+.markdown-text {
+  color: #334155;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  word-break: break-word;
+}
+.markdown-text > :first-child {
+  margin-top: 0;
+}
+.markdown-text > :last-child {
+  margin-bottom: 0;
+}
+.markdown-text :is(h1, h2, h3, h4, h5, h6) {
+  color: #0f172a;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.markdown-text :is(h1, h2) {
+  font-size: 1rem;
+  margin: 1rem 0 0.375rem;
+}
+.markdown-text :is(h3, h4) {
+  font-size: 0.9375rem;
+  margin: 0.875rem 0 0.375rem;
+}
+.markdown-text :is(h5, h6) {
+  font-size: 0.875rem;
+  margin: 0.75rem 0 0.375rem;
+}
+.markdown-text p {
+  margin: 0.375rem 0;
+}
+.markdown-text ul {
+  margin: 0.375rem 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+.markdown-text ol {
+  margin: 0.375rem 0;
+  padding-left: 1.25rem;
+  list-style: decimal;
+}
+.markdown-text li {
+  margin: 0.125rem 0;
+}
+.markdown-text strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+.markdown-text a {
+  color: #0d9488;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+.markdown-text a:visited {
+  color: #0f766e;
+}
+.markdown-text code {
+  background: #f1f5f9;
+  padding: 0 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+.markdown-text pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  font-size: 0.8125rem;
+}
+.markdown-text pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.markdown-text blockquote {
+  margin: 0.375rem 0;
+  padding: 0.25rem 0 0.25rem 0.75rem;
+  border-left: 2px solid #cbd5e1;
+  color: #64748b;
+}
+.markdown-text table {
+  margin: 0.75rem 0;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+.markdown-text :is(th, td) {
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+.markdown-text th {
+  color: #0f172a;
+  font-weight: 600;
+}
+.markdown-text hr {
+  border-style: solid;
+  border-width: 1px 0 0;
+  border-color: #e2e8f0;
+  margin: 0.75rem 0;
+}
+@media (prefers-color-scheme: dark) {
+  .markdown-text {
+    color: #cbd5e1;
+  }
+  .markdown-text :is(h1, h2, h3, h4, h5, h6, strong, th) {
+    color: #f1f5f9;
+  }
+  .markdown-text a {
+    color: #2dd4bf;
+  }
+  .markdown-text a:visited {
+    color: #45d0c6;
+  }
+  .markdown-text blockquote {
+    border-color: #334155;
+    color: #94a3b8;
+  }
+  .markdown-text code {
+    background: #1e293b;
+  }
+  .markdown-text pre {
+    background: #020617;
+    color: #e2e8f0;
+  }
+  .markdown-text :is(th, td) {
+    border-color: #1e293b;
+  }
+  .markdown-text hr {
+    border-color: #1e293b;
+  }
 }

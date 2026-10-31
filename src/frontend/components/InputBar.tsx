@@ -1,6 +1,6 @@
-import { ArrowUp, Loader2, SlidersHorizontal } from "lucide-react";
+import { ArrowUp, Loader2 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
-import { getGroupedInsurerOptions } from "../../constants/insurers";
+import { InsurerFilterMenu } from "./InsurerFilterMenu";
 
 export interface InputBarProps {
   onSend: (query: string, options?: { insurer?: string; turnstileToken?: string }) => void;
@@ -12,13 +12,13 @@ export interface InputBarProps {
   className?: string;
 }
 
-const GROUPED_INSURER_OPTIONS = getGroupedInsurerOptions();
-
 /**
- * Chat Input Bar with Swiss-Style Minimalist Editorial Aesthetic (Perplexity Docked Card).
- * Features a generous, comfortable query canvas, bottom utility strip with
- * compact insurer selector pill chip, mode selector, Turnstile PDS verification,
- * desktop keyboard hint, and deep teal/slate accent submit action.
+ * Chat Input Bar — Structured Two-Row Composer.
+ * A rectangular 12px-radius card with a crisp 1px border (no pill rounding):
+ * the query textarea owns the full-width top row, and a dedicated toolbar row
+ * beneath it hosts the insurer filter (anchored command palette on desktop,
+ * native bottom sheet on mobile) plus the deep teal/slate submit action.
+ * Turnstile PDS verification mounts outside the card.
  */
 export function InputBar({
   onSend,
@@ -152,57 +152,12 @@ export function InputBar({
     }
   };
 
-  const selectedLabel =
-    GROUPED_INSURER_OPTIONS.flatMap((group) => group.options).find(
-      (option) => option.value === selectedInsurer
-    )?.label ?? "All Insurers (39)";
-
   return (
     <div className={`w-full ${className}`}>
       <div
         data-testid="composer-field"
-        className="relative rounded-[28px] border-2 border-slate-200 bg-white shadow-sm focus-within:border-teal-600 dark:border-slate-800 dark:bg-slate-900"
+        className="relative rounded-xl border border-slate-200 bg-white shadow-sm focus-within:border-teal-600 dark:border-slate-800 dark:bg-slate-900"
       >
-        <div
-          className="absolute bottom-1 left-1 flex h-11 w-11 items-center justify-center"
-          title={selectedLabel}
-        >
-          <SlidersHorizontal
-            className={`h-5 w-5 ${selectedInsurer ? "text-teal-700 dark:text-teal-400" : "text-slate-500"}`}
-            aria-hidden="true"
-          />
-          {selectedInsurer && (
-            <span
-              className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-teal-600"
-              aria-hidden="true"
-            />
-          )}
-          <select
-            id="insurer-select"
-            data-testid="insurer-select"
-            aria-label="Filter by insurer"
-            aria-describedby="selected-insurer"
-            title={selectedLabel}
-            value={selectedInsurer}
-            onChange={(e) => setSelectedInsurer(e.target.value)}
-            disabled={isBlocked}
-            className="absolute inset-0 h-11 w-11 cursor-pointer opacity-0 focus:outline-none disabled:cursor-not-allowed"
-          >
-            <option value="">All Insurers (39)</option>
-            {GROUPED_INSURER_OPTIONS.map((group) => (
-              <optgroup key={group.category} label={group.label}>
-                {group.options.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-          <span id="selected-insurer" className="sr-only">
-            Selected insurer: {selectedLabel}
-          </span>
-        </div>
         <textarea
           ref={textareaRef}
           data-testid="chat-input-textarea"
@@ -214,22 +169,30 @@ export function InputBar({
           aria-label="Insurance policy question"
           aria-describedby="composer-hint"
           rows={1}
-          className="block min-h-[56px] max-h-[min(200px,25dvh)] w-full resize-none bg-transparent py-3 pl-14 pr-14 text-base leading-7 text-slate-900 placeholder:text-slate-500 focus:outline-none disabled:opacity-50 dark:text-slate-100 dark:placeholder:text-slate-400"
+          className="block min-h-[56px] max-h-[min(200px,25dvh)] w-full resize-none bg-transparent px-4 pt-3 pb-2 text-base leading-7 text-slate-900 placeholder:text-slate-500 focus:outline-none disabled:opacity-50 dark:text-slate-100 dark:placeholder:text-slate-400"
         />
-        <button
-          type="button"
-          data-testid="send-button"
-          onClick={handleSend}
-          disabled={isSendDisabled}
-          aria-label="Send message"
-          className={`absolute right-1 bottom-1 flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${isSendDisabled ? "text-slate-400 cursor-not-allowed dark:text-slate-600" : "text-teal-700 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-slate-800"}`}
-        >
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
-          ) : (
-            <ArrowUp className="h-5 w-5 stroke-[2.5]" aria-hidden="true" />
-          )}
-        </button>
+        <div className="flex items-center justify-between px-2 pb-2">
+          <InsurerFilterMenu
+            value={selectedInsurer}
+            onSelect={setSelectedInsurer}
+            disabled={isBlocked}
+            anchorTo="container"
+          />
+          <button
+            type="button"
+            data-testid="send-button"
+            onClick={handleSend}
+            disabled={isSendDisabled}
+            aria-label="Send message"
+            className={`flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${isSendDisabled ? "text-slate-400 cursor-not-allowed dark:text-slate-600" : "text-teal-700 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-slate-800"}`}
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
+            ) : (
+              <ArrowUp className="h-5 w-5 stroke-[2.5]" aria-hidden="true" />
+            )}
+          </button>
+        </div>
       </div>
       <p id="composer-hint" className="sr-only">
         Enter to send. Shift+Enter for a new line.

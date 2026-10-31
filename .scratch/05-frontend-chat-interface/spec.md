@@ -36,15 +36,18 @@ src/frontend/
 │   └── chat-ui.ts              # UI models, StreamState, and Telemetry contracts
 ├── utils/
 │   ├── citations.ts            # Citation parsing & chunk matching heuristics
+│   ├── markdown.ts             # Derived-markdown pipeline: backend-tag stripping + raw-URL anchoring
 │   └── client-pii-scrubber.ts  # Browser pre-ingress APP 3/11 PII redaction
 └── components/
     ├── AppShell.tsx            # Navigation bar, telemetry meters, comparison toggle & GAW footer
+    ├── GlobalFilterDropdown.tsx# THE reusable responsive dropdown: palette/sheet menu + locked internal UI
     ├── ChatContainer.tsx       # Message list, auto-scrolling, stream anchoring & starter prompts
     ├── UserMessage.tsx         # User query bubble with insurer filter pill
     ├── AssistantMessage.tsx    # Streaming Markdown canvas, tabular sub-limits, inline citations
     ├── InputBar.tsx            # Query textarea, 39-insurer selector, Turnstile container
+    ├── MarkdownText.tsx        # Standard parsed + sanitized markdown for derived corpus text
     ├── CitationPill.tsx        # Clickable inline badge [Source: Insurer Product (Section)]
-    ├── CitationDrawer.tsx      # Slide-over sheet with breadcrumbs, underwriter & raw Markdown
+    ├── CitationDrawer.tsx      # Slide-over sheet with breadcrumbs, underwriter & parsed excerpt (verbatim copy)
     ├── PolicyComparisonView.tsx# Side-by-side comparison matrix across 39 insurers
     ├── RefusalCard.tsx         # ASIC RG 244 safe-harbor refusal explanation card
     ├── EmergencyBanner.tsx     # High-contrast red COP emergency banner with one-touch dial
@@ -89,9 +92,12 @@ stateDiagram-v2
 
 ### 4.1 Chat Layout and 39-Insurer Grouped Dropdown (`InputBar.tsx`)
 * The viewport uses a fixed-height flex column: a non-shrinking header and footer surround a `min-h-0` main region, with an independently scrolling conversation and non-shrinking bottom composer.
-* Consumer copy omits infrastructure telemetry and model labels. The grouped insurer selector is an icon control inside the floating composer; its current selection is named for assistive technology and available as a title.
+* Consumer copy omits infrastructure telemetry and model labels. The composer is a rectangular card (12px radius, crisp 1px border) with a two-row layout: the query textarea spans the full-width top row and a dedicated toolbar row beneath it hosts the insurer filter and send control; the filter reads either "All Insurers" or the selected insurer beside its icon, and the current selection is also named for assistive technology and available as a title.
 * Empty conversations start at the top of the mobile chat region so the heading and starter questions appear immediately; starter questions wrap without truncation. The composer is followed by centered inline legal and privacy controls.
-* Uses `getGroupedInsurerOptions()` ([`src/constants/insurers.ts`](../../src/constants/insurers.ts)) to render categorized `<optgroup>` options:
+* Uses `getGroupedInsurerOptions()` ([`src/constants/insurers.ts`](../../src/constants/insurers.ts)) to render the categorized option roster through the single reusable `GlobalFilterDropdown` control that owns the approved dropdown design — every dropdown in the app composes it (the composer filter is the `InsurerFilterMenu` domain composition; the comparison screen's two "Primary insurer" / "Comparison insurer" pickers are `field`-variant instances), and no native `<select>`/`<option>` or per-screen dropdown CSS is permitted. Both views swap the control's wrapper at the `lg` (1024px) breakpoint:
+  * **Above 1024px:** a floating command palette anchored flush to the composer card's bottom-left (its straight edges align with the card, no float gap), 12px radius (`rounded-xl`), drop shadow, and a constrained 320px width.
+  * **Below 1024px:** a native bottom sheet anchored to the viewport bottom with a muted horizontal drag handle (drag-down dismisses past the threshold), 44px full-width touch targets, and a dimmed backdrop.
+  * **Shared internal UI (locked in `GlobalFilterDropdown`, never copied per screen):** sticky search bar separated by a 1px hairline border, muted small-caps category headers, flat hairline checklist rows, and the active selection rendered as a checkmark on a light gray block. Escape, backdrop/outside dismissal, and Tab focus trapping behave identically in both wrappers.
   * **All Insurers (General Corpus)**
   * **Suncorp Group (6):** Suncorp, AAMI, GIO, APIA, Shannons, Bingle
   * **Major Insurers (4):** Allianz, QBE, Vero, NRMA
@@ -113,7 +119,7 @@ stateDiagram-v2
   * Insurer brand & statutory underwriter (e.g. `AAI Limited (ABN 48 005 297 807, AFSL 230859)`)
   * Document classification (`PDS`, `SPDS`, `TMD`, `FAQ`, `GUIDE`) and effective date
   * Retrieval relevance score badge (e.g. `94% match`)
-  * Full operative section excerpt rendered as formatted Markdown with tables
+  * Full operative section excerpt through the standard Markdown pipeline (`utils/markdown.ts` + `MarkdownText`): internal backend tags (e.g. `**Clause Classification:**`) and breadcrumb comments are stripped first, raw/embedded URLs are rewritten as clean labelled anchors, `**`/`###`/tables parse into real markup, and raw HTML never reaches the DOM; the Copy action still writes the verbatim original chunk
 
 ### 4.3 39-Insurer Policy Comparison (`PolicyComparisonView.tsx`)
 * Allows users to select two insurers from all 39 primary brands and compare policy terms across standard dimensions (`POLICY_COMPARISON_DIMENSIONS`):
@@ -126,7 +132,7 @@ stateDiagram-v2
   * Towing & Emergency Assistance
 * Displays category baseline conditions with insurer-specific schedule overrides via `resolvePolicyComparisonCell()`.
 * Renders each coverage category as a standalone heading followed by the primary insurer’s terms and then the comparison insurer’s terms in a vertical definition list. There is no horizontal comparison table or outer card.
-* The screen uses the title "Compare Policies", direct insurer selectors, and a plain Back control at the top left. Policy sources from the current chat remain accessible below the comparisons.
+* The screen uses the title "Compare Policies", two `GlobalFilterDropdown` (`field` variant) insurer selectors that disable the counterpart insurer so the pairing cannot collide on one insurer, and a plain Back control at the top left. Policy sources from the current chat remain accessible below the comparisons. Every rendered cell and source excerpt passes through `MarkdownText` (standard parser + sanitizer, per `utils/markdown.ts`), so raw corpus markdown — emphasis syntax, headers, backend tags, copyable URL labels — never reaches the UI.
 
 ### 4.4 Regulatory & Life-Safety Cards
 * **ASIC RG 244 Safe-Harbor Card (`RefusalCard.tsx`):** Triggered when `ADVICE_BOUNDARY_VIOLATION` is received; renders safe-harbor advice refusal, explains the statutory boundary, and presents factual inquiry suggestions.
@@ -152,6 +158,8 @@ The frontend test suite (`tests/frontend/`) executes 11 test suites covering 84 
 | **Citation System** | `citation-drawer.test.tsx`, `citations-utils.test.ts` | Citation pill rendering, chunk matching heuristics, drawer slide-over and close interactions. |
 | **Regulatory Cards** | `regulatory-cards.test.tsx` | Refusal card rendering, emergency banner dial buttons, persistent GAW disclaimer. |
 | **Policy Comparison** | `policy-comparison.test.tsx` | 39-insurer selector updates, benchmark table rows, session disclosure overlay, quick launch prompts. |
+| **Global Dropdown** | `global-filter-dropdown.test.tsx`, `insurer-filter.test.tsx` | Locked internal UI (hairline search/dividers, small-caps headers, gray+checkmark selection), chip & field variants, disabled-option guard, sheet/palette testid scoping, responsive branches. |
+| **Markdown Pipeline** | `markdown-text.test.tsx` | Backend-tag stripping, raw-URL anchoring, `**`/`###` parsing, raw-HTML never mounted, verbatim excerpt copy, raw strings absent from comparison. |
 | **Header & Input** | `header-input.test.tsx` | Insurer selector options, rate-limit pills, textarea auto-resize, submit button disabling. |
 | **PII Scrubber** | `client-pii-scrubber.test.ts` | Pre-ingress scrubbing of TFNs, Medicare, Credit Cards, Phones, and Licences. |
 
@@ -166,12 +174,13 @@ The frontend test suite (`tests/frontend/`) executes 11 test suites covering 84 
 
 ### Responsive navigation and composer
 
-At 1024px and wider, a persistent sidebar lists the current session's user questions and navigation. On smaller screens, navigation opens in a modal drawer with trapped focus, Escape and backdrop dismissal, and focus restoration; a standalone new-chat action remains in the mobile header. The desktop sidebar is the only global navigation surface, with New Chat first, and collapses from 256px to a 64px icon rail. Its top-left header toggle preserves an 800px maximum chat width centered in the remaining space; selecting History expands the sidebar. Selecting a question returns to chat and scrolls to that message, including repeated selections. Switching to comparison and back preserves the unsent draft. Enter submits a question, Shift+Enter inserts a newline, and Enter during IME composition does not submit. The send control sits inside the textarea row, the insurer selector is embedded in the floating pill, and the keyboard hint is available to assistive technology. Mobile header icons use borderless 44px hit areas, starter questions begin at the top of the chat region, the composer is followed by an inline disclosure footer, and the shell follows visual viewport height during keyboard resizing while ignoring pinch zoom.
+At 1024px and wider, a persistent sidebar lists the current session's user questions and navigation. On smaller screens, navigation opens in a modal drawer with trapped focus, Escape and backdrop dismissal, and focus restoration; a standalone new-chat action remains in the mobile header. The desktop sidebar is the only global navigation surface, with New Chat first, and collapses from 256px to a 64px icon rail. Within the sidebar, New Chat sits in a distinct primary-action container (hairline border over a faint gray surface) rather than reading like a list row; the active Chat or Compare tab is marked by a subtle muted-gray block with bolder primary-colored text instead of a tinted background block; and the empty History placeholder is set in reduced-opacity italic gray so it reads as a prompt, distinct from the semibold History heading. Its top-left header toggle preserves an 800px maximum chat width centered in the remaining space; selecting History expands the sidebar. Selecting a question returns to chat and scrolls to that message, including repeated selections. Switching to comparison and back preserves the unsent draft. Enter submits a question, Shift+Enter inserts a newline, and Enter during IME composition does not submit. The send control sits in the dedicated toolbar row rather than inside the textarea row, and the insurer selector is a labelled toolbar chip — "All Insurers", or the selected insurer beside its icon, truncating on narrow viewports — whose menu is a rectangular card: on desktop the palette anchors flush to the composer card's bottom-left, on mobile tapping it opens the native bottom sheet. The keyboard hint is available to assistive technology. Mobile header icons use borderless 44px hit areas, the mobile drawer's header row is space-between so the close control is pinned to the right edge on every width as an exact 44×44 target with the glyph centered, starter questions begin at the top of the chat region, the composer is followed by an inline disclosure footer, and the shell follows visual viewport height during keyboard resizing while ignoring pinch zoom.
 
-Chat messages use an unframed assistant response and a right-aligned soft-blue user bubble. Tables retain horizontal scrolling and semantic headers without an outer card. The centered footer has plain General advice warning and Privacy controls, with disclosures expanding in normal flow.
+Chat messages use an unframed assistant response and a right-aligned soft-blue user bubble. Tables retain horizontal scrolling and semantic headers without an outer card. The centered footer has plain General advice warning and Privacy controls, with disclosures expanding in normal flow. While waiting for the first token, the loading state renders inside the assistant response's own component shell — the same header row (status microcopy riding the action slot), the same sources shelf slot, and the same body typography with pulse placeholder bars — so the streamed and final layouts land without structural layout shifts.
 
 History lists the current conversation's questions, not archived sessions. Deleting a question removes its associated answer; the desktop row exposes a contextual delete control, while mobile rows reveal Delete on a left swipe and support the Delete key. Clear all history and Undo deletion appear at the bottom of the expanded history panel. Deletions update session storage and subsequent conversation context; deleting an active turn or clearing history cancels its stream.
 
 ### Feed scrolling and layout invariants
 
 Automatic streaming updates, explicit bottom jumps, and history navigation scroll only the message feed, never ancestor layout containers. Automatic following is immediate so intermediate smooth-scroll events cannot disable anchoring. Manual reading position is preserved; feed resizing rechecks the bottom distance. The bottom-jump control occupies a reserved row above the composer and never overlays response text.
+The main chat feed's scrollbar is a styled macOS-style overlay bar, never `display: none`: a 6px bespoke `::-webkit-scrollbar` (transparent track, rounded semi-transparent gray pill thumb with a slightly darker hover state, and Firefox `scrollbar-width: thin` parity) so the track blends into the app background without eating layout space. Only the mobile filter bottom sheet hides its scrollbar entirely.

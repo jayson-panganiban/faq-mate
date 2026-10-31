@@ -9,6 +9,8 @@ import {
 } from "../../constants/insurers";
 import type { GroundedChunk } from "../types/chat-ui";
 import { formatProductDoc } from "../utils/citations";
+import { GlobalFilterDropdown } from "./GlobalFilterDropdown";
+import { MarkdownText } from "./MarkdownText";
 
 export interface PolicyComparisonViewProps {
   /**
@@ -79,8 +81,19 @@ export function PolicyComparisonView({
     )?.label ?? code;
   const nameA = labelFor(insurerA);
   const nameB = labelFor(insurerB);
-  const selectClass =
-    "min-h-[44px] w-full min-w-0 rounded-xl border border-slate-300 bg-transparent px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-teal-600 dark:border-slate-700 dark:text-slate-100 cursor-pointer";
+  const filterGroups = useMemo(
+    () =>
+      GROUPED_INSURER_OPTIONS.map((group) => ({
+        id: group.category,
+        label: group.label,
+        options: group.options.map((option) => ({
+          value: option.value,
+          label: option.label,
+          title: option.underwriter,
+        })),
+      })),
+    []
+  );
   const linkClass =
     "inline-flex min-h-[44px] items-center gap-1.5 text-sm text-slate-600 hover:text-teal-700 dark:text-slate-400 dark:hover:text-teal-400 focus-visible:outline-2 focus-visible:outline-teal-600 cursor-pointer";
 
@@ -117,32 +130,21 @@ export function PolicyComparisonView({
         ].map(({ id, label, value, other, set }) => (
           <div key={id} className="min-w-0">
             <label
-              htmlFor={`insurer-${id}-select`}
+              htmlFor={`insurer-${id}-trigger`}
               className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300"
             >
               {label}
             </label>
-            <select
-              id={`insurer-${id}-select`}
-              data-testid={`insurer-${id}-select`}
+            <GlobalFilterDropdown
+              triggerId={`insurer-${id}-trigger`}
+              testIdPrefix={`insurer-${id}`}
+              variant="field"
+              ariaLabel={label}
               value={value}
-              onChange={(event) => set(event.target.value as PrimaryInsurerCode)}
-              className={selectClass}
-            >
-              {GROUPED_INSURER_OPTIONS.map((group) => (
-                <optgroup key={group.category} label={group.label}>
-                  {group.options.map((option) => (
-                    <option
-                      key={option.value}
-                      value={option.value}
-                      disabled={option.value === other}
-                    >
-                      {option.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+              onSelect={(next) => set(next as PrimaryInsurerCode)}
+              groups={filterGroups}
+              disabledOptionValues={[other]}
+            />
           </div>
         ))}
       </div>
@@ -169,8 +171,10 @@ export function PolicyComparisonView({
                   <dt className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                     {name}
                   </dt>
-                  <dd className="mt-1 text-sm leading-7 text-slate-600 dark:text-slate-300 break-words">
-                    {resolvePolicyComparisonCell(dimension.id, code, insurerChunks)}
+                  <dd className="mt-1 break-words">
+                    <MarkdownText
+                      markdown={resolvePolicyComparisonCell(dimension.id, code, insurerChunks)}
+                    />
                   </dd>
                 </div>
               ))}
@@ -208,9 +212,7 @@ export function PolicyComparisonView({
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       {chunk.source.section}
                     </p>
-                    <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                      {chunk.content}
-                    </p>
+                    <MarkdownText markdown={chunk.content} />
                     <button
                       type="button"
                       onClick={() => onSelectCitation?.(chunk)}

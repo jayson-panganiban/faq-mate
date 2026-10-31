@@ -138,6 +138,97 @@ describe("Responsive navigation", () => {
     fireEvent.click(question);
     expect(feed.scrollTop).toBe(250);
   });
+
+  it("styles the sidebar New Chat as a distinct bordered primary action", () => {
+    render(
+      <AppShell onReset={vi.fn()} onToggleComparison={vi.fn()}>
+        <div>Body</div>
+      </AppShell>
+    );
+
+    const newChat = screen.getByTestId("reset-chat-button");
+    // Hairline border + faint surface visually separate it from the list
+    expect(newChat.className).toContain("border-slate-200");
+    expect(newChat.className).toContain("bg-slate-50");
+
+    // Navigation rows must not adopt the primary container
+    const chatTab = screen.getByRole("button", { name: "Chat" });
+    expect(chatTab.className).not.toContain("border-slate-200");
+    expect(chatTab.className).not.toContain("bg-slate-50");
+  });
+
+  it("marks the active navigation tab with a muted gray highlight instead of the pale-green block", () => {
+    const { rerender } = render(
+      <AppShell onReset={vi.fn()} onToggleComparison={vi.fn()}>
+        <div>Body</div>
+      </AppShell>
+    );
+
+    const chatTab = screen.getByRole("button", { name: "Chat" });
+    expect(chatTab).toHaveAttribute("aria-current", "page");
+    expect(chatTab.className).toContain("bg-slate-100");
+    expect(chatTab.className).toContain("font-semibold");
+    expect(chatTab.className).not.toContain("bg-teal-50");
+
+    rerender(
+      <AppShell isComparisonMode onReset={vi.fn()} onToggleComparison={vi.fn()}>
+        <div>Body</div>
+      </AppShell>
+    );
+    const compareTab = screen.getByRole("button", { name: "Switch to chat view" });
+    expect(compareTab).toHaveAttribute("aria-current", "page");
+    expect(compareTab.className).toContain("bg-slate-100");
+    expect(compareTab.className).toContain("font-semibold");
+    expect(compareTab.className).not.toContain("bg-teal-50");
+  });
+
+  it("renders the empty history placeholder as a muted italic prompt", () => {
+    render(
+      <AppShell historyItems={[]} onReset={vi.fn()}>
+        <div>Body</div>
+      </AppShell>
+    );
+
+    const heading = screen.getByRole("heading", { name: "History" });
+    // The header stays semibold slate-500; the placeholder recedes below it
+    expect(heading.className).toContain("font-semibold");
+    expect(heading.className).toContain("text-slate-500");
+    const placeholder = screen.getByText("Your questions will appear here.");
+    expect(placeholder.className).toContain("italic");
+    expect(placeholder.className).toContain("text-slate-400");
+    expect(placeholder.className).not.toContain("text-slate-500 ");
+  });
+
+  it("pins the drawer close control to the right edge with a 44x44 hit area", () => {
+    render(
+      <AppShell onReset={vi.fn()}>
+        <div>Body</div>
+      </AppShell>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
+    const dialog = screen.getByRole("dialog", { name: "Navigation" });
+    const newChat = within(dialog).getByRole("button", { name: "Start new chat" });
+    const row = newChat.parentElement as HTMLElement;
+
+    // Justified header row: the close control never crowds New Chat on narrow
+    // viewports because the row itself is space-between, not growth-dependent.
+    expect(row.className).toContain("justify-between");
+    // Mobile New Chat keeps its natural width; flex growth is desktop-only.
+    expect(newChat.className).not.toContain("flex-1");
+
+    const close = within(dialog).getByRole("button", { name: "Close navigation" });
+    expect(close.className).toContain("h-11");
+    expect(close.className).toContain("w-11");
+    expect(close.className).toContain("justify-center");
+    // The glyph is centered inside an exact 44x44 target that cannot shrink
+    // below the touch minimum or be squeezed by siblings.
+    expect(close.className).toContain("min-h-[44px]");
+    expect(close.className).toContain("min-w-[44px]");
+    expect(close.className).toContain("shrink-0");
+    // It is the last control of the row, pushed to the drawer's right edge.
+    expect(row.lastElementChild).toBe(close);
+  });
 });
 
 describe("history actions", () => {

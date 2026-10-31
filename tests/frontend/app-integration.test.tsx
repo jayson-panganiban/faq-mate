@@ -256,8 +256,9 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
     const drawer = await screen.findByRole("dialog", { name: /policy sources/i });
     expect(drawer).toBeInTheDocument();
     expect(within(drawer).getByText("Policy sources")).toBeInTheDocument();
-    expect(within(drawer).getByText(/94% Match/i)).toBeInTheDocument();
     expect(within(drawer).getByText(SAMPLE_CHUNK.content)).toBeInTheDocument();
+    // All score badges stay out of the consumer view.
+    expect(within(drawer).queryByText(/94% Match/i)).not.toBeInTheDocument();
 
     // Close via backdrop click
     const backdrop = screen.getByTestId("citation-drawer-backdrop");
@@ -277,6 +278,92 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
       fireEvent.keyDown(window, { key: "Escape" });
     });
     expect(screen.queryByRole("dialog", { name: /policy sources/i })).not.toBeInTheDocument();
+  });
+
+  it("routes the developer debug toggle to the citation drawer's diagnostic overlay", async () => {
+    const clearDebugFlag = () => {
+      try {
+        localStorage.removeItem("faq_mate_debug_mode");
+      } catch {
+        // Storage-unavailable testdom: the mode is session-local anyway.
+      }
+    };
+    clearDebugFlag();
+    const mockSse = [
+      `event: metadata\ndata: ${JSON.stringify({ latency_ms: 25, retrieved_chunks: [SAMPLE_CHUNK] })}\n\n`,
+      `event: token\ndata: ${JSON.stringify({ text: "Flood details: [Source: Suncorp Classic Home PDS, Section 1]." })}\n\n`,
+      `event: done\ndata: ${JSON.stringify({ finish_reason: "stop" })}\n\n`,
+    ];
+
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(createSseStream(mockSse), {
+        status: 200,
+        headers: new Headers({
+          "Content-Type": "text/event-stream",
+          "X-RateLimit-Limit": "10",
+          "X-RateLimit-Remaining": "8",
+          "X-RateLimit-Reset": "60",
+          "cf-ray": "90123456-SYD",
+        }),
+      })
+    );
+
+    render(<App />);
+
+    const input = screen.getByTestId("chat-input-textarea");
+    fireEvent.change(input, { target: { value: "Tell me about Suncorp flood" } });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("send-button"));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("citation-pill")).toBeInTheDocument();
+    });
+
+    // Open the drawer while debug mode is still off: no diagnostics.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("citation-pill"));
+    });
+    const drawer = await screen.findByRole("dialog", { name: /policy sources/i });
+    expect(within(drawer).queryByTestId("citation-debug-overlay")).not.toBeInTheDocument();
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "Escape" });
+    });
+
+    // Flip the footer switch and reopen: the monospace diagnostics appear
+    // wired to the live edge telemetry (metadata latency + cf-ray POP).
+    await act(async () => {
+      fireEvent.click(screen.getByRole("switch", { name: "Developer debug mode" }));
+    });
+    expect(screen.getByRole("switch", { name: "Developer debug mode" })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("citation-pill"));
+    });
+    const debugDrawer = await screen.findByRole("dialog", { name: /policy sources/i });
+    const overlay = within(debugDrawer).getByTestId("citation-debug-overlay");
+    expect(overlay.textContent).toContain(`chunk_id: ${SAMPLE_CHUNK.id}`);
+    expect(overlay.textContent).toContain("total: 25 ms");
+    expect(overlay.textContent).toContain("edge_pop: SYD");
+
+    // Toggling off hides the overlay again.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("switch", { name: "Developer debug mode" }));
+    });
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "Escape" });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("citation-pill"));
+    });
+    expect(
+      within(await screen.findByRole("dialog", { name: /policy sources/i })).queryByTestId(
+        "citation-debug-overlay"
+      )
+    ).not.toBeInTheDocument();
+    clearDebugFlag();
   });
 
   it("handles ASIC RG 244 advice boundary violation by displaying RefusalCard", async () => {

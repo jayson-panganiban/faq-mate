@@ -153,7 +153,7 @@ export function InputBar({
   };
 
   return (
-    <div className={`w-full ${className}`}>
+    <div className={`w-full sticky bottom-0 ${className}`}>
       <div
         data-testid="composer-field"
         className="relative rounded-xl border border-slate-200 bg-white shadow-sm focus-within:border-teal-600 dark:border-slate-800 dark:bg-slate-900"

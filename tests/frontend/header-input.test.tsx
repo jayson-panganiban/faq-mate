@@ -474,6 +474,12 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
       expect(field.className).not.toContain("rounded-[28px]");
       expect(field.className).not.toContain("border-2");
 
+      // The composer stays pinned to the viewport bottom when the shell
+      // scrolls under an open keyboard.
+      const wrapper = field.parentElement as HTMLElement;
+      expect(wrapper.className).toContain("sticky");
+      expect(wrapper.className).toContain("bottom-0");
+
       const textarea = screen.getByTestId("chat-input-textarea");
       // The input owns the full-width top row with no reserved icon gutters
       expect(textarea.className).toContain("w-full");

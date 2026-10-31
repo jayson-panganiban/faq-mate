@@ -69,12 +69,13 @@ describe("Responsive navigation", () => {
     await waitFor(() => expect(trigger).toHaveFocus());
   });
 
-  it("tracks the visual viewport height and ignores pinch zoom", () => {
+  it("tracks the visual viewport height, offsets keyboard panning, and ignores pinch zoom", () => {
     const original = Object.getOwnPropertyDescriptor(window, "visualViewport");
     const viewport = new EventTarget() as VisualViewport;
     Object.defineProperties(viewport, {
       height: { value: 600, writable: true },
       scale: { value: 1, writable: true },
+      offsetTop: { value: 0, writable: true },
     });
     Object.defineProperty(window, "visualViewport", { configurable: true, value: viewport });
     const { container, unmount } = render(
@@ -84,16 +85,27 @@ describe("Responsive navigation", () => {
     );
     const shell = container.querySelector(".chat-app") as HTMLElement;
     expect(shell.style.height).toBe("600px");
-    Object.assign(viewport, { height: 400, scale: 2 });
-    act(() => {
-      viewport.dispatchEvent(new Event("resize"));
-    });
-    expect(shell.style.height).toBe("");
-    Object.assign(viewport, { height: 400, scale: 1 });
+    // iOS scrolls the layout viewport when the keyboard opens; the shell must
+    // stay glued under the visual viewport while the composer keeps its
+    // bottom-anchored position above the keyboard edge.
+    Object.assign(viewport, { height: 400, offsetTop: 120 });
     act(() => {
       viewport.dispatchEvent(new Event("resize"));
     });
     expect(shell.style.height).toBe("400px");
+    expect(shell.style.transform).toBe("translateY(120px)");
+    Object.assign(viewport, { offsetTop: 200 });
+    act(() => {
+      viewport.dispatchEvent(new Event("scroll"));
+    });
+    expect(shell.style.transform).toBe("translateY(200px)");
+    // Pinch zoom frees the shell entirely from keyboard compensation.
+    Object.assign(viewport, { height: 400, scale: 2, offsetTop: 200 });
+    act(() => {
+      viewport.dispatchEvent(new Event("resize"));
+    });
+    expect(shell.style.height).toBe("");
+    expect(shell.style.transform).toBe("");
     unmount();
     if (original) Object.defineProperty(window, "visualViewport", original);
     else Reflect.deleteProperty(window, "visualViewport");
@@ -228,6 +240,45 @@ describe("Responsive navigation", () => {
     expect(close.className).toContain("shrink-0");
     // It is the last control of the row, pushed to the drawer's right edge.
     expect(row.lastElementChild).toBe(close);
+  });
+
+  it("exposes the developer debug mode as a subtle footer switch", () => {
+    const onToggleDebug = vi.fn();
+    const { rerender } = render(
+      <AppShell debugMode={false} onToggleDebugMode={onToggleDebug}>
+        <div>Body</div>
+      </AppShell>
+    );
+
+    const sw = screen.getByRole("switch", { name: "Developer debug mode" });
+    // Subtle by default: no amber tint until enabled.
+    expect(sw).toHaveAttribute("aria-checked", "false");
+    expect(sw.textContent).toBe("Debug");
+    expect(sw.className).not.toContain("text-amber-700");
+
+    fireEvent.click(sw);
+    expect(onToggleDebug).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <AppShell debugMode onToggleDebugMode={onToggleDebug}>
+        <div>Body</div>
+      </AppShell>
+    );
+    expect(screen.getByRole("switch", { name: "Developer debug mode" })).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+    expect(screen.getByRole("switch", { name: "Developer debug mode" }).textContent).toBe(
+      "Debug on"
+    );
+
+    // Without the toggle callback the control never renders.
+    rerender(
+      <AppShell>
+        <div>Body</div>
+      </AppShell>
+    );
+    expect(screen.queryByRole("switch", { name: "Developer debug mode" })).not.toBeInTheDocument();
   });
 });
 

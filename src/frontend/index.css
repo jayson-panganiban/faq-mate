@@ -21,6 +21,19 @@ body {
   overscroll-behavior-y: contain;
 }
 
+/* App shell viewport height on every platform:
+   - `100vh` fallback for engines without `dvh` (old WebKit),
+   - `100dvh` tracks the URL bar on the remaining browsers.
+   After that, AppShell sizes the shell to `visualViewport.height` and
+   translates it by `visualViewport.offsetTop` while the software keyboard is
+   open — `dvh`/`lvh` never shrink for the keyboard on iOS, and bottom-pinned
+   composer geometry would otherwise fly away from the keyboard edge. */
+.chat-app {
+  height: 100vh;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: intentional 100vh fallback above for engines without dvh support */
+  height: 100dvh;
+}
+
 /* Fast touch response without 300ms delay or double-tap zoom on buttons */
 button,
 a,

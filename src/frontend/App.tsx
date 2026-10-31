@@ -84,6 +84,29 @@ export function App() {
   const [selectedChunkId, setSelectedChunkId] = useState<string | undefined>(undefined);
   const [isComparisonMode, setIsComparisonMode] = useState(false);
   const [historySelection, setHistorySelection] = useState<{ id: string; sequence: number }>();
+  /**
+   * Developer debug mode (frontend-only override of the PDS Stage 8 debug
+   * instrumentation): persisted in localStorage so a reviewer's session keeps
+   * the diagnostic overlay across reloads.
+   */
+  const [debugMode, setDebugMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("faq_mate_debug_mode") === "on";
+    } catch {
+      return false;
+    }
+  });
+  const toggleDebugMode = useCallback(() => {
+    setDebugMode((previous) => {
+      const next = !previous;
+      try {
+        localStorage.setItem("faq_mate_debug_mode", next ? "on" : "off");
+      } catch {
+        // Storage-restricted browsers keep the mode session-local.
+      }
+      return next;
+    });
+  }, []);
 
   // Sync message updates to sessionStorage
   useEffect(() => {
@@ -196,6 +219,8 @@ export function App() {
       }}
       onUndoHistoryDeletion={undoHistoryDeletion}
       canUndoHistoryDeletion={canUndoHistoryDeletion}
+      debugMode={debugMode}
+      onToggleDebugMode={toggleDebugMode}
       onSelectHistory={(id) => {
         setIsComparisonMode(false);
         setHistorySelection((previous) => ({ id, sequence: (previous?.sequence ?? 0) + 1 }));
@@ -243,6 +268,8 @@ export function App() {
         chunks={allChunks}
         selectedChunkId={selectedChunkId}
         onSelectChunk={handleSelectDrawerChunk}
+        debugMode={debugMode}
+        telemetry={telemetry}
       />
     </AppShell>
   );

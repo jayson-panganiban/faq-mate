@@ -148,20 +148,23 @@ describe("CitationDrawer Component", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("renders operative section breadcrumb", () => {
+  it("renders the source location trail as consumer copy, not backend jargon", () => {
     render(<CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunk1]} />);
 
-    // Breadcrumb: product/docType > section inside the breadcrumb navigation
-    const breadcrumbNav = screen.getByRole("navigation", { name: /operative section breadcrumb/i });
-    expect(within(breadcrumbNav).getByText(/Suncorp Classic Home PDS/i)).toBeInTheDocument();
-    expect(within(breadcrumbNav).getByText("Section 1")).toBeInTheDocument();
+    const trailNav = screen.getByRole("navigation", { name: /source location/i });
+    expect(within(trailNav).getByText(/Suncorp Classic Home PDS/i)).toBeInTheDocument();
+    expect(within(trailNav).getByText("Section 1")).toBeInTheDocument();
+    // Backend jargon never appears in the default consumer view.
+    expect(screen.queryByText(/operative breadcrumb/i)).not.toBeInTheDocument();
   });
 
-  it("renders relevance confidence score pill", () => {
+  it("hides all score badges from the consumer view; similarity lives in the debug overlay", () => {
     render(<CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunk1]} />);
 
-    // 0.96 relevance score should show 96% Match or Score: 0.96
-    expect(screen.getByText(/96% Match/i)).toBeInTheDocument();
+    // No confidence pill, no plain or raw score anywhere by default.
+    expect(screen.queryByText(/96% Match/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/score:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("0.96")).not.toBeInTheDocument();
   });
 
   it("renders chunk ID and docType badges", () => {
@@ -169,6 +172,75 @@ describe("CitationDrawer Component", () => {
 
     expect(screen.queryByText(/chunk-suncorp-01/i)).not.toBeInTheDocument();
     expect(screen.getByText("PDS")).toBeInTheDocument();
+  });
+
+  it("renders a non-shrinking tab strip with a muted active tab instead of a clipping card", () => {
+    render(<CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunk1, mockChunk2]} />);
+
+    const activeTab = screen.getByRole("tab", { selected: true });
+    // The tab never shrinks below its label, and the active state is a muted
+    // gray block — no white bounding box or border clip around the label.
+    expect(activeTab.className).toContain("shrink-0");
+    expect(activeTab.className).toContain("bg-slate-200/80");
+    expect(activeTab.className).not.toContain("bg-white");
+    expect(activeTab.className).not.toContain("border");
+    const row = activeTab.parentElement as HTMLElement;
+    expect(row.className).toContain("items-center");
+  });
+
+  describe("Developer Debug Mode", () => {
+    it("shows nothing diagnostic by default", () => {
+      render(
+        <CitationDrawer
+          isOpen={true}
+          onClose={onClose}
+          chunks={[mockChunk1]}
+          telemetry={{ latencyMs: 812 }}
+        />
+      );
+
+      expect(screen.queryByTestId("citation-debug-overlay")).not.toBeInTheDocument();
+      // The raw similarity score is kept out of the consumer view.
+      expect(screen.queryByText(/0\.96/)).not.toBeInTheDocument();
+    });
+
+    it("reveals chunk id, similarity score and edge latency in a monospace overlay when debug mode is on", () => {
+      render(
+        <CitationDrawer
+          isOpen={true}
+          onClose={onClose}
+          chunks={[mockChunk1]}
+          debugMode
+          telemetry={{
+            latencyMs: 812,
+            ttftMs: 143,
+            popLocation: "SYD",
+            hybrid_retrieval_latency_ms: 37,
+            inference_ttft_ms: 121,
+          }}
+        />
+      );
+
+      const overlay = screen.getByTestId("citation-debug-overlay");
+      // Distinct diagnostic aesthetic: amber monospace overlay, lucide-free.
+      expect(overlay.className).toContain("font-mono");
+      expect(overlay.textContent).toContain("chunk_id: chunk-suncorp-01");
+      expect(overlay.textContent).toContain("similarity: 0.960 (96%)");
+      expect(overlay.textContent).toContain("retrieval: 37 ms");
+      expect(overlay.textContent).toContain("ttft: 121 ms");
+      expect(overlay.textContent).toContain("total: 812 ms");
+      expect(overlay.textContent).toContain("edge_pop: SYD");
+      // Missing telemetry degrades to em-dashes instead of empty values.
+    });
+
+    it("degrades missing telemetry to em-dashes", () => {
+      render(<CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunk1]} debugMode />);
+
+      const overlay = screen.getByTestId("citation-debug-overlay");
+      expect(overlay.textContent).toContain("retrieval: — ms");
+      expect(overlay.textContent).toContain("total: — ms");
+      expect(overlay.textContent).toContain("edge_pop: —");
+    });
   });
 
   it("renders operative markdown/text excerpt viewer", () => {

@@ -19,6 +19,10 @@ export interface AppShellProps {
   onClearHistory?: () => void;
   onUndoHistoryDeletion?: () => void;
   canUndoHistoryDeletion?: boolean;
+  /** Developer debug mode; routed to the footer switch. */
+  debugMode?: boolean;
+  /** Flips the debug mode switch; omitting it hides the control. */
+  onToggleDebugMode?: () => void;
   children: ReactNode;
   className?: string;
 }
@@ -53,12 +57,21 @@ export function AppShell({
   onClearHistory,
   onUndoHistoryDeletion,
   canUndoHistoryDeletion = false,
+  debugMode,
+  onToggleDebugMode,
   children,
   className = "",
 }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [viewportHeight, setViewportHeight] = useState<number>();
+  /**
+   * iOS keyboard anchoring: `100dvh`/`dvh` never shrink when the software
+   * keyboard opens, so while the keyboard is up the shell is sized to the
+   * *visual* viewport and translated by its `offsetTop` — the layout viewport
+   * Safari scrolls on focus would otherwise leave the bottom-pinned composer
+   * flying away from the keyboard edge.
+   */
+  const [viewportState, setViewportState] = useState<{ height?: number; top?: number }>();
   const menuTrigger = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const desktopHistory = useRef<HTMLHeadingElement>(null);
@@ -71,10 +84,21 @@ export function AppShell({
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
-    const update = () => setViewportHeight(viewport.scale === 1 ? viewport.height : undefined);
+    // Pinch zooms (scale !== 1) are ignored: the layout stays put and zoom
+    // panning frees the shell from keyboard compensation entirely.
+    const update = () =>
+      setViewportState(
+        viewport.scale === 1 ? { height: viewport.height, top: viewport.offsetTop } : undefined
+      );
     update();
     viewport.addEventListener("resize", update);
-    return () => viewport.removeEventListener("resize", update);
+    // offsetTop also changes while the user pans the zoomed-out layout under
+    // an open keyboard, so scroll events must refresh the compensation.
+    viewport.addEventListener("scroll", update);
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+    };
   }, []);
   useEffect(() => {
     if (!drawerOpen) return;
@@ -288,8 +312,15 @@ export function AppShell({
   };
   return (
     <div
-      className={`chat-app h-[100dvh] flex overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 ${className}`}
-      style={viewportHeight === undefined ? undefined : { height: viewportHeight }}
+      className={`chat-app flex overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 ${className}`}
+      style={
+        viewportState === undefined
+          ? undefined
+          : {
+              height: viewportState.height,
+              transform: viewportState.top ? `translateY(${viewportState.top}px)` : undefined,
+            }
+      }
     >
       <aside
         id="desktop-sidebar"
@@ -355,7 +386,7 @@ export function AppShell({
         <main className="min-h-0 flex-1 flex flex-col w-full max-w-[800px] mx-auto px-3 sm:px-4 lg:pt-4 overflow-hidden relative">
           {children}
         </main>
-        <ComplianceFooter />
+        <ComplianceFooter debugEnabled={debugMode} onToggleDebug={onToggleDebugMode} />
       </div>
       {drawerOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">

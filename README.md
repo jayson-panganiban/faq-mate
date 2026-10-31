@@ -111,6 +111,7 @@ If you fork or deploy this project to your own Cloudflare account:
    ```bash
    npm run deploy
    ```
+   This deploys only the Worker API; it does not update the frontend.
 5. **Deploy Frontend to Cloudflare Pages:**
    Update `public/_redirects` to point `/api/*` to your worker's `.workers.dev` URL, then deploy:
    ```bash

@@ -35,6 +35,13 @@ Execute every task through this 5-stage loop:
 4. **Fast Verify Gate:** Run `npm run verify` (typecheck + vitest + AFCA evals). Never consider a turn complete on failing tests.
 5. **Regulatory Audit:** Validate non-negotiable statutory invariants before reporting completion.
 
+### Deployment Surface
+
+When asked to deploy, inspect the changed files and deploy every affected production surface:
+- Frontend changes in `src/frontend/`, `index.html`, `public/`, or `vite.config.ts` require a Cloudflare Pages build and deployment.
+- Worker runtime changes require `npm run deploy`.
+- If both surfaces changed, deploy both. `npm run deploy` deploys only the Worker; use the Pages command in `README.md` for the frontend.
+
 ---
 
 ## Non-Negotiable Engineering Rules
@@ -100,4 +107,3 @@ Canonical five-role triage vocabulary. See [`docs/agents/triage-labels.md`](docs
 ### Domain docs
 
 Single-context ([`GLOSSARY.md`](GLOSSARY.md) + [`docs/adr/`](docs/adr/) at repo root). See [`docs/agents/domain.md`](docs/agents/domain.md).
-

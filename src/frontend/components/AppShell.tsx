@@ -1,4 +1,12 @@
-import { Columns, History, Menu, MessageSquare, PanelLeft, Plus, Shield, X } from "lucide-react";
+import {
+  ChevronLeft,
+  Columns,
+  History,
+  MessageSquare,
+  PanelLeft,
+  Plus,
+  Shield,
+} from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { RateLimitInfo, TelemetryInfo } from "../types/chat-ui";
 import { ComplianceFooter } from "./ComplianceFooter";
@@ -29,13 +37,6 @@ export interface AppShellProps {
 
 const actionClass =
   "inline-flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-lg px-3 text-sm font-medium cursor-pointer text-slate-700 hover:bg-teal-50 hover:text-teal-800 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500";
-
-/**
- * Sidebar primary action: a distinct bordered container with a faint surface
- * so it reads as a button, not a static navigation list row.
- */
-const primaryActionClass =
-  "inline-flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium cursor-pointer text-slate-900 transition-colors duration-150 hover:border-slate-300 hover:bg-slate-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-600 dark:hover:bg-slate-700/70";
 
 /**
  * Sidebar navigation row: neutral gray hover/active states keep the tabs
@@ -133,7 +134,7 @@ export function AppShell({
   }, [drawerOpen, closeDrawer]);
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return;
-    const media = window.matchMedia("(min-width: 1024px)");
+    const media = window.matchMedia("(min-width: 768px)");
     const change = () => {
       if (media.matches) setDrawerOpen(false);
     };
@@ -146,9 +147,42 @@ export function AppShell({
     const compact = !mobile && collapsed;
     return (
       <>
-        {/* Drawer/mobile header: justified so the close control pins to the
-            right edge on every width; the close glyph is a solid 44x44 target. */}
-        <div className="flex items-start justify-between gap-2 px-2 pt-4 pb-3">
+        <div
+          className={`flex shrink-0 items-center pt-3 pb-3 ${
+            compact ? "justify-center px-2" : "justify-between px-2"
+          }`}
+        >
+          {!mobile && (
+            <div
+              role="img"
+              aria-label="FAQ-Mate"
+              className={`flex min-w-0 items-center ${compact ? "" : "gap-2 px-2.5"}`}
+            >
+              <Shield size={24} className="shrink-0 text-teal-700 dark:text-teal-400" aria-hidden />
+              {!compact && (
+                <span className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">
+                  FAQ-Mate
+                </span>
+              )}
+            </div>
+          )}
+          {mobile && (
+            <button
+              type="button"
+              aria-label="Close navigation"
+              title="Close navigation"
+              onClick={closeDrawer}
+              // Keep a full 44x44 hit area while centering the close glyph.
+              className={`${actionClass} h-11 w-11 shrink-0 justify-center px-0`}
+            >
+              <ChevronLeft size={20} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+        <nav
+          aria-label={mobile ? "Mobile navigation" : "Main navigation"}
+          className="space-y-1 px-2"
+        >
           <button
             type="button"
             data-testid={mobile ? undefined : "reset-chat-button"}
@@ -158,31 +192,11 @@ export function AppShell({
               onReset?.();
               if (mobile) closeDrawer();
             }}
-            className={`${primaryActionClass} ${
-              compact ? "justify-center px-0" : mobile ? "justify-start" : "flex-1 justify-start"
-            }`}
+            className={`${navItemClass} ${compact ? "justify-center px-0" : "justify-start"}`}
           >
             <Plus size={20} aria-hidden="true" />
             {!compact && "New Chat"}
           </button>
-          {mobile && (
-            <button
-              type="button"
-              aria-label="Close navigation"
-              title="Close navigation"
-              onClick={closeDrawer}
-              // Exact 44x44 target with the glyph centered, shrunk to nothing
-              // and separated from "New Chat" by the row's gap.
-              className={`${actionClass} h-11 w-11 shrink-0 justify-center px-0`}
-            >
-              <X size={20} />
-            </button>
-          )}
-        </div>
-        <nav
-          aria-label={mobile ? "Mobile navigation" : "Main navigation"}
-          className="space-y-1 px-2"
-        >
           <button
             type="button"
             aria-label="Chat"
@@ -219,33 +233,32 @@ export function AppShell({
           )}
         </nav>
         {compact ? (
-          <button
-            type="button"
-            aria-label="History"
-            title="History"
-            className={`${actionClass} mx-2 mt-6 justify-center px-0`}
-            onClick={() => {
-              setCollapsed(false);
-              requestAnimationFrame(() => desktopHistory.current?.focus());
-            }}
-          >
-            <History size={20} aria-hidden="true" />
-          </button>
+          <div className="px-2">
+            <button
+              type="button"
+              aria-label="History"
+              title="History"
+              className={`${navItemClass} justify-center px-0`}
+              onClick={() => {
+                setCollapsed(false);
+                requestAnimationFrame(() => desktopHistory.current?.focus());
+              }}
+            >
+              <History size={20} aria-hidden="true" />
+            </button>
+          </div>
         ) : (
-          <section className="min-h-0 flex flex-1 flex-col pt-6">
+          <section className="min-h-0 flex flex-1 flex-col border-t border-slate-200 pt-4 dark:border-slate-800">
             <div className="min-h-0 flex-1 overflow-y-auto px-2">
               <h2
                 ref={mobile ? mobileHistory : desktopHistory}
                 tabIndex={-1}
-                className="px-3 pb-2 text-xs font-semibold text-slate-500 dark:text-slate-400"
+                className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
               >
                 History
               </h2>
-              <p className="px-3 pb-2 text-xs text-slate-500 dark:text-slate-400">
-                This conversation
-              </p>
               {historyItems.length === 0 ? (
-                <p className="px-3 pb-2 text-sm text-slate-400 italic dark:text-slate-500">
+                <p className="px-3 pb-2 text-sm font-normal text-slate-400 dark:text-slate-500">
                   Your questions will appear here.
                 </p>
               ) : (
@@ -325,7 +338,7 @@ export function AppShell({
       <aside
         id="desktop-sidebar"
         data-collapsed={collapsed}
-        className={`hidden lg:flex ${collapsed ? "w-16" : "w-64"} shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900`}
+        className={`hidden md:flex ${collapsed ? "w-20" : "w-[260px]"} shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900`}
       >
         {navigation(false)}
       </aside>
@@ -336,45 +349,38 @@ export function AppShell({
               <button
                 ref={menuTrigger}
                 type="button"
-                aria-label="Open navigation"
+                data-testid="mobile-sidebar-toggle"
+                aria-label="Toggle sidebar"
                 aria-expanded={drawerOpen}
                 aria-controls="mobile-navigation"
-                onClick={() => setDrawerOpen(true)}
-                className={`${actionClass} lg:hidden`}
+                onClick={() => (drawerOpen ? closeDrawer() : setDrawerOpen(true))}
+                className={`${actionClass} md:hidden`}
               >
-                <Menu size={20} />
+                <PanelLeft size={20} aria-hidden="true" />
               </button>
               <button
                 id="sidebar-toggle"
                 type="button"
-                aria-label="Toggle sidebar"
+                aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
                 aria-expanded={!collapsed}
                 aria-controls="desktop-sidebar"
                 onClick={() => setCollapsed((value) => !value)}
-                className={`${actionClass} hidden lg:inline-flex`}
+                className={`${actionClass} hidden md:inline-flex`}
               >
-                <PanelLeft size={20} />
+                <PanelLeft size={20} aria-hidden="true" />
               </button>
-              <Shield className="hidden sm:block h-5 w-5 shrink-0" aria-hidden="true" />
-              <div>
+              <div className="flex min-w-0 items-center gap-2 md:hidden">
+                <Shield
+                  size={24}
+                  className="shrink-0 text-teal-700 dark:text-teal-400"
+                  aria-hidden="true"
+                />
                 <h1 className="text-sm font-bold">FAQ-Mate</h1>
-                <p className="hidden sm:block text-xs text-slate-600 dark:text-slate-400">
-                  Australian insurance, explained
-                </p>
               </div>
             </div>
             <div className="flex items-center gap-1">
               {!isThrottled && <RateLimitBadge rateLimit={rateLimit} />}
-              <button
-                type="button"
-                id="mobile-new-chat-button"
-                data-testid="mobile-new-chat-button"
-                aria-label="Start new chat"
-                onClick={onReset}
-                className={`${actionClass} justify-center px-0 lg:hidden`}
-              >
-                <Plus size={20} aria-hidden="true" />
-              </button>
             </div>
           </div>
           {isThrottled && (
@@ -388,27 +394,27 @@ export function AppShell({
         </main>
         <ComplianceFooter debugEnabled={debugMode} onToggleDebug={onToggleDebugMode} />
       </div>
-      {drawerOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            type="button"
-            aria-label="Close navigation backdrop"
-            tabIndex={-1}
-            onClick={closeDrawer}
-            className="absolute inset-0 w-full bg-slate-950/50"
-          />
-          <aside
-            ref={drawerRef}
-            id="mobile-navigation"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Navigation"
-            className="relative flex h-full w-64 max-w-[85vw] flex-col pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] bg-white shadow-xl dark:bg-slate-900"
-          >
-            {navigation(true)}
-          </aside>
-        </div>
-      )}
+      <div data-open={drawerOpen} className="mobile-navigation-layer fixed inset-0 z-50 md:hidden">
+        <button
+          type="button"
+          aria-label="Close navigation backdrop"
+          tabIndex={-1}
+          onClick={closeDrawer}
+          className="mobile-navigation-backdrop absolute inset-0 w-full bg-slate-950/50"
+        />
+        <aside
+          ref={drawerRef}
+          id="mobile-navigation"
+          role="dialog"
+          aria-modal="true"
+          aria-hidden={!drawerOpen}
+          inert={!drawerOpen || undefined}
+          aria-label="Navigation"
+          className="mobile-navigation-panel relative flex h-full w-[75vw] max-w-[320px] flex-col pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] bg-white shadow-xl dark:bg-slate-900"
+        >
+          {navigation(true)}
+        </aside>
+      </div>
     </div>
   );
 }

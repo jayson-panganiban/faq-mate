@@ -791,6 +791,8 @@ describe("history deletion persistence", () => {
       ])
     );
     render(<App />);
+    const sidebar = document.getElementById("desktop-sidebar");
+    if (!sidebar) throw new Error("Expected the desktop navigation sidebar");
     fireEvent.click(screen.getByTestId("history-delete-u1"));
     await waitFor(() =>
       expect(
@@ -800,9 +802,9 @@ describe("history deletion persistence", () => {
       ).toEqual(["u2", "a2"])
     );
     expect(screen.queryByText("First answer")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("Clear all history"));
-    expect(screen.getByText("Your questions will appear here.")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Undo deletion"));
+    fireEvent.click(within(sidebar).getByText("Clear all history"));
+    expect(within(sidebar).getByText("Your questions will appear here.")).toBeInTheDocument();
+    fireEvent.click(within(sidebar).getByText("Undo deletion"));
     expect(screen.getByText("Second answer")).toBeInTheDocument();
     await waitFor(() =>
       expect(JSON.parse(sessionStorage.getItem("faq_mate_chat_session") || "[]")).toHaveLength(2)

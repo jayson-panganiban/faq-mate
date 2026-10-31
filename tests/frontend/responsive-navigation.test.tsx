@@ -16,13 +16,14 @@ describe("Responsive navigation", () => {
         <button type="button">Page action</button>
       </AppShell>
     );
-    const trigger = screen.getByRole("button", { name: "Open navigation" });
+    const trigger = screen.getByTestId("mobile-sidebar-toggle");
     trigger.focus();
     fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
     const dialog = screen.getByRole("dialog", { name: "Navigation" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(screen.getByText("Page action").closest("[inert]")).not.toBeNull();
-    const first = within(dialog).getByRole("button", { name: "Start new chat" });
+    const first = within(dialog).getByRole("button", { name: "Close navigation" });
     const last = within(dialog).getByRole("button", { name: "Clear all history" });
     expect(first).toHaveFocus();
     fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
@@ -31,6 +32,10 @@ describe("Responsive navigation", () => {
     expect(first).toHaveFocus();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Navigation" })).not.toBeInTheDocument();
+    const drawer = document.getElementById("mobile-navigation");
+    expect(drawer).toHaveAttribute("aria-hidden", "true");
+    expect(drawer).toHaveAttribute("inert");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
     await waitFor(() => expect(trigger).toHaveFocus());
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("button", { name: "Close navigation backdrop" }));
@@ -38,21 +43,64 @@ describe("Responsive navigation", () => {
     await waitFor(() => expect(trigger).toHaveFocus());
   });
 
-  it("keeps new chat and navigation available on mobile and in the collapsed sidebar", async () => {
+  it("uses the sidebar panel toggle to open and close mobile navigation", async () => {
+    render(
+      <AppShell>
+        <button type="button">Page action</button>
+      </AppShell>
+    );
+
+    const trigger = screen.getByTestId("mobile-sidebar-toggle");
+    expect(trigger).toHaveAccessibleName("Toggle sidebar");
+    expect(trigger.querySelector("svg")).toHaveClass("lucide-panel-left");
+    fireEvent.click(trigger);
+
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(trigger.querySelector("svg")).toHaveClass("lucide-panel-left");
+    expect(screen.getByRole("dialog", { name: "Navigation" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close navigation" }));
+
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger.querySelector("svg")).toHaveClass("lucide-panel-left");
+    expect(screen.queryByRole("dialog", { name: "Navigation" })).not.toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("keeps mobile branding and drawer navigation available alongside the collapsible desktop sidebar", async () => {
     const reset = vi.fn();
     const compare = vi.fn();
-    render(
+    const { container } = render(
       <AppShell onReset={reset} onToggleComparison={compare}>
         <div>Body</div>
       </AppShell>
     );
-    fireEvent.click(screen.getByTestId("mobile-new-chat-button"));
+    const mobileHeaderBrand = screen.getByRole("heading", { name: "FAQ-Mate" });
+    expect(mobileHeaderBrand.parentElement).toHaveClass("md:hidden");
+    expect(mobileHeaderBrand.parentElement?.querySelector("svg")).toHaveClass("lucide-shield");
+    expect(mobileHeaderBrand.parentElement?.parentElement?.firstElementChild).toBe(
+      screen.getByTestId("mobile-sidebar-toggle")
+    );
+    expect(screen.queryByTestId("mobile-new-chat-button")).not.toBeInTheDocument();
+
+    const sidebar = container.querySelector("#desktop-sidebar");
+    expect(sidebar).toHaveClass("hidden", "md:flex", "w-[260px]");
+    fireEvent.click(screen.getByTestId("mobile-sidebar-toggle"));
+    const dialog = screen.getByRole("dialog", { name: "Navigation" });
+    expect(dialog).toHaveClass("w-[75vw]", "max-w-[320px]");
+    const mobileNavigation = within(dialog).getByRole("navigation", {
+      name: "Mobile navigation",
+    });
+    expect(mobileNavigation.firstElementChild).toHaveAccessibleName("Start new chat");
+    fireEvent.click(within(mobileNavigation).getByRole("button", { name: "Start new chat" }));
     expect(reset).toHaveBeenCalledTimes(1);
+
     const toggle = document.getElementById("sidebar-toggle") as HTMLButtonElement;
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(document.getElementById("desktop-sidebar")).toHaveAttribute("data-collapsed", "true");
+    expect(sidebar).toHaveClass("w-20");
     expect(screen.getByTestId("reset-chat-button")).toHaveAccessibleName("Start new chat");
     expect(screen.getByTestId("comparison-toggle")).toHaveAccessibleName(
       "Switch to policy comparison view"
@@ -60,7 +108,7 @@ describe("Responsive navigation", () => {
     fireEvent.click(screen.getByRole("button", { name: "History" }));
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     await waitFor(() => expect(screen.getByRole("heading", { name: "History" })).toHaveFocus());
-    const trigger = screen.getByRole("button", { name: "Open navigation" });
+    const trigger = screen.getByTestId("mobile-sidebar-toggle");
     fireEvent.click(trigger);
     fireEvent.click(
       within(screen.getByRole("dialog")).getByRole("button", { name: "Start new chat" })
@@ -151,22 +199,94 @@ describe("Responsive navigation", () => {
     expect(feed.scrollTop).toBe(250);
   });
 
-  it("styles the sidebar New Chat as a distinct bordered primary action", () => {
+  it("places the desktop sidebar toggle in the app header and New Chat first in navigation", () => {
     render(
-      <AppShell onReset={vi.fn()} onToggleComparison={vi.fn()}>
+      <AppShell isComparisonMode onReset={vi.fn()} onToggleComparison={vi.fn()}>
         <div>Body</div>
       </AppShell>
     );
 
-    const newChat = screen.getByTestId("reset-chat-button");
-    // Hairline border + faint surface visually separate it from the list
-    expect(newChat.className).toContain("border-slate-200");
-    expect(newChat.className).toContain("bg-slate-50");
+    const sidebar = document.getElementById("desktop-sidebar");
+    if (!sidebar) throw new Error("Expected the desktop navigation sidebar");
+    const header = sidebar.firstElementChild as HTMLElement;
+    const brand = within(header).getByRole("img", { name: "FAQ-Mate" });
+    const logo = brand.querySelector("svg");
+    expect(logo).toHaveClass("lucide-shield");
+    expect(logo).toHaveAttribute("width", "24");
+    expect(logo).toHaveAttribute("height", "24");
+    expect(brand).toHaveTextContent("FAQ-Mate");
+    expect(brand.className).toContain("px-2.5");
+    expect(
+      within(header).queryByRole("button", { name: "Collapse sidebar" })
+    ).not.toBeInTheDocument();
+    const desktopToggle = screen.getByRole("button", { name: "Collapse sidebar" });
+    expect(desktopToggle.id).toBe("sidebar-toggle");
+    expect(desktopToggle.closest("header")).not.toBeNull();
+    expect(desktopToggle.querySelector("svg")).toHaveClass("lucide-panel-left");
 
-    // Navigation rows must not adopt the primary container
-    const chatTab = screen.getByRole("button", { name: "Chat" });
-    expect(chatTab.className).not.toContain("border-slate-200");
-    expect(chatTab.className).not.toContain("bg-slate-50");
+    const desktopHeaderBrand = screen.getByRole("heading", { name: "FAQ-Mate" });
+    expect(desktopHeaderBrand.parentElement).toHaveClass("md:hidden");
+    const navigation = within(sidebar).getByRole("navigation", { name: "Main navigation" });
+    const newChat = screen.getByTestId("reset-chat-button");
+    const chatTab = within(navigation).getByRole("button", { name: "Chat" });
+    expect(newChat.parentElement).toBe(navigation);
+    expect(navigation.firstElementChild).toBe(newChat);
+    expect(newChat.className.trim()).toBe(chatTab.className.trim());
+    expect(newChat.className).not.toContain("border");
+    expect(newChat.className).not.toContain("bg-slate-50");
+
+    fireEvent.click(screen.getByTestId("mobile-sidebar-toggle"));
+    const dialog = screen.getByRole("dialog", { name: "Navigation" });
+    expect(dialog).toHaveClass("w-[75vw]", "max-w-[320px]");
+    const mobileHeader = dialog.firstElementChild as HTMLElement;
+    expect(within(mobileHeader).queryByRole("img", { name: "FAQ-Mate" })).not.toBeInTheDocument();
+    expect(mobileHeader.lastElementChild).toBe(
+      within(mobileHeader).getByRole("button", { name: "Close navigation" })
+    );
+    const mobileNavigation = within(dialog).getByRole("navigation", {
+      name: "Mobile navigation",
+    });
+    const mobileNewChat = within(dialog).getByRole("button", { name: "Start new chat" });
+    const mobileChatTab = within(dialog).getByRole("button", { name: "Chat" });
+    expect(mobileNewChat.parentElement).toBe(mobileNavigation);
+    expect(mobileNavigation.firstElementChild).toBe(mobileNewChat);
+    expect(mobileNewChat.className.trim()).toBe(mobileChatTab.className.trim());
+  });
+
+  it("centers the logo over the navigation icons when the desktop sidebar is collapsed", () => {
+    render(
+      <AppShell>
+        <div>Body</div>
+      </AppShell>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+
+    const sidebar = document.getElementById("desktop-sidebar");
+    if (!sidebar) throw new Error("Expected the desktop navigation sidebar");
+    const header = sidebar.firstElementChild as HTMLElement;
+    expect(header.className).toContain("justify-center");
+    expect(header.className).not.toContain("justify-between");
+  });
+
+  it("aligns the collapsed History button with the other navigation buttons", () => {
+    render(
+      <AppShell>
+        <div>Body</div>
+      </AppShell>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+
+    const sidebar = document.getElementById("desktop-sidebar");
+    if (!sidebar) throw new Error("Expected the desktop navigation sidebar");
+    const history = within(sidebar).getByRole("button", { name: "History" });
+    expect(history.parentElement).toHaveClass("px-2");
+    expect(history.className).toContain("w-full");
+    expect(history.className).toContain("justify-center");
+    expect(history.className).toContain("px-0");
+    expect(history.className).not.toContain("mt-");
+    expect(history.className).not.toContain("mx-2");
   });
 
   it("marks the active navigation tab with a muted gray highlight instead of the pale-green block", () => {
@@ -194,21 +314,30 @@ describe("Responsive navigation", () => {
     expect(compareTab.className).not.toContain("bg-teal-50");
   });
 
-  it("renders the empty history placeholder as a muted italic prompt", () => {
+  it("separates history with a hairline and uses a tracked heading with regular placeholder text", () => {
     render(
       <AppShell historyItems={[]} onReset={vi.fn()}>
         <div>Body</div>
       </AppShell>
     );
 
-    const heading = screen.getByRole("heading", { name: "History" });
-    // The header stays semibold slate-500; the placeholder recedes below it
+    const sidebar = document.getElementById("desktop-sidebar");
+    if (!sidebar) throw new Error("Expected the desktop navigation sidebar");
+    const section = within(sidebar).getByRole("heading", { name: "History" }).closest("section");
+    if (!section) throw new Error("Expected the history section");
+    expect(section.className).toContain("border-t");
+    expect(section.className).toContain("border-slate-200");
+    const heading = within(section).getByRole("heading", { name: "History" });
     expect(heading.className).toContain("font-semibold");
+    expect(heading.className).toContain("uppercase");
+    expect(heading.className).toContain("tracking-wider");
     expect(heading.className).toContain("text-slate-500");
-    const placeholder = screen.getByText("Your questions will appear here.");
-    expect(placeholder.className).toContain("italic");
+    expect(within(sidebar).queryByText("This conversation")).not.toBeInTheDocument();
+    const placeholder = within(section).getByText("Your questions will appear here.");
+    expect(placeholder.className).toContain("font-normal");
     expect(placeholder.className).toContain("text-slate-400");
     expect(placeholder.className).not.toContain("text-slate-500 ");
+    expect(placeholder.className).not.toContain("italic");
   });
 
   it("pins the drawer close control to the right edge with a 44x44 hit area", () => {
@@ -218,18 +347,13 @@ describe("Responsive navigation", () => {
       </AppShell>
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
+    fireEvent.click(screen.getByTestId("mobile-sidebar-toggle"));
     const dialog = screen.getByRole("dialog", { name: "Navigation" });
-    const newChat = within(dialog).getByRole("button", { name: "Start new chat" });
-    const row = newChat.parentElement as HTMLElement;
-
-    // Justified header row: the close control never crowds New Chat on narrow
-    // viewports because the row itself is space-between, not growth-dependent.
-    expect(row.className).toContain("justify-between");
-    // Mobile New Chat keeps its natural width; flex growth is desktop-only.
-    expect(newChat.className).not.toContain("flex-1");
-
-    const close = within(dialog).getByRole("button", { name: "Close navigation" });
+    expect(dialog.className).toContain("w-[75vw]");
+    expect(dialog.className).toContain("max-w-[320px]");
+    const header = dialog.firstElementChild as HTMLElement;
+    const close = within(header).getByRole("button", { name: "Close navigation" });
+    expect(close.querySelector("svg")).toHaveClass("lucide-chevron-left");
     expect(close.className).toContain("h-11");
     expect(close.className).toContain("w-11");
     expect(close.className).toContain("justify-center");
@@ -238,8 +362,8 @@ describe("Responsive navigation", () => {
     expect(close.className).toContain("min-h-[44px]");
     expect(close.className).toContain("min-w-[44px]");
     expect(close.className).toContain("shrink-0");
-    // It is the last control of the row, pushed to the drawer's right edge.
-    expect(row.lastElementChild).toBe(close);
+    // The drawer close control stays on the far right of the logo row.
+    expect(header.lastElementChild).toBe(close);
   });
 
   it("exposes the developer debug mode as a subtle footer switch", () => {
@@ -283,6 +407,27 @@ describe("Responsive navigation", () => {
 });
 
 describe("history actions", () => {
+  it("uses the same neutral hover colors as the sidebar navigation", () => {
+    render(
+      <AppShell historyItems={[{ id: "one", label: "Flood question" }]}>
+        <div>Body</div>
+      </AppShell>
+    );
+
+    const sidebar = document.getElementById("desktop-sidebar");
+    if (!sidebar) throw new Error("Expected the desktop navigation sidebar");
+    const historyItem = within(sidebar).getByTestId("history-item-one");
+    const historyButton = within(historyItem).getByRole("button", { name: "Flood question" });
+    expect(historyButton).toHaveClass(
+      "hover:bg-slate-100",
+      "hover:text-slate-900",
+      "dark:hover:bg-slate-800",
+      "dark:hover:text-white"
+    );
+    expect(historyButton.className).not.toContain("hover:bg-teal-50");
+    expect(historyButton.className).not.toContain("hover:text-teal-800");
+  });
+
   it("deletes without selecting, and reveals the mobile action only after a left swipe", () => {
     const select = vi.fn();
     const remove = vi.fn();
@@ -298,7 +443,7 @@ describe("history actions", () => {
     fireEvent.click(screen.getByTestId("history-delete-one"));
     expect(remove).toHaveBeenCalledWith("one");
     expect(select).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
+    fireEvent.click(screen.getByTestId("mobile-sidebar-toggle"));
     const dialog = screen.getByRole("dialog");
     const row = within(dialog).getByTestId("history-item-one");
     const action = within(row).getByTestId("history-swipe-delete-one");

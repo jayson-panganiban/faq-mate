@@ -9,6 +9,30 @@ import { RateLimitBadge } from "../../src/frontend/components/RateLimitBadge";
 import type { RateLimitInfo } from "../../src/frontend/types/chat-ui";
 
 describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
+  describe("InputBar submit icon", () => {
+    it("renders an enclosed, heavier upward arrow for the send action", () => {
+      render(<InputBar onSend={vi.fn()} isLoading={false} isThrottled={false} />);
+
+      const button = screen.getByTestId("send-button");
+      const icon = button.querySelector("svg");
+      expect(icon).toHaveClass("lucide-arrow-up");
+      expect(icon).toHaveAttribute("stroke-width", "3");
+      expect(button).toHaveClass("bg-slate-200", "dark:bg-slate-700");
+      expect(button).toHaveClass("rounded-full");
+
+      fireEvent.change(screen.getByTestId("chat-input-textarea"), {
+        target: { value: "When is flood covered?" },
+      });
+      expect(button).toBeEnabled();
+      expect(button).toHaveClass(
+        "bg-teal-700",
+        "text-white",
+        "dark:bg-teal-400",
+        "dark:text-slate-950"
+      );
+    });
+  });
+
   describe("RateLimitBadge Component", () => {
     beforeEach(() => {
       vi.useFakeTimers();

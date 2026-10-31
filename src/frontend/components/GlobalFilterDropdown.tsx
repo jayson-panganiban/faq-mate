@@ -5,6 +5,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -86,6 +87,16 @@ const DESKTOP_QUERY = "(min-width: 1024px)";
 
 /** Drag distance (px) past which the mobile sheet commits dismissal. */
 const DRAG_DISMISS_THRESHOLD = 96;
+const DESKTOP_MENU_MARGIN = 8;
+const DESKTOP_MENU_MAX_HEIGHT = 322; // 20rem content height plus the menu border.
+
+interface DesktopMenuPosition {
+  top: number;
+  left: number;
+  width: number;
+  maxHeight: number;
+  placement: "above" | "below";
+}
 
 /* --- Locked dropdown aesthetics (Spec 05 §4.1) — the single source of truth.
      Never copy these classes to screen code; compose this component instead. */
@@ -139,7 +150,8 @@ function useDesktopViewport(): boolean {
  *
  * Renders the approved selection menu design as a single responsive control:
  * an anchored command palette above the mobile breakpoint and a bottom sheet
- * below it. Both views share the same state logic (open/search/selection,
+ * below it. Desktop field pickers escape scroll clipping and flip to the
+ * available side of their trigger. Both views share the same state logic (open/search/selection,
  * focus trap, keyboard navigation) and the locked internal UI (sticky hairline
  * search bar, muted small-caps group headers, flat hairline checklist rows,
  * deepened gray selection with a teal checkmark). Screen code must compose
@@ -169,6 +181,7 @@ export function GlobalFilterDropdown({
   const [query, setQuery] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
+  const [desktopMenuPosition, setDesktopMenuPosition] = useState<DesktopMenuPosition | null>(null);
   const isDesktop = useDesktopViewport();
 
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -226,6 +239,74 @@ export function GlobalFilterDropdown({
     if (!isOpen) return;
     requestAnimationFrame(() => searchRef.current?.focus());
   }, [isOpen]);
+
+  useLayoutEffect(() => {
+    if (!isOpen || !isDesktop || variant !== "field") {
+      setDesktopMenuPosition(null);
+      return;
+    }
+
+    const trigger = triggerRef.current;
+    const menu = contentRef.current;
+    if (!trigger || !menu) return;
+
+    const updatePosition = () => {
+      const triggerRect = trigger.getBoundingClientRect();
+      const menuHeight = Math.min(
+        menu.getBoundingClientRect().height || DESKTOP_MENU_MAX_HEIGHT,
+        DESKTOP_MENU_MAX_HEIGHT,
+        window.innerHeight * 0.6
+      );
+      const availableAbove = Math.max(0, triggerRect.top - DESKTOP_MENU_MARGIN);
+      const availableBelow = Math.max(
+        0,
+        window.innerHeight - triggerRect.bottom - DESKTOP_MENU_MARGIN
+      );
+      const placement =
+        availableAbove >= menuHeight || availableAbove >= availableBelow ? "above" : "below";
+      const availableSpace = placement === "above" ? availableAbove : availableBelow;
+      const width = Math.min(320, window.innerWidth - DESKTOP_MENU_MARGIN * 2);
+      const left = Math.max(
+        DESKTOP_MENU_MARGIN,
+        Math.min(triggerRect.left, window.innerWidth - width - DESKTOP_MENU_MARGIN)
+      );
+      const position: DesktopMenuPosition = {
+        top:
+          placement === "above"
+            ? triggerRect.top - Math.min(menuHeight, availableSpace)
+            : triggerRect.bottom,
+        left,
+        width,
+        maxHeight: Math.min(menuHeight, availableSpace),
+        placement,
+      };
+
+      setDesktopMenuPosition((current) =>
+        current &&
+        current.top === position.top &&
+        current.left === position.left &&
+        current.width === position.width &&
+        current.maxHeight === position.maxHeight &&
+        current.placement === position.placement
+          ? current
+          : position
+      );
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    const resizeObserver =
+      typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(updatePosition);
+    resizeObserver?.observe(trigger);
+    resizeObserver?.observe(menu);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      resizeObserver?.disconnect();
+    };
+  }, [isDesktop, isOpen, variant]);
 
   // Escape dismisses and Tab traps focus inside whichever wrapper is mounted.
   // The content node is resolved at event time so a viewport flip (inline
@@ -439,6 +520,42 @@ export function GlobalFilterDropdown({
   );
 
   const chipLabel = isDefault ? (emptyLabel ?? allOption?.label ?? "") : selectedLabel;
+  const desktopMenu =
+    isOpen && isDesktop ? (
+      <div
+        ref={contentRef}
+        id={ids.menu}
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        data-testid={testIds.menu}
+        data-placement={desktopMenuPosition?.placement}
+        className={`${variant === "field" ? "fixed" : "absolute bottom-full left-0"} z-50 w-[320px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900`}
+        style={
+          variant === "field"
+            ? {
+                top: desktopMenuPosition?.top ?? 0,
+                left: desktopMenuPosition?.left ?? 0,
+                width: desktopMenuPosition?.width ?? 320,
+                maxHeight: desktopMenuPosition?.maxHeight,
+                visibility: desktopMenuPosition ? "visible" : "hidden",
+              }
+            : undefined
+        }
+      >
+        <div
+          className="max-h-[min(20rem,60vh)] overflow-y-auto overscroll-contain"
+          style={
+            variant === "field" && desktopMenuPosition
+              ? { maxHeight: Math.max(0, desktopMenuPosition.maxHeight - 2) }
+              : undefined
+          }
+        >
+          {stickySearch}
+          {options}
+        </div>
+      </div>
+    ) : null;
 
   return (
     <div className={`inline-block ${anchorTo === "container" ? "" : "relative"} ${className}`}>
@@ -495,25 +612,8 @@ export function GlobalFilterDropdown({
         </span>
       </button>
 
-      {isOpen && isDesktop && (
-        // Desktop: floating command palette anchored flush above the anchor
-        // root — the trigger wrapper, or the nearest positioned ancestor
-        // (e.g. the rectangular composer card) when `anchorTo="container"`.
-        <div
-          ref={contentRef}
-          id={ids.menu}
-          role="dialog"
-          aria-modal="true"
-          aria-label={ariaLabel}
-          data-testid={testIds.menu}
-          className="absolute bottom-full left-0 z-50 w-[320px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900"
-        >
-          <div className="max-h-[min(20rem,60vh)] overflow-y-auto overscroll-contain">
-            {stickySearch}
-            {options}
-          </div>
-        </div>
-      )}
+      {desktopMenu &&
+        (variant === "field" ? createPortal(desktopMenu, document.body) : desktopMenu)}
 
       {isOpen &&
         !isDesktop &&

@@ -17,7 +17,7 @@ export interface InputBarProps {
  * A rectangular 12px-radius card with a crisp 1px border (no pill rounding):
  * the query textarea owns the full-width top row, and a dedicated toolbar row
  * beneath it hosts the insurer filter (anchored command palette on desktop,
- * native bottom sheet on mobile) plus the deep teal/slate submit action.
+ * native bottom sheet on mobile) plus the enclosed upward-arrow submit action.
  * Turnstile PDS verification mounts outside the card.
  */
 export function InputBar({
@@ -184,12 +184,12 @@ export function InputBar({
             onClick={handleSend}
             disabled={isSendDisabled}
             aria-label="Send message"
-            className={`flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${isSendDisabled ? "text-slate-400 cursor-not-allowed dark:text-slate-600" : "text-teal-700 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-slate-800"}`}
+            className={`flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${isSendDisabled ? "cursor-not-allowed bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400" : "cursor-pointer bg-teal-700 text-white hover:bg-teal-800 dark:bg-teal-400 dark:text-slate-950 dark:hover:bg-teal-300"}`}
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
             ) : (
-              <ArrowUp className="h-5 w-5 stroke-[2.5]" aria-hidden="true" />
+              <ArrowUp className="h-5 w-5" strokeWidth={3} aria-hidden="true" />
             )}
           </button>
         </div>

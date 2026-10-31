@@ -90,7 +90,7 @@ export function HistoryItem({ id, label, onSelect, onDelete, mobile }: HistoryIt
         <button
           type="button"
           data-history-select
-          className="min-h-[44px] min-w-0 flex-1 cursor-pointer rounded-lg px-3 text-left text-sm font-medium break-words text-slate-700 hover:bg-teal-50 hover:text-teal-800 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500 dark:text-slate-200 dark:hover:bg-slate-800"
+          className="min-h-[44px] min-w-0 flex-1 cursor-pointer rounded-lg px-3 text-left text-sm font-medium break-words text-slate-700 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
           onClick={() => {
             if (suppressClick.current) {
               suppressClick.current = false;

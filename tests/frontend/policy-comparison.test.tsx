@@ -78,6 +78,60 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
     expect(screen.getAllByText(/AAI Limited/i).length).toBeGreaterThan(0);
   });
 
+  it("keeps the desktop picker visible and selectable when it opens near the scroll viewport top", () => {
+    const originalMatchMedia = window.matchMedia;
+    const originalInnerHeight = window.innerHeight;
+    const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+    window.matchMedia = () => Object.assign(new EventTarget(), { matches: true }) as MediaQueryList;
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 900 });
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      if (this.getAttribute("data-testid") === "insurer-a-trigger")
+        return new DOMRect(474, 221, 104, 44);
+      if (this.getAttribute("data-testid") === "insurer-b-trigger")
+        return new DOMRect(859, 650, 104, 44);
+      if (
+        this.getAttribute("data-testid") === "insurer-a-menu" ||
+        this.getAttribute("data-testid") === "insurer-b-menu"
+      ) {
+        const top = Number.parseFloat(this.style.top) || -101;
+        return new DOMRect(474, top, 320, 322);
+      }
+      return originalGetBoundingClientRect.call(this);
+    };
+
+    const { unmount } = render(<PolicyComparisonView />);
+    try {
+      fireEvent.click(screen.getByTestId("insurer-a-trigger"));
+
+      const menu = screen.getByTestId("insurer-a-menu");
+      expect(menu.parentElement).toBe(document.body);
+      expect(menu).toHaveClass("fixed");
+      expect(menu.getBoundingClientRect().top).toBeGreaterThanOrEqual(0);
+      expect(menu.getBoundingClientRect().bottom).toBeLessThanOrEqual(window.innerHeight);
+      expect(Number.parseFloat(menu.style.maxHeight)).toBeLessThanOrEqual(322);
+      expect(menu).toHaveAttribute("data-placement", "below");
+      fireEvent.click(screen.getByRole("option", { name: "GIO" }));
+      expect(screen.getByTestId("insurer-a-trigger")).toHaveTextContent("GIO");
+
+      fireEvent.click(screen.getByTestId("insurer-b-trigger"));
+      const comparisonMenu = screen.getByTestId("insurer-b-menu");
+      expect(comparisonMenu.parentElement).toBe(document.body);
+      expect(comparisonMenu.getBoundingClientRect().top).toBeGreaterThanOrEqual(0);
+      expect(comparisonMenu.getBoundingClientRect().bottom).toBeLessThanOrEqual(window.innerHeight);
+      expect(comparisonMenu).toHaveAttribute("data-placement", "above");
+      fireEvent.click(screen.getByRole("option", { name: "Allianz" }));
+      expect(screen.getByTestId("insurer-b-trigger")).toHaveTextContent("Allianz");
+    } finally {
+      unmount();
+      window.matchMedia = originalMatchMedia;
+      Object.defineProperty(window, "innerHeight", {
+        configurable: true,
+        value: originalInnerHeight,
+      });
+      HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    }
+  });
+
   it("disables the counterpart insurer so the two pickers cannot collide", () => {
     render(<PolicyComparisonView />);
 

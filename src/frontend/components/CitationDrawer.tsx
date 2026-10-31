@@ -39,7 +39,7 @@ export interface CitationDrawerProps {
 /**
  * CitationDrawer Component
  *
- * Slide-over Grounding Inspector sheet displaying the exact operative policy wording
+ * Slide-over Policy sources sheet displaying the exact operative policy wording
  * retrieved from R2 via Cloudflare AI Search hybrid retrieval.
  * Features:
  * - Operative section breadcrumb (Insurer > Product PDS > Section > Clause)
@@ -155,10 +155,10 @@ export function CitationDrawer({
                   id="citation-drawer-title"
                   className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight"
                 >
-                  Grounding Inspector
+                  Policy sources
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Operative Insurance Policy Verification
+                  Read the policy wording
                 </p>
               </div>
             </div>
@@ -303,11 +303,6 @@ export function CitationDrawer({
                     {currentChunk.source.docType}
                   </span>
 
-                  {/* Chunk ID Badge */}
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
-                    {currentChunk.id}
-                  </span>
-
                   {/* Effective Date if Present */}
                   {currentChunk.source.effectiveDate && (
                     <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-slate-600 dark:text-slate-300 bg-slate-100 border border-slate-200 dark:bg-slate-800 dark:border-slate-700">
@@ -363,12 +358,10 @@ export function CitationDrawer({
                 <div className="p-3.5 rounded-lg bg-sky-50/70 border border-sky-100 dark:bg-sky-950/40 dark:border-sky-900/60 text-xs text-sky-900 dark:text-sky-200 space-y-1">
                   <div className="font-semibold flex items-center gap-1.5 text-sky-800 dark:text-sky-300">
                     <ShieldCheck className="w-4 h-4 text-sky-600 dark:text-sky-400 flex-shrink-0" />
-                    <span>Verbatim Grounding Verification</span>
+                    <span>About this source</span>
                   </div>
                   <p className="text-[11px] leading-relaxed text-sky-800/90 dark:text-sky-300/90">
-                    This excerpt was retrieved directly from the insurer&apos;s operative disclosure
-                    documents stored in R2 via Cloudflare AI Search hybrid retrieval. The generated
-                    answer reflects these terms pursuant to ASIC RG 244 factual advice standards.
+                    Check this excerpt alongside the full policy document for context.
                   </p>
                 </div>
               </div>
@@ -378,7 +371,7 @@ export function CitationDrawer({
           {/* Drawer Footer */}
           <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 flex items-center justify-between pb-[max(1rem,env(safe-area-inset-bottom))]">
             <span className="text-[11px] text-slate-500 dark:text-slate-400">
-              {chunks.length} {chunks.length === 1 ? "retrieved chunk" : "retrieved chunks"}
+              {chunks.length} {chunks.length === 1 ? "source" : "sources"}
             </span>
             <button
               type="button"

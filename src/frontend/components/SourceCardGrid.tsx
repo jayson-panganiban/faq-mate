@@ -1,4 +1,3 @@
-import { BookOpen, ChevronRight, Shield } from "lucide-react";
 import type { GroundedChunk } from "../../types/chat";
 import { formatProductDoc } from "../utils/citations";
 
@@ -8,7 +7,7 @@ export interface SourceCardGridProps {
    */
   chunks?: GroundedChunk[];
   /**
-   * Callback fired when a source card is clicked.
+   * Callback fired when a source document is selected.
    */
   onSelectCitation?: (chunk: GroundedChunk) => void;
   /**
@@ -17,125 +16,65 @@ export interface SourceCardGridProps {
   className?: string;
 }
 
-/**
- * Formats relevance score (0.0 - 1.0) into a readable integer percentage.
- */
-function formatRelevancePercent(score?: number): string {
-  if (typeof score !== "number" || Number.isNaN(score)) return "";
-  const pct = Math.min(100, Math.max(0, Math.round(score * 100)));
-  return `${pct}% match`;
+/** Plain-text previews only; opening a source always uses the untouched chunk. */
+function plainSnippet(markdown: string): string {
+  return markdown
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/```[^\n]*\n([\s\S]*?)```/g, "$1")
+    .replace(/!?\[([^\]]*)\]\([^\s]*(?:\s+[^)]*)?\)/g, "$1")
+    .replace(/^\s{0,3}(?:#{1,6}\s+|>\s*|[-+*]\s+|\d+[.)]\s+)/gm, "")
+    .replace(/\s+#+\s*$/gm, "")
+    .replace(/^\s*\|?[\s:|-]*-{3}[\s:|-]*\|?\s*$/gm, " ")
+    .replace(/<https?:\/\/[^>]+>/g, "")
+    .replace(/<\/?[a-z][^>]*>/gi, "")
+    .replace(/https?:\/\/[^\s]+/g, "")
+    .replace(/[*_`~]+/g, "")
+    .replace(/\|/g, " · ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**
- * SourceCardGrid Component
- *
- * Implements the Perplexity-style Answer Engine Sources Shelf.
- * Positioned at the top of an answer dossier, it renders interactive cards for
- * every retrieved PDS/SPDS policy section, displaying insurer brand, document title,
- * section hierarchy, match relevance, and a short snippet preview.
+ * Compact source list above the answer. Titles open the citation drawer;
+ * snippets are plain-text previews without cards or relevance badges.
  */
 export function SourceCardGrid({ chunks, onSelectCitation, className = "" }: SourceCardGridProps) {
-  if (!chunks || chunks.length === 0) {
-    return null;
-  }
+  if (!chunks?.length) return null;
 
   return (
     <section
       data-testid="sources-shelf"
-      aria-label="Operative Policy Sources"
-      className={`mb-4 pb-3 border-b border-slate-200/80 dark:border-slate-800 ${className}`}
+      aria-label="Sources"
+      className={`mb-4 min-w-0 ${className}`}
     >
-      <div className="flex items-center justify-between gap-2 mb-2.5">
-        <div className="flex items-center gap-2">
-          <div
-            className="w-5 h-5 rounded-md bg-sky-100 dark:bg-sky-950/80 text-sky-700 dark:text-sky-300 flex items-center justify-center shrink-0"
-            aria-hidden="true"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-          </div>
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-            Operative Sources
-          </h4>
-          <span
-            data-testid="sources-count-badge"
-            className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 tabular-nums"
-          >
-            {chunks.length}
-          </span>
-        </div>
-
-        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hidden sm:inline">
-          Grounded in Australian General Insurance PDS
-        </span>
-      </div>
-
-      {/* Responsive Sources Shelf: Horizontal Snap Carousel on Mobile, Grid on Tablet/Desktop */}
-      <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-2.5 overflow-x-auto sm:overflow-visible pb-2 sm:pb-0 scrollbar-none snap-x -mx-1 px-1 sm:mx-0 sm:px-0">
-        {chunks.map((chunk, idx) => {
-          const productDoc = formatProductDoc(chunk.source.product, chunk.source.docType);
-          const matchPercent = formatRelevancePercent(chunk.relevanceScore);
-          const indexNumber = idx + 1;
-
+      <h4 className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">Sources</h4>
+      <ul className="space-y-1">
+        {chunks.map((chunk, index) => {
+          const title = plainSnippet(formatProductDoc(chunk.source.product, chunk.source.docType));
+          const snippet = plainSnippet(chunk.content);
           return (
-            <button
-              key={chunk.id || `chunk-${idx}`}
-              type="button"
-              data-testid={`source-card-${idx}`}
-              onClick={() => onSelectCitation?.(chunk)}
-              aria-label={`View source: ${productDoc}, ${chunk.source.section}`}
-              className="group relative p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-sky-400 dark:hover:border-sky-500 hover:shadow-xs transition-[border-color,box-shadow,transform] duration-150 active:scale-[0.99] text-left cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 focus-visible:outline-hidden flex flex-col justify-between gap-2 min-h-[96px] w-[230px] sm:w-auto shrink-0 sm:shrink snap-start"
-            >
-              {/* Card Header: Index Badge + Insurer Brand + Relevance */}
-              <div className="flex items-center justify-between gap-1.5 w-full">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span
-                    data-testid={`source-card-badge-${idx}`}
-                    className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 tabular-nums shrink-0 group-hover:bg-sky-100 group-hover:text-sky-700 dark:group-hover:bg-sky-900/80 dark:group-hover:text-sky-300 transition-colors"
-                  >
-                    {indexNumber}
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 truncate max-w-[110px]">
-                    <Shield
-                      className="w-2.5 h-2.5 text-sky-600 dark:text-sky-400 shrink-0"
-                      aria-hidden="true"
-                    />
-                    <span className="truncate">{chunk.source.insurer}</span>
-                  </span>
-                </div>
-
-                {matchPercent && (
-                  <span className="text-[10px] tabular-nums font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded shrink-0">
-                    {matchPercent}
+            <li key={chunk.id || index} className="min-w-0">
+              <button
+                type="button"
+                data-testid={`source-card-${index}`}
+                onClick={() => onSelectCitation?.(chunk)}
+                aria-label={`View source: ${title}, ${chunk.source.section}`}
+                title={`${title}, ${chunk.source.section}`}
+                className="group block min-h-[44px] w-full min-w-0 py-1 text-left cursor-pointer focus-visible:outline-2 focus-visible:outline-teal-600"
+              >
+                <span className="block truncate text-sm font-medium text-slate-700 underline decoration-slate-300 underline-offset-2 group-hover:text-slate-950 dark:text-slate-200 dark:decoration-slate-600 dark:group-hover:text-white">
+                  {title}
+                </span>
+                {snippet && (
+                  <span className="mt-0.5 line-clamp-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                    {snippet}
                   </span>
                 )}
-              </div>
-
-              {/* Card Middle: Product Doc & Section Hierarchy */}
-              <div className="space-y-0.5 w-full">
-                <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
-                  {productDoc}
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                  {chunk.source.section}
-                </p>
-              </div>
-
-              {/* Card Bottom: Snippet Excerpt */}
-              {chunk.content && (
-                <p className="text-[11px] text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed text-left">
-                  {chunk.content}
-                </p>
-              )}
-
-              {/* Card Footer Hover Hint */}
-              <div className="flex items-center justify-end text-[10px] font-medium text-sky-600 dark:text-sky-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span>Inspect in drawer</span>
-                <ChevronRight className="w-3 h-3 ml-0.5" aria-hidden="true" />
-              </div>
-            </button>
+              </button>
+            </li>
           );
         })}
-      </div>
+      </ul>
     </section>
   );
 }

@@ -87,7 +87,10 @@ stateDiagram-v2
 
 ## 4. Key UI Capabilities
 
-### 4.1 39-Insurer Grouped Dropdown (`InputBar.tsx`)
+### 4.1 Chat Layout and 39-Insurer Grouped Dropdown (`InputBar.tsx`)
+* The viewport uses a fixed-height flex column: a non-shrinking header and footer surround a `min-h-0` main region, with an independently scrolling conversation and non-shrinking bottom composer.
+* Consumer copy omits infrastructure telemetry and model labels. The grouped insurer selector is an icon control inside the floating composer; its current selection is named for assistive technology and available as a title.
+* Empty conversations start at the top of the mobile chat region so the heading and starter questions appear immediately; starter questions wrap without truncation. The composer is followed by centered inline legal and privacy controls.
 * Uses `getGroupedInsurerOptions()` ([`src/constants/insurers.ts`](../../src/constants/insurers.ts)) to render categorized `<optgroup>` options:
   * **All Insurers (General Corpus)**
   * **Suncorp Group (6):** Suncorp, AAMI, GIO, APIA, Shannons, Bingle
@@ -98,6 +101,8 @@ stateDiagram-v2
 * Automatically resolves bancassurance queries (e.g. "CommBank") to their issuing underwriter ("Allianz").
 
 ### 4.2 Interactive Citation Drawer (`CitationDrawer.tsx` & `CitationPill.tsx`)
+* The source shelf is a compact vertical list headed "Sources", with borderless document title controls and single-line, plain-text snippet previews. Markdown formatting is stripped only from previews; selecting a title opens the original source in the citation drawer. No match scores, insurer badges, counters, or horizontal carousel appear in the list.
+* Inline citations are small bracketed references with accessible source details and open the citation drawer. Citation-only paragraphs and list entries keep a readable document title instead of an isolated marker; this presentation is identical across viewport sizes. Empty Markdown list markers are omitted. Descriptive links replace raw HTTP(S) URLs in answer prose, and related questions appear as muted text controls.
 * Detects citation patterns formatted as `[Source: {insurer} {product} ({section})]` or `[Insurer Product, Section X]`.
 * Maps citation strings to retrieved chunks via `findMatchingChunk()` using a 4-tier match strategy:
   1. Direct chunk ID match
@@ -110,7 +115,7 @@ stateDiagram-v2
   * Retrieval relevance score badge (e.g. `94% match`)
   * Full operative section excerpt rendered as formatted Markdown with tables
 
-### 4.3 39-Insurer Policy Comparison Matrix (`PolicyComparisonView.tsx`)
+### 4.3 39-Insurer Policy Comparison (`PolicyComparisonView.tsx`)
 * Allows users to select two insurers from all 39 primary brands and compare policy terms across standard dimensions (`POLICY_COMPARISON_DIMENSIONS`):
   * Building & Contents Coverage
   * Accidental Damage
@@ -120,7 +125,8 @@ stateDiagram-v2
   * Standard Basic Excess
   * Towing & Emergency Assistance
 * Displays category baseline conditions with insurer-specific schedule overrides via `resolvePolicyComparisonCell()`.
-* Overlays active retrieved chunks from the current chat session to ground comparative rows in real policy text.
+* Renders each coverage category as a standalone heading followed by the primary insurer’s terms and then the comparison insurer’s terms in a vertical definition list. There is no horizontal comparison table or outer card.
+* The screen uses the title "Compare Policies", direct insurer selectors, and a plain Back control at the top left. Policy sources from the current chat remain accessible below the comparisons.
 
 ### 4.4 Regulatory & Life-Safety Cards
 * **ASIC RG 244 Safe-Harbor Card (`RefusalCard.tsx`):** Triggered when `ADVICE_BOUNDARY_VIOLATION` is received; renders safe-harbor advice refusal, explains the statutory boundary, and presents factual inquiry suggestions.
@@ -128,7 +134,7 @@ stateDiagram-v2
 * **Statutory GAW Footer & Multi-Layer Deduplication (`StatutoryGaw.tsx`, `src/constants/statutory.ts`, `AssistantMessage.tsx`, `RefusalCard.tsx`, `AppShell.tsx`):**
   * Persistent, non-dismissible Section 949A disclaimer rendered via `<StatutoryGaw />`.
   * `stripStatutoryGaw()` and `isGawDisclaimerText()` in `src/constants/statutory.ts` strip raw LLM-emitted GAW boilerplate (exact copy, headings, bold/italic, blockquotes, bullets, numbered items, quotes, and partial streaming tails) from `AssistantMessage`, `RefusalCard`, and `useChatStream` multi-turn history, while preserving educational explanations of Section 949A.
-  * Viewport-level coordination between `AppShell`, `ChatContainer`, `AssistantMessage`, and `RefusalCard` ensures only a single `<StatutoryGaw />` banner is displayed on screen at any time.
+  * `AppShell` owns one persistent canonical warning in `<ComplianceFooter />` across chat, streaming, refusal, and comparison views. `ChatContainer` disables inline warning cards; the footer expands in normal flow inside a bounded scroll area so legal and privacy details cannot overlap the composer.
 * **Known Policy Exclusion vs. Silent PDS Notice Demarcation (`AssistantMessage.tsx`):**
   * Standard insurance specialist answers routinely state what is excluded (*"Storm surge and actions of the sea are not covered"* or *"The policy does not cover damage during the first 72 hours"*). These are **known contractual exclusions**, not missing policy data.
   * `SILENT_PDS_REGEX` in [`src/frontend/components/AssistantMessage.tsx`](../../src/frontend/components/AssistantMessage.tsx) must strictly match genuine **Policy Silence / Unlisted Hazard** admissions (`does not specify`, `silent on`, `policy is silent`, `pds is silent`, `unlisted domestic hazard`, `not named in the insured events`, e.g., AFCA TC-10 `pet chimpanzee`) and must **never** match ordinary exclusion statements (`not covered`, `does not cover`, `is excluded`).
@@ -156,3 +162,16 @@ The frontend test suite (`tests/frontend/`) executes 11 test suites covering 84 
 | # | Gap | Current Behaviour | Target Behaviour |
 | :--- | :--- | :--- | :--- |
 | G6 | User Feedback Submission | Feedback score column exists in D1 schema; UI does not have thumbs up/down buttons. | Add feedback buttons on `AssistantMessage` that dispatch to `POST /api/feedback`. |
+
+
+### Responsive navigation and composer
+
+At 1024px and wider, a persistent sidebar lists the current session's user questions and navigation. On smaller screens, navigation opens in a modal drawer with trapped focus, Escape and backdrop dismissal, and focus restoration; a standalone new-chat action remains in the mobile header. The desktop sidebar is the only global navigation surface, with New Chat first, and collapses from 256px to a 64px icon rail. Its top-left header toggle preserves an 800px maximum chat width centered in the remaining space; selecting History expands the sidebar. Selecting a question returns to chat and scrolls to that message, including repeated selections. Switching to comparison and back preserves the unsent draft. Enter submits a question, Shift+Enter inserts a newline, and Enter during IME composition does not submit. The send control sits inside the textarea row, the insurer selector is embedded in the floating pill, and the keyboard hint is available to assistive technology. Mobile header icons use borderless 44px hit areas, starter questions begin at the top of the chat region, the composer is followed by an inline disclosure footer, and the shell follows visual viewport height during keyboard resizing while ignoring pinch zoom.
+
+Chat messages use an unframed assistant response and a right-aligned soft-blue user bubble. Tables retain horizontal scrolling and semantic headers without an outer card. The centered footer has plain General advice warning and Privacy controls, with disclosures expanding in normal flow.
+
+History lists the current conversation's questions, not archived sessions. Deleting a question removes its associated answer; the desktop row exposes a contextual delete control, while mobile rows reveal Delete on a left swipe and support the Delete key. Clear all history and Undo deletion appear at the bottom of the expanded history panel. Deletions update session storage and subsequent conversation context; deleting an active turn or clearing history cancels its stream.
+
+### Feed scrolling and layout invariants
+
+Automatic streaming updates, explicit bottom jumps, and history navigation scroll only the message feed, never ancestor layout containers. Automatic following is immediate so intermediate smooth-scroll events cannot disable anchoring. Manual reading position is preserved; feed resizing rechecks the bottom distance. The bottom-jump control occupies a reserved row above the composer and never overlays response text.

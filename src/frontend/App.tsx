@@ -7,6 +7,7 @@ import { PolicyComparisonView } from "./components/PolicyComparisonView";
 import { useChatStream } from "./hooks/useChatStream";
 import type { ChatMessage, GroundedChunk } from "./types/chat-ui";
 import { findMatchingChunk } from "./utils/citations";
+import { sanitizeClientPii } from "./utils/client-pii-scrubber";
 
 const STORAGE_KEY = "faq_mate_chat_session";
 
@@ -73,11 +74,16 @@ export function App() {
     setSelectedCitation,
     sendMessage,
     reset,
+    deleteTurn,
+    clearHistory,
+    undoHistoryDeletion,
+    canUndoHistoryDeletion,
   } = useChatStream({ initialMessages });
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedChunkId, setSelectedChunkId] = useState<string | undefined>(undefined);
   const [isComparisonMode, setIsComparisonMode] = useState(false);
+  const [historySelection, setHistorySelection] = useState<{ id: string; sequence: number }>();
 
   // Sync message updates to sessionStorage
   useEffect(() => {
@@ -165,32 +171,37 @@ export function App() {
     status === "CONNECTING" || status === "METADATA_RECEIVED" || status === "STREAMING";
   const isThrottled = status === "THROTTLED" || rateLimit.remaining <= 0;
 
-  // Hide the footer GAW when an inline StatutoryGaw is already rendered on a completed message
-  // or refusal card in the active chat view, preventing duplicate GAW banners on screen.
-  const hasInlineGaw =
-    !isComparisonMode &&
-    messages.some((msg, idx) => {
-      if (msg.role === "user") return false;
-      if (msg.refusal?.code === "ADVICE_BOUNDARY_VIOLATION") return true;
-      if (msg.refusal?.code === "EMERGENCY_INTERCEPTION") return false;
-      const isLast = idx === messages.length - 1;
-      const isMsgStreaming =
-        isLast &&
-        (status === "CONNECTING" || status === "METADATA_RECEIVED" || status === "STREAMING");
-      return !isMsgStreaming && msg.content.trim().length > 0;
-    });
-
   return (
     <AppShell
       telemetry={telemetry}
       rateLimit={rateLimit}
       isThrottled={isThrottled}
       isComparisonMode={isComparisonMode}
-      hideFooterGaw={hasInlineGaw}
       onToggleComparison={() => setIsComparisonMode((prev) => !prev)}
       onReset={handleReset}
+      historyItems={messages
+        .filter((m) => m.role === "user")
+        .map((m) => ({ id: m.id, label: sanitizeClientPii(m.content).sanitized }))}
+      onDeleteHistory={(id) => {
+        deleteTurn(id);
+        setIsDrawerOpen(false);
+        setSelectedChunkId(undefined);
+        setHistorySelection(undefined);
+      }}
+      onClearHistory={() => {
+        clearHistory();
+        setIsDrawerOpen(false);
+        setSelectedChunkId(undefined);
+        setHistorySelection(undefined);
+      }}
+      onUndoHistoryDeletion={undoHistoryDeletion}
+      canUndoHistoryDeletion={canUndoHistoryDeletion}
+      onSelectHistory={(id) => {
+        setIsComparisonMode(false);
+        setHistorySelection((previous) => ({ id, sequence: (previous?.sequence ?? 0) + 1 }));
+      }}
     >
-      {isComparisonMode ? (
+      {isComparisonMode && (
         <PolicyComparisonView
           chunks={allChunks}
           onSelectCitation={handleSelectCitation}
@@ -200,28 +211,30 @@ export function App() {
           }}
           onClose={() => setIsComparisonMode(false)}
         />
-      ) : (
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden w-full max-w-full">
-          {/* Chat Feed & Empty State Prompts */}
-          <ChatContainer
-            messages={messages}
-            status={status}
-            citations={allChunks.length > 0 ? allChunks : citations}
-            onSelectCitation={handleSelectCitation}
-            onSelectStarterQuery={handleSelectStarterQuery}
-          />
-
-          {/* User Input Bar & Insurer Filter */}
-          <div className="pt-2.5 pb-1 sm:pt-3.5 sm:pb-2 shrink-0 bg-transparent">
-            <InputBar
-              onSend={handleSend}
-              isLoading={isLoading}
-              isThrottled={isThrottled}
-              disabled={isThrottled}
-            />
-          </div>
-        </div>
       )}
+      <div
+        className={`${isComparisonMode ? "hidden" : "flex"} flex-1 flex-col min-h-0 overflow-hidden w-full max-w-full`}
+      >
+        {/* Chat Feed & Empty State Prompts */}
+        <ChatContainer
+          messages={messages}
+          scrollToMessage={historySelection}
+          status={status}
+          citations={allChunks.length > 0 ? allChunks : citations}
+          onSelectCitation={handleSelectCitation}
+          onSelectStarterQuery={handleSelectStarterQuery}
+        />
+
+        {/* User Input Bar & Insurer Filter */}
+        <div className="lg:pt-3.5 shrink-0 bg-transparent">
+          <InputBar
+            onSend={handleSend}
+            isLoading={isLoading}
+            isThrottled={isThrottled}
+            disabled={isThrottled}
+          />
+        </div>
+      </div>
 
       {/* Slide-over Grounding Inspector Drawer */}
       <CitationDrawer

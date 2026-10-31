@@ -1,5 +1,5 @@
-import { AlertTriangle, Clock, Gauge } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { Clock } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { RateLimitInfo } from "../types/chat-ui";
 
 export interface RateLimitBadgeProps {
@@ -77,7 +77,7 @@ export function RateLimitBadge({
       aria-label={accessibleLabel}
       data-testid="rate-limit-badge"
       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border shadow-2xs transition-colors ${badgeStyles} ${className}`}
-      title={`Edge abuse protection: 10 requests per minute per IP (${remaining}/${limit} remaining)`}
+      title={`Up to 10 questions per minute (${remaining}/${limit} remaining)`}
     >
       <span
         data-status={statusColor}

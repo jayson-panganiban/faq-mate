@@ -1,4 +1,4 @@
-import { AlertCircle, Bot, Check, Copy, ThumbsDown, ThumbsUp } from "lucide-react";
+import { AlertCircle, Check, Copy, ThumbsDown, ThumbsUp } from "lucide-react";
 import React, { useState } from "react";
 import {
   isGawDisclaimerText,
@@ -153,6 +153,40 @@ function renderFormatting(text: string): React.ReactNode[] {
   });
 }
 
+/** Produces a readable label without exposing a URL in the answer. */
+function linkLabel(href: string): string {
+  const url = new URL(href);
+  const host = url.hostname.replace(/^www\./, "");
+  const path = decodeURIComponent(url.pathname).replace(/[-_]/g, " ").toLowerCase();
+  if (
+    (host === "suncorp.com.au" || host.endsWith(".suncorp.com.au")) &&
+    /home/.test(path) &&
+    /contents/.test(path)
+  ) {
+    const docType = /\bspds\b/.test(path)
+      ? "SPDS"
+      : /\btmd\b/.test(path)
+        ? "TMD"
+        : /\bpds\b/.test(path)
+          ? "PDS"
+          : "policy document";
+    return `Suncorp Home & Contents ${docType}`;
+  }
+  return `${host} document`;
+}
+
+function trimUrlPunctuation(value: string): [string, string] {
+  let href = value;
+  while (/[.,;:!?]$/.test(href)) href = href.slice(0, -1);
+  while (
+    href.endsWith(")") &&
+    (href.match(/\)/g)?.length ?? 0) > (href.match(/\(/g)?.length ?? 0)
+  ) {
+    href = href.slice(0, -1);
+  }
+  return [href, value.slice(href.length)];
+}
+
 /**
  * Renders inline text containing potential CitationPills and typography formatting.
  */
@@ -161,9 +195,80 @@ function renderInlineText(
   chunks?: GroundedChunk[],
   onSelectCitation?: (chunk: GroundedChunk | string) => void
 ): React.ReactNode {
+  // Keep emphasis around links intact before scanning the link itself.
+  const emphasizedLinks = text.split(
+    /(\*\*[^*\n]*https?:\/\/[^*\n]+\*\*|\*[^*\n]*https?:\/\/[^*\n]+\*)/gi
+  );
+  if (emphasizedLinks.length > 1) {
+    return emphasizedLinks.map((part, index) => {
+      const bold = part.startsWith("**") && part.endsWith("**");
+      const italic = !bold && part.startsWith("*") && part.endsWith("*");
+      if (bold)
+        return (
+          <strong key={index} className="font-semibold text-slate-900 dark:text-slate-100">
+            {renderInlineText(part.slice(2, -2), chunks, onSelectCitation)}
+          </strong>
+        );
+      if (italic)
+        return (
+          <em key={index} className="italic text-slate-800 dark:text-slate-200">
+            {renderInlineText(part.slice(1, -1), chunks, onSelectCitation)}
+          </em>
+        );
+      return (
+        <React.Fragment key={index}>
+          {renderInlineText(part, chunks, onSelectCitation)}
+        </React.Fragment>
+      );
+    });
+  }
   const citationPattern =
     /(\[(?:Source:\s*[^\]]+|[^\]]+(?:PDS|TMD|SPDS|FAQ|GUIDE|Section)[^\]]*)\])/g;
+  // Recognize links before citation labels, including labels containing "PDS".
+  const linkPattern =
+    /(\[[^\]]+\]\([^\s)]*(?:\([^)]*\)[^\s)]*)*\)|<https?:\/\/[^\s>]+>|https?:\/\/[^\s<>*]+)/gi;
+  const linkParts = text.split(linkPattern);
+  if (linkParts.length > 1) {
+    return linkParts.map((part, index) => {
+      const markdown = part.match(/^\[([^\]]+)\]\((.*)\)$/);
+      const auto = part.match(/^<(https?:\/\/[^>]+)>$/i);
+      if (markdown || auto || /^https?:\/\//i.test(part)) {
+        const raw = markdown?.[2] ?? auto?.[1] ?? part;
+        const [href, punctuation] = markdown || auto ? [raw, ""] : trimUrlPunctuation(raw);
+        if (!/^https?:\/\//i.test(href))
+          return <React.Fragment key={index}>{markdown?.[1]}</React.Fragment>;
+        try {
+          const parsed = new URL(href);
+          if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+            throw new Error("Invalid protocol");
+          const label =
+            markdown?.[1] && !/https?:\/\//i.test(markdown[1]) ? markdown[1] : linkLabel(href);
+          return (
+            <React.Fragment key={index}>
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-600 underline decoration-slate-400 underline-offset-2 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+              >
+                {label}
+              </a>
+              {punctuation}
+            </React.Fragment>
+          );
+        } catch {
+          return <React.Fragment key={index}>document{punctuation}</React.Fragment>;
+        }
+      }
+      return (
+        <React.Fragment key={index}>
+          {renderInlineText(part, chunks, onSelectCitation)}
+        </React.Fragment>
+      );
+    });
+  }
   const parts = text.split(citationPattern);
+  const sourceOnly = parts.length > 1 && /^[\s.,;:!?]*$/.test(text.replace(citationPattern, ""));
 
   return (
     <>
@@ -200,9 +305,14 @@ function renderInlineText(
             return (
               <span
                 key={`cit-wrap-${index}`}
-                className="inline-flex items-baseline whitespace-nowrap align-baseline"
+                className={
+                  sourceOnly
+                    ? "inline"
+                    : "inline-flex items-baseline whitespace-nowrap align-baseline"
+                }
               >
                 <CitationPill
+                  compact={!sourceOnly}
                   index={chunkIndex && chunkIndex > 0 ? chunkIndex : undefined}
                   chunk={matchedChunk}
                   label={part}
@@ -241,6 +351,7 @@ type MarkdownBlock =
 function isStartOfOtherBlock(lines: string[], idx: number): boolean {
   const line = lines[idx]?.trim() ?? "";
   if (!line) return true;
+  if (/^[-*+]\s*$/.test(line)) return true;
   if (line.startsWith("```")) return true;
   if (/^#{1,6}\s+/.test(line)) return true;
   if (/^[-*]\s+/.test(line)) return true;
@@ -372,7 +483,7 @@ export function AssistantMessage({
     const line = lines[i];
     const trimmed = line.trim();
 
-    if (!trimmed) {
+    if (!trimmed || /^[-*+]\s*$/.test(trimmed)) {
       i++;
       continue;
     }
@@ -535,32 +646,14 @@ export function AssistantMessage({
       aria-label="Assistant message"
       className={`my-4 flex items-start gap-3 group max-w-full ${className}`}
     >
-      {/* Bot Avatar */}
-      <div
-        className="w-8 h-8 rounded-full bg-sky-600 dark:bg-sky-500 text-white flex items-center justify-center shrink-0 mt-1 shadow-xs ring-2 ring-white dark:ring-slate-900"
-        aria-hidden="true"
-      >
-        <Bot className="w-4 h-4" />
-      </div>
-
-      {/* Main Canvas Card */}
-      <div className="flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-2xl rounded-tl-xs p-4 sm:p-5 border border-slate-200/90 dark:border-slate-800 shadow-xs">
-        {/* Top bar: Assistant branding + Copy button */}
-        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-800 text-xs">
-          <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-            <span>FAQ-Mate Grounded Intelligence</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 font-semibold uppercase tracking-wider">
-              PDS Edge
-            </span>
-          </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-3 text-xs">
+          <span className="font-medium text-slate-700 dark:text-slate-300">FAQ-Mate</span>
 
           <div className="flex items-center gap-1.5">
             {/* Feedback Affordance Controls (Spec 05 G6 & ui-craft ai-chat pattern) */}
             {!isStreaming && message.trim().length > 0 && (
-              <div
-                className="flex items-center mr-1 gap-0.5 border-r border-slate-200 dark:border-slate-800 pr-1.5"
-                data-testid="assistant-feedback-controls"
-              >
+              <div className="flex items-center gap-0.5" data-testid="assistant-feedback-controls">
                 <button
                   type="button"
                   onClick={() => {
@@ -651,13 +744,9 @@ export function AssistantMessage({
 
             if (block.type === "table") {
               return (
-                <div
-                  key={bIdx}
-                  data-testid="table-container"
-                  className="my-4 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs"
-                >
+                <div key={bIdx} data-testid="table-container" className="my-4 overflow-x-auto">
                   <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
-                    <thead className="bg-slate-50 dark:bg-slate-800/80">
+                    <thead>
                       <tr>
                         {block.headers.map((h, i) => (
                           <th
@@ -676,12 +765,9 @@ export function AssistantMessage({
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 tabular-nums">
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800 tabular-nums">
                       {block.rows.map((row, rIdx) => (
-                        <tr
-                          key={rIdx}
-                          className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 even:bg-slate-50/40 dark:even:bg-slate-800/20 transition-colors"
-                        >
+                        <tr key={rIdx}>
                           {row.map((cell, cIdx) => (
                             <td
                               key={cIdx}
@@ -795,15 +881,15 @@ export function AssistantMessage({
             data-testid="suggested-follow-ups"
           >
             <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">
-              Related Statutory Inquiries
+              Related questions
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col items-start gap-1">
               {suggestedFollowUps.map((prompt, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => onSelectFollowUp?.(prompt)}
-                  className="inline-flex items-center text-xs font-medium px-3 py-1.5 rounded-full bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/60 border border-sky-200 dark:border-sky-800/80 transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 focus-visible:outline-hidden text-left cursor-pointer"
+                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:underline focus-visible:outline-2 focus-visible:outline-teal-600 text-left cursor-pointer"
                 >
                   {prompt}
                 </button>

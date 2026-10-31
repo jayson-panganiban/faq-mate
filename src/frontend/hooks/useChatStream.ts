@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { stripStatutoryGaw } from "../../constants/statutory";
 import type {
   ChatMessage,
@@ -22,7 +22,29 @@ const DEFAULT_RATE_LIMIT: RateLimitInfo = {
 export function useChatStream(options?: UseChatStreamOptions): UseChatStreamReturn {
   const apiEndpoint = options?.apiEndpoint || "/api/chat";
 
-  const [messages, setMessages] = useState<ChatMessage[]>(options?.initialMessages || []);
+  const [messages, setMessagesState] = useState<ChatMessage[]>(options?.initialMessages || []);
+  const messagesRef = useRef(messages);
+  const setMessages = useCallback(
+    (update: ChatMessage[] | ((previous: ChatMessage[]) => ChatMessage[])) => {
+      const next = typeof update === "function" ? update(messagesRef.current) : update;
+      messagesRef.current = next;
+      setMessagesState(next);
+    },
+    []
+  );
+  const [undoSnapshot, setUndoSnapshot] = useState<ChatMessage[] | null>(null);
+  const requestRef = useRef<{
+    controller: AbortController;
+    userId: string;
+    reader?: ReadableStreamDefaultReader<Uint8Array>;
+  } | null>(null);
+  const invalidate = useCallback(() => {
+    const request = requestRef.current;
+    requestRef.current = null;
+    request?.controller.abort();
+    void request?.reader?.cancel().catch(() => {});
+  }, []);
+  useEffect(() => () => invalidate(), [invalidate]);
   const [status, setStatus] = useState<StreamState>("IDLE");
   const [rateLimit, setRateLimit] = useState<RateLimitInfo>(DEFAULT_RATE_LIMIT);
   const [telemetry, setTelemetry] = useState<TelemetryInfo>({});
@@ -33,7 +55,61 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
   const statusRef = useRef<StreamState>("IDLE");
   statusRef.current = status;
 
+  const restoreDerived = useCallback((remaining: ChatMessage[]) => {
+    const last = [...remaining].reverse().find((message) => message.role === "assistant");
+    setCitations(last?.metadata?.retrievedChunks ?? []);
+    setActiveRefusal(last?.refusal ?? null);
+    setSelectedCitation(null);
+  }, []);
+
+  const deleteTurn = useCallback(
+    (id: string) => {
+      const current = messagesRef.current;
+      const start = current.findIndex((message) => message.id === id && message.role === "user");
+      if (start < 0) return;
+      let end = start + 1;
+      while (end < current.length && current[end].role !== "user") end++;
+      if (requestRef.current?.userId === id) {
+        invalidate();
+        statusRef.current = "IDLE";
+        setStatus("IDLE");
+      }
+      setUndoSnapshot(current);
+      const remaining = [...current.slice(0, start), ...current.slice(end)];
+      setMessages(remaining);
+      restoreDerived(remaining);
+    },
+    [invalidate, restoreDerived, setMessages]
+  );
+
+  const clearHistory = useCallback(() => {
+    if (!messagesRef.current.length) return;
+    setUndoSnapshot(messagesRef.current);
+    invalidate();
+    setMessages([]);
+    restoreDerived([]);
+    statusRef.current = "IDLE";
+    setStatus("IDLE");
+    setTelemetry({});
+  }, [invalidate, restoreDerived, setMessages]);
+
+  const undoHistoryDeletion = useCallback(() => {
+    if (!undoSnapshot) return;
+    const current = messagesRef.current;
+    const currentById = new Map(current.map((message) => [message.id, message]));
+    const snapshotIds = new Set(undoSnapshot.map((message) => message.id));
+    const restored = [
+      ...undoSnapshot.map((message) => currentById.get(message.id) ?? message),
+      ...current.filter((message) => !snapshotIds.has(message.id)),
+    ];
+    setMessages(restored);
+    restoreDerived(restored);
+    setUndoSnapshot(null);
+  }, [undoSnapshot, restoreDerived, setMessages]);
+
   const reset = useCallback(() => {
+    invalidate();
+    setUndoSnapshot(null);
     setStatus("IDLE");
     statusRef.current = "IDLE";
     setMessages([]);
@@ -41,7 +117,7 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
     setSelectedCitation(null);
     setActiveRefusal(null);
     setTelemetry({});
-  }, []);
+  }, [invalidate, setMessages]);
 
   const sendMessage = useCallback(
     async (query: string, sendOptions?: SendMessageOptions) => {
@@ -50,7 +126,11 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
         return;
       }
 
-      if (statusRef.current === "CONNECTING" || statusRef.current === "STREAMING") {
+      if (
+        statusRef.current === "CONNECTING" ||
+        statusRef.current === "METADATA_RECEIVED" ||
+        statusRef.current === "STREAMING"
+      ) {
         return;
       }
 
@@ -78,6 +158,14 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
         timestamp: Date.now(),
       };
 
+      const previousMessages = messagesRef.current;
+      const request = { controller: new AbortController(), userId: userMessage.id } as {
+        controller: AbortController;
+        userId: string;
+        reader?: ReadableStreamDefaultReader<Uint8Array>;
+      };
+      requestRef.current = request;
+      const isCurrent = () => requestRef.current === request && !request.controller.signal.aborted;
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
       setStatus("CONNECTING");
       statusRef.current = "CONNECTING";
@@ -92,7 +180,7 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
       }
 
       // Ephemeral multi-turn context carry-over (up to 4 turns, Spec 07 Section 1)
-      const historyTurns = messages
+      const historyTurns = previousMessages
         .filter((m) => m.content.trim().length > 0 && !m.refusal)
         .slice(-4)
         .map((m) => ({
@@ -125,9 +213,12 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
       try {
         const response = await fetch(apiEndpoint, {
           method: "POST",
+          signal: request.controller.signal,
           headers,
           body: JSON.stringify(bodyPayload),
         });
+
+        if (!isCurrent()) return;
 
         // 1. Parse Rate-Limit headers
         const limitHeader = response.headers.get("X-RateLimit-Limit");
@@ -165,11 +256,13 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
 
         // 4. SSE Stream Processing
         const reader = response.body.getReader();
+        request.reader = reader;
         const decoder = new TextDecoder();
         let buffer = "";
         let firstTokenReceived = false;
 
         const processEventBlock = (eventBlock: string) => {
+          if (!isCurrent()) return;
           const lines = eventBlock.split(/\r?\n/);
           let eventType = "message";
           const dataLines: string[] = [];
@@ -302,6 +395,7 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
 
         while (true) {
           const { done, value } = await reader.read();
+          if (!isCurrent()) return;
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
@@ -327,12 +421,13 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
           statusRef.current = "COMPLETED";
         }
       } catch (err) {
+        if (!isCurrent()) return;
         console.error("[useChatStream] Execution failed:", err);
         setStatus("COMPLETED");
         statusRef.current = "COMPLETED";
       }
     },
-    [apiEndpoint]
+    [apiEndpoint, setMessages]
   );
 
   return {
@@ -346,5 +441,9 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamRetu
     activeRefusal,
     sendMessage,
     reset,
+    deleteTurn,
+    clearHistory,
+    undoHistoryDeletion,
+    canUndoHistoryDeletion: undoSnapshot !== null,
   };
 }

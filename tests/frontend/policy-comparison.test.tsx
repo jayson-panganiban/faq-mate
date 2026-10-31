@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { PolicyComparisonView } from "../../src/frontend/components/PolicyComparisonView";
@@ -35,12 +35,12 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
     render(<PolicyComparisonView />);
 
     expect(screen.getByTestId("policy-comparison-view")).toBeInTheDocument();
-    expect(screen.getByText("Broker Policy Comparison Matrix")).toBeInTheDocument();
+    expect(screen.getByText("Compare Policies")).toBeInTheDocument();
     expect(screen.getByTestId("insurer-a-select")).toBeInTheDocument();
     expect(screen.getByTestId("insurer-b-select")).toBeInTheDocument();
   });
 
-  it("renders benchmark matrix rows comparing core coverages", () => {
+  it("renders stacked coverage comparisons", () => {
     render(<PolicyComparisonView />);
 
     expect(screen.getByText("Flood Definition")).toBeInTheDocument();
@@ -49,30 +49,32 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
     expect(screen.getByText("Rainwater Run-off & Storm Surge")).toBeInTheDocument();
   });
 
-  it("updates comparison table headers when selecting any of the 39 insurers", () => {
+  it("updates insurer labels and terms in each comparison when the selection changes", () => {
     render(<PolicyComparisonView />);
 
     const selectB = screen.getByTestId("insurer-b-select");
     fireEvent.change(selectB, { target: { value: "ALLIANZ" } });
-    expect(screen.getByRole("columnheader", { name: /ALLIANZ Policy Terms/i })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Flood Definition" })).getByText("Allianz")
+    ).toBeInTheDocument();
 
     fireEvent.change(selectB, { target: { value: "AAMI" } });
-    expect(screen.getByRole("columnheader", { name: /AAMI Policy Terms/i })).toBeInTheDocument();
-    expect(screen.getByText(/AAI Limited/i)).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Flood Definition" })).getByText("AAMI")
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/AAI Limited/i).length).toBeGreaterThan(0);
   });
 
   it("renders retrieved session disclosures when matching chunks are provided", () => {
     const handleSelectCitation = vi.fn();
     render(<PolicyComparisonView chunks={mockChunks} onSelectCitation={handleSelectCitation} />);
 
-    expect(
-      screen.getByText(/Retrieved Operative PDS Disclosures in Current Session/i)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/SUNCORP Disclosures/i)).toBeInTheDocument();
-    expect(screen.getByText(/NRMA Disclosures/i)).toBeInTheDocument();
+    expect(screen.getByText(/Policy sources/i)).toBeInTheDocument();
+    expect(screen.getByText(/Suncorp sources/i)).toBeInTheDocument();
+    expect(screen.getByText(/NRMA sources/i)).toBeInTheDocument();
 
-    // Click inspect operative excerpt
-    const inspectButtons = screen.getAllByRole("button", { name: /inspect operative excerpt/i });
+    // Click read source
+    const inspectButtons = screen.getAllByRole("button", { name: /read source/i });
     expect(inspectButtons.length).toBeGreaterThan(0);
     fireEvent.click(inspectButtons[0]);
     expect(handleSelectCitation).toHaveBeenCalledWith(mockChunks[0]);
@@ -90,7 +92,7 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
     );
   });
 
-  it("triggers onClose callback when clicking Back to Chat button", () => {
+  it("triggers onClose callback when clicking Back link", () => {
     const handleClose = vi.fn();
     render(<PolicyComparisonView onClose={handleClose} />);
 
@@ -100,10 +102,12 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
 
-  it("configures table with min-width for responsive mobile scrolling", () => {
+  it("stacks the primary insurer before the comparison insurer in every category", () => {
     render(<PolicyComparisonView />);
-
-    const table = screen.getByRole("table");
-    expect(table.className).toContain("min-w-[560px]");
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    const flood = screen.getByRole("region", { name: "Flood Definition" });
+    const insurerNames = Array.from(flood.querySelectorAll("dt")).map((item) => item.textContent);
+    expect(insurerNames).toEqual(["Suncorp", "NRMA"]);
+    expect(flood.querySelectorAll("dd")).toHaveLength(2);
   });
 });

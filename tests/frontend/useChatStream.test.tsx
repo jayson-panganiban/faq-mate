@@ -374,3 +374,115 @@ describe("useChatStream Hook (Spec 05 Section 1 & 2)", () => {
     expect(fetchBody.query).not.toContain("123 456 789");
   });
 });
+
+describe("history deletion", () => {
+  const initial = [
+    { id: "u1", role: "user" as const, content: "First", timestamp: 1 },
+    {
+      id: "a1",
+      role: "assistant" as const,
+      content: "Answer one",
+      timestamp: 2,
+      metadata: { retrievedChunks: [SAMPLE_CHUNK] },
+    },
+    { id: "u2", role: "user" as const, content: "Second", timestamp: 3 },
+    { id: "a2", role: "assistant" as const, content: "Answer two", timestamp: 4 },
+  ];
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("deletes a turn, restores it, and clears and restores the conversation", () => {
+    const { result } = renderHook(() => useChatStream({ initialMessages: initial }));
+    act(() => result.current.deleteTurn("a1"));
+    expect(result.current.messages).toEqual(initial);
+    act(() => result.current.deleteTurn("u2"));
+    expect(result.current.messages).toEqual(initial.slice(0, 2));
+    expect(result.current.citations).toEqual([SAMPLE_CHUNK]);
+    act(() => result.current.undoHistoryDeletion());
+    expect(result.current.messages).toEqual(initial);
+    act(() => result.current.clearHistory());
+    expect(result.current.messages).toEqual([]);
+    act(() => result.current.undoHistoryDeletion());
+    expect(result.current.messages).toEqual(initial);
+  });
+
+  it("omits deleted turns from the next request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null));
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useChatStream({ initialMessages: initial }));
+    act(() => result.current.deleteTurn("u1"));
+    await act(async () => result.current.sendMessage("Third"));
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.history).toEqual([
+      { role: "user", content: "Second" },
+      { role: "assistant", content: "Answer two" },
+    ]);
+  });
+
+  it("ignores a late response after deleting the active turn and preserves the rate limit", async () => {
+    let resolveFetch!: (response: Response) => void;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { headers: { "X-RateLimit-Remaining": "7" } }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFetch = resolve;
+          })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useChatStream());
+    await act(async () => result.current.sendMessage("First"));
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.sendMessage("Second");
+    });
+    const activeId = result.current.messages[2].id;
+    act(() => result.current.deleteTurn(activeId));
+    await act(async () => {
+      resolveFetch(new Response(createSseStream(['event: token\ndata: {"text":"late"}\n\n'])));
+      await pending;
+    });
+    expect(result.current.messages.map((m) => m.content)).toEqual(["First", ""]);
+    expect(result.current.status).toBe("IDLE");
+    expect(result.current.rateLimit.remaining).toBe(7);
+  });
+});
+
+describe("undo during streaming", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("keeps tokens received by a retained turn after deleting an older turn", async () => {
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const stream = new ReadableStream<Uint8Array>({
+      start(value) {
+        controller = value;
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(stream)));
+    const initial = [
+      { id: "old-user", role: "user" as const, content: "Old", timestamp: 1 },
+      { id: "old-answer", role: "assistant" as const, content: "Old answer", timestamp: 2 },
+    ];
+    const { result } = renderHook(() => useChatStream({ initialMessages: initial }));
+    let pending!: Promise<void>;
+    await act(async () => {
+      pending = result.current.sendMessage("New");
+    });
+    act(() => result.current.deleteTurn("old-user"));
+    await act(async () => {
+      controller.enqueue(
+        new TextEncoder().encode('event: token\ndata: {"text":"Fresh answer"}\n\n')
+      );
+    });
+    act(() => result.current.undoHistoryDeletion());
+    expect(result.current.messages.map((message) => message.content)).toEqual([
+      "Old",
+      "Old answer",
+      "New",
+      "Fresh answer",
+    ]);
+    await act(async () => {
+      controller.close();
+      await pending;
+    });
+  });
+});

@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { STATUTORY_GAW } from "../../src/constants/statutory";
 import { App } from "../../src/frontend/App";
 import type { GroundedChunk } from "../../src/types/chat";
 
@@ -14,6 +15,13 @@ function createSseStream(chunks: string[]): ReadableStream<Uint8Array> {
       controller.close();
     },
   });
+}
+
+function expectFooterWarning() {
+  const warnings = screen.getAllByTestId("statutory-gaw");
+  expect(warnings).toHaveLength(1);
+  expect(screen.getByRole("contentinfo")).toContainElement(warnings[0]);
+  expect(warnings[0]).toHaveTextContent(STATUTORY_GAW);
 }
 
 const SAMPLE_CHUNK: GroundedChunk = {
@@ -61,8 +69,8 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
     render(<App />);
 
     // Brand and header telemetry presence
-    expect(screen.getByText("FAQ-Mate Edge RAG")).toBeInTheDocument();
-    expect(screen.getByTestId("cf-pop-badge")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "FAQ-Mate" })).toBeInTheDocument();
+    expect(screen.queryByTestId("cf-pop-badge")).not.toBeInTheDocument();
     expect(screen.getByTestId("rate-limit-badge")).toBeInTheDocument();
     expect(screen.getByTestId("reset-chat-button")).toBeInTheDocument();
 
@@ -74,12 +82,12 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
     // Input bar ready
     expect(screen.getByTestId("chat-input-textarea")).toBeInTheDocument();
     expect(screen.getByTestId("insurer-select")).toBeInTheDocument();
-    expect(screen.getByTestId("turnstile-widget")).toBeInTheDocument();
     expect(screen.getByTestId("send-button")).toBeDisabled();
 
     // Persistent Section 949A GAW in footer
-    expect(screen.getByTestId("statutory-gaw")).toBeInTheDocument();
-    expect(screen.getByText(/Corporations Act 2001 \(Cth\) s\.949A/i)).toBeInTheDocument();
+    expectFooterWarning();
+    fireEvent.click(screen.getByRole("button", { name: /view general advice warning/i }));
+    expectFooterWarning();
     expect(screen.getByTestId("pii-assurance-badge")).toBeInTheDocument();
   });
 
@@ -112,7 +120,9 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
 
     // Check user message is rendered with query and Suncorp insurer badge
     await waitFor(() => {
-      expect(screen.getByText("What is Suncorp's flood definition?")).toBeInTheDocument();
+      expect(
+        within(screen.getByRole("log")).getByText("What is Suncorp's flood definition?")
+      ).toBeInTheDocument();
     });
     expect(screen.getByTestId("insurer-badge")).toHaveTextContent("SUNCORP");
 
@@ -193,9 +203,11 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
     expect(citationPill).toBeInTheDocument();
     expect(citationPill).toHaveTextContent(/Allianz Home and Contents PDS/i);
 
+    expectFooterWarning();
+
     // Verify telemetry header updated
-    expect(screen.getByTestId("retrieval-latency-badge")).toHaveTextContent("28ms retrieval");
-    expect(screen.getByTestId("cf-pop-badge")).toHaveTextContent("MEL");
+    expect(screen.queryByTestId("retrieval-latency-badge")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("cf-pop-badge")).not.toBeInTheDocument();
   });
 
   it("opens CitationDrawer with matching chunk when citation pill is clicked, and closes on backdrop/escape", async () => {
@@ -232,7 +244,7 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
     });
 
     // Drawer should not be open initially
-    expect(screen.queryByRole("dialog", { name: /grounding inspector/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /policy sources/i })).not.toBeInTheDocument();
 
     // Click the citation pill
     const pill = screen.getByTestId("citation-pill");
@@ -241,9 +253,9 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
     });
 
     // Drawer opens
-    const drawer = await screen.findByRole("dialog", { name: /grounding inspector/i });
+    const drawer = await screen.findByRole("dialog", { name: /policy sources/i });
     expect(drawer).toBeInTheDocument();
-    expect(within(drawer).getByText("Grounding Inspector")).toBeInTheDocument();
+    expect(within(drawer).getByText("Policy sources")).toBeInTheDocument();
     expect(within(drawer).getByText(/94% Match/i)).toBeInTheDocument();
     expect(within(drawer).getByText(SAMPLE_CHUNK.content)).toBeInTheDocument();
 
@@ -253,18 +265,18 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
       fireEvent.click(backdrop);
     });
 
-    expect(screen.queryByRole("dialog", { name: /grounding inspector/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /policy sources/i })).not.toBeInTheDocument();
 
     // Re-open and close via Escape key
     await act(async () => {
       fireEvent.click(screen.getByTestId("citation-pill"));
     });
-    expect(screen.getByRole("dialog", { name: /grounding inspector/i })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: /policy sources/i })).toBeInTheDocument();
 
     await act(async () => {
       fireEvent.keyDown(window, { key: "Escape" });
     });
-    expect(screen.queryByRole("dialog", { name: /grounding inspector/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /policy sources/i })).not.toBeInTheDocument();
   });
 
   it("handles ASIC RG 244 advice boundary violation by displaying RefusalCard", async () => {
@@ -307,6 +319,7 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
       expect(screen.getByTestId("refusal-card")).toBeInTheDocument();
     });
 
+    expectFooterWarning();
     const refusalCard = screen.getByTestId("refusal-card");
     expect(within(refusalCard).getByText("ASIC RG 244 Safe Harbor")).toBeInTheDocument();
     expect(
@@ -516,7 +529,6 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
 
     // Still in METADATA_RECEIVED (no tokens yet) -> loading indicator still present
     expect(screen.getByTestId("loading-indicator")).toBeInTheDocument();
-
     // Enqueue first token
     await act(async () => {
       controllerRef.enqueue(
@@ -541,7 +553,11 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
   it("handles stream anchoring and scroll to bottom when user scrolls up", async () => {
     render(<App />);
 
-    // Initially with empty messages, scroll button shouldn't be present
+    // Scrolling starter questions must not suggest jumping to a nonexistent conversation.
+    const emptyFeed = screen.getByTestId("chat-scroll-container");
+    Object.defineProperty(emptyFeed, "scrollHeight", { value: 1000, configurable: true });
+    Object.defineProperty(emptyFeed, "clientHeight", { value: 300, configurable: true });
+    fireEvent.scroll(emptyFeed);
     expect(screen.queryByTestId("scroll-to-bottom-button")).not.toBeInTheDocument();
 
     const mockSse = [
@@ -573,7 +589,11 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
     // Simulate user scrolling up (scrollHeight: 1000, clientHeight: 400, scrollTop: 200 -> distance: 400px > 80px)
     Object.defineProperty(scrollContainer, "scrollHeight", { value: 1000, configurable: true });
     Object.defineProperty(scrollContainer, "clientHeight", { value: 400, configurable: true });
-    Object.defineProperty(scrollContainer, "scrollTop", { value: 200, configurable: true });
+    Object.defineProperty(scrollContainer, "scrollTop", {
+      value: 200,
+      writable: true,
+      configurable: true,
+    });
 
     fireEvent.scroll(scrollContainer);
 
@@ -612,10 +632,38 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
     render(<App />);
 
     // Check that persisted messages are loaded
-    expect(screen.getByText("What is my excess for flood?")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("log")).getByText("What is my excess for flood?")
+    ).toBeInTheDocument();
     expect(
       screen.getByText("Standard excess is $500 as noted in your policy schedule.")
     ).toBeInTheDocument();
+  });
+
+  it("keeps one warning in the footer for a multi-turn conversation", () => {
+    sessionStorage.setItem(
+      "faq_mate_chat_session",
+      JSON.stringify([
+        { id: "u1", role: "user", content: "What is flood cover?", timestamp: Date.now() },
+        {
+          id: "a1",
+          role: "assistant",
+          content: `First answer.\n\n${STATUTORY_GAW}`,
+          timestamp: Date.now(),
+        },
+        { id: "u2", role: "user", content: "What about excess?", timestamp: Date.now() },
+        {
+          id: "a2",
+          role: "assistant",
+          content: `Second answer.\n\n${STATUTORY_GAW}`,
+          timestamp: Date.now(),
+        },
+      ])
+    );
+    render(<App />);
+    expect(screen.getByText("First answer.")).toBeInTheDocument();
+    expect(screen.getByText("Second answer.")).toBeInTheDocument();
+    expectFooterWarning();
   });
 
   it("toggles between chat view and policy comparison view via comparison toggle (Spec 05 US-15)", () => {
@@ -629,10 +677,46 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
 
     // Verify comparison matrix is rendered
     expect(screen.getByTestId("policy-comparison-view")).toBeInTheDocument();
-    expect(screen.getByText("Broker Policy Comparison Matrix")).toBeInTheDocument();
+    expectFooterWarning();
+    expect(screen.getByText("Compare Policies")).toBeInTheDocument();
 
-    // Toggle back
-    fireEvent.click(toggleBtn);
+    // Return to chat through sidebar navigation
+    fireEvent.click(screen.getByRole("button", { name: "Chat" }));
     expect(screen.queryByTestId("policy-comparison-view")).not.toBeInTheDocument();
+  });
+});
+
+describe("history deletion persistence", () => {
+  afterEach(() => {
+    cleanup();
+    sessionStorage.clear();
+  });
+  it("persists deletion and restores cleared history with undo", async () => {
+    sessionStorage.setItem(
+      "faq_mate_chat_session",
+      JSON.stringify([
+        { id: "u1", role: "user", content: "First question", timestamp: 1 },
+        { id: "a1", role: "assistant", content: "First answer", timestamp: 2 },
+        { id: "u2", role: "user", content: "Second question", timestamp: 3 },
+        { id: "a2", role: "assistant", content: "Second answer", timestamp: 4 },
+      ])
+    );
+    render(<App />);
+    fireEvent.click(screen.getByTestId("history-delete-u1"));
+    await waitFor(() =>
+      expect(
+        JSON.parse(sessionStorage.getItem("faq_mate_chat_session") || "[]").map(
+          (m: { id: string }) => m.id
+        )
+      ).toEqual(["u2", "a2"])
+    );
+    expect(screen.queryByText("First answer")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Clear all history"));
+    expect(screen.getByText("Your questions will appear here.")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Undo deletion"));
+    expect(screen.getByText("Second answer")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(JSON.parse(sessionStorage.getItem("faq_mate_chat_session") || "[]")).toHaveLength(2)
+    );
   });
 });

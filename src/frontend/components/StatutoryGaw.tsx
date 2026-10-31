@@ -41,12 +41,7 @@ export function StatutoryGaw({
               aria-hidden="true"
             />
             <span className="font-semibold text-slate-600 dark:text-slate-300 text-[11px] sm:text-xs">
-              <span className="hidden sm:inline">Corporations Act 2001 (Cth) s.949A</span>
-              <span className="sm:hidden">s.949A Advice Warning</span>
-            </span>
-            <span className="hidden sm:inline text-slate-400 dark:text-slate-600">·</span>
-            <span className="hidden sm:inline text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate">
-              General Advice Warning
+              <span>General advice warning</span>
             </span>
           </div>
 
@@ -59,9 +54,9 @@ export function StatutoryGaw({
                 ? "Hide General Advice Warning details"
                 : "View General Advice Warning legal terms"
             }
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors cursor-pointer shrink-0"
+            className="inline-flex items-center gap-1 min-h-[44px] px-2 py-1 rounded text-xs font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors cursor-pointer shrink-0"
           >
-            <span>{isExpanded ? "Hide Legal Terms" : "View Legal Terms"}</span>
+            <span>{isExpanded ? "Hide details" : "View details"}</span>
             <ChevronDown
               className={`w-3 h-3 transition-transform duration-150 ${isExpanded ? "rotate-180" : ""}`}
               aria-hidden="true"
@@ -75,7 +70,7 @@ export function StatutoryGaw({
             isExpanded ? "mt-2 block" : "sr-only"
           }`}
         >
-          <div className="p-2.5 rounded-lg border border-slate-200/80 bg-slate-50/90 dark:border-slate-800 dark:bg-slate-900/80 text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
+          <div className="p-2.5 rounded-lg border border-slate-200/80 bg-slate-50/90 dark:border-slate-800 dark:bg-slate-900/80 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
             {STATUTORY_GAW}
           </div>
         </div>

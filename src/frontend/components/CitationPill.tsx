@@ -1,4 +1,3 @@
-import { BookOpen } from "lucide-react";
 import React from "react";
 import type { GroundedChunk } from "../../types/chat";
 import { formatProductDoc } from "../utils/citations";
@@ -33,7 +32,7 @@ export interface CitationPillProps {
    */
   section?: string;
   /**
-   * Whether to display in ultra-compact Answer Engine badge mode (default: true).
+   * Whether the reference is inline with prose (default: true). Standalone references show the document name.
    */
   compact?: boolean;
   /**
@@ -53,9 +52,8 @@ export interface CitationPillProps {
 /**
  * CitationPill Component
  *
- * Inline clickable citation chip rendered inside the streaming assistant response.
- * In compact mode (Answer Engine design), it renders an ultra-compact numbered badge
- * linked to the Operative Sources Shelf, with full accessible text and tap targets.
+ * Clickable source reference rendered inside the assistant response.
+ * Inline references use small markers; standalone references keep their document names.
  */
 export function CitationPill({
   index,
@@ -91,28 +89,24 @@ export function CitationPill({
     }
   };
 
+  // A standalone reference needs its document name; a superscript alone has no context.
   if (!compact) {
+    const sourceTitle = chunk
+      ? productDoc
+      : (label
+          ?.replace(/^\[\s*(?:Source:\s*)?/i, "")
+          .replace(/\]$/, "")
+          .replace(/[*_`]/g, "") ?? productDoc);
+    const sourceDescription = chunk ? `${productDoc}, ${effectiveSection}` : sourceTitle;
     return (
       <button
         type="button"
         data-testid="citation-pill"
         onClick={handleClick}
-        aria-label={`View citation source: ${productDoc}, ${effectiveSection}`}
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 my-0.5 mx-0.5 rounded-full text-xs font-medium bg-sky-50 text-sky-800 border border-sky-200 hover:bg-sky-100 hover:border-sky-300 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/80 dark:hover:bg-sky-900/60 transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 focus-visible:outline-hidden cursor-pointer select-none align-middle touch-manipulation min-h-[32px] sm:min-h-[28px] ${className}`}
+        aria-label={`View source: ${sourceDescription}`}
+        className={`inline-flex min-h-[44px] max-w-full items-center whitespace-normal break-words text-left text-sm text-slate-600 underline decoration-slate-400 underline-offset-2 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white focus-visible:outline-2 focus-visible:outline-teal-600 cursor-pointer ${className}`}
       >
-        {typeof index === "number" && index > 0 && (
-          <span
-            data-testid="citation-index-badge"
-            className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-sky-200 dark:bg-sky-800 text-[10px] font-bold text-sky-900 dark:text-sky-100 tabular-nums shrink-0"
-          >
-            {index}
-          </span>
-        )}
-        <BookOpen
-          className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 flex-shrink-0"
-          aria-hidden="true"
-        />
-        <span className="truncate max-w-[280px] sm:max-w-[360px]">{displayText}</span>
+        {sourceTitle}
       </button>
     );
   }
@@ -123,19 +117,13 @@ export function CitationPill({
       data-testid="citation-pill"
       onClick={handleClick}
       aria-label={`View citation source: ${productDoc}, ${effectiveSection}`}
-      className={`inline-flex items-center justify-center relative min-w-[20px] h-[20px] sm:min-w-[22px] sm:h-[22px] px-1.5 py-0 ml-1 mr-0 rounded-full text-xs font-semibold bg-sky-100 dark:bg-sky-950/80 text-sky-800 dark:text-sky-200 border border-sky-300/90 dark:border-sky-700/80 hover:bg-sky-200 dark:hover:bg-sky-900 hover:border-sky-400 dark:hover:border-sky-600 transition-[color,background-color,border-color,transform] duration-150 active:scale-95 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 focus-visible:outline-hidden cursor-pointer select-none align-baseline touch-manipulation after:absolute after:-inset-1.5 ${className}`}
+      className={`citation-inline text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:underline focus-visible:outline-2 focus-visible:outline-teal-600 cursor-pointer ${className}`}
     >
       {typeof index === "number" && index > 0 ? (
-        <span
-          data-testid="citation-index-badge"
-          className="inline-flex items-center justify-center font-mono text-[10px] sm:text-[11px] font-bold tabular-nums shrink-0"
-        >
-          {index}
-        </span>
+        <span data-testid="citation-index-badge">[{index}]</span>
       ) : (
-        <BookOpen className="w-3 h-3 text-sky-600 dark:text-sky-400 shrink-0" aria-hidden="true" />
+        <span>[source]</span>
       )}
-      {/* Screen reader & test DOM accessibility */}
       <span className="sr-only">{displayText}</span>
     </button>
   );

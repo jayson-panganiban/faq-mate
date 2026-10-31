@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { STATUTORY_GAW } from "../../src/constants/statutory";
@@ -6,7 +6,7 @@ import { AppShell } from "../../src/frontend/components/AppShell";
 import { InputBar } from "../../src/frontend/components/InputBar";
 import { PiiAssuranceBadge } from "../../src/frontend/components/PiiAssuranceBadge";
 import { RateLimitBadge } from "../../src/frontend/components/RateLimitBadge";
-import type { RateLimitInfo, TelemetryInfo } from "../../src/frontend/types/chat-ui";
+import type { RateLimitInfo } from "../../src/frontend/types/chat-ui";
 
 describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
   describe("RateLimitBadge Component", () => {
@@ -90,7 +90,7 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
 
       const badge = screen.getByTestId("pii-assurance-badge");
       expect(badge).toBeInTheDocument();
-      expect(badge).toHaveTextContent(/APP 3\/11|Privacy Shield/i);
+      expect(badge).toHaveTextContent(/Your privacy/i);
     });
 
     it("reveals disclosure explaining TFN, Medicare, and Card sanitization on interaction", async () => {
@@ -104,7 +104,7 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
       expect(popover).toHaveTextContent(/Tax File Number|TFN/i);
       expect(popover).toHaveTextContent(/Medicare/i);
       expect(popover).toHaveTextContent(/Card|PAN/i);
-      expect(popover).toHaveTextContent(/k-Anonymity|Zero raw query/i);
+      expect(popover).toHaveTextContent(/Raw questions are not stored/i);
     });
 
     it("supports keyboard toggle via Enter or Space key", () => {
@@ -141,65 +141,19 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
         </AppShell>
       );
 
-      expect(screen.getByText(/FAQ-Mate Edge RAG/i)).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "FAQ-Mate" })).toBeInTheDocument();
       expect(screen.getByTestId("chat-content")).toBeInTheDocument();
     });
 
-    it("displays Cloudflare Anycast PoP badge with location indicator", () => {
-      const telemetry: TelemetryInfo = { popLocation: "SYD" };
+    it("does not expose technical telemetry in the header", () => {
       render(
-        <AppShell telemetry={telemetry}>
+        <AppShell telemetry={{ popLocation: "SYD", latencyMs: 24, ttftMs: 185 }}>
           <div>Body</div>
         </AppShell>
       );
-
-      const popBadge = screen.getByTestId("cf-pop-badge");
-      expect(popBadge).toBeInTheDocument();
-      expect(popBadge).toHaveTextContent(/SYD/i);
-    });
-
-    it("displays fallback Anycast badge when popLocation is not yet available", () => {
-      render(
-        <AppShell>
-          <div>Body</div>
-        </AppShell>
-      );
-
-      const popBadge = screen.getByTestId("cf-pop-badge");
-      expect(popBadge).toBeInTheDocument();
-      expect(popBadge).toHaveTextContent(/Anycast|EDGE|LOCAL/i);
-    });
-
-    it("displays hybrid retrieval latency badge when telemetry includes latency", () => {
-      const telemetry: TelemetryInfo = {
-        popLocation: "MEL",
-        latencyMs: 24,
-      };
-      render(
-        <AppShell telemetry={telemetry}>
-          <div>Body</div>
-        </AppShell>
-      );
-
-      const retrievalBadge = screen.getByTestId("retrieval-latency-badge");
-      expect(retrievalBadge).toBeInTheDocument();
-      expect(retrievalBadge).toHaveTextContent("24ms retrieval");
-    });
-
-    it("displays inference TTFT badge when telemetry includes ttftMs", () => {
-      const telemetry: TelemetryInfo = {
-        popLocation: "BNE",
-        ttftMs: 185,
-      };
-      render(
-        <AppShell telemetry={telemetry}>
-          <div>Body</div>
-        </AppShell>
-      );
-
-      const ttftBadge = screen.getByTestId("ttft-badge");
-      expect(ttftBadge).toBeInTheDocument();
-      expect(ttftBadge).toHaveTextContent("185ms TTFT");
+      expect(screen.queryByTestId("cf-pop-badge")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("retrieval-latency-badge")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("ttft-badge")).not.toBeInTheDocument();
     });
 
     it("renders reset / new chat button and triggers onReset when clicked", () => {
@@ -236,7 +190,7 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
           <div>Body</div>
         </AppShell>
       );
-      expect(screen.getByTestId("comparison-toggle")).toHaveTextContent("Chat View");
+      expect(screen.getByTestId("comparison-toggle")).toHaveAttribute("aria-pressed", "true");
     });
 
     it("renders persistent statutory Section 949A GAW and PII badge in footer", () => {
@@ -256,6 +210,30 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
       const piiBadge = screen.getByTestId("pii-assurance-badge");
       expect(piiBadge).toBeInTheDocument();
     });
+  });
+
+  it("expands and collapses the inline legal and privacy disclosures", () => {
+    render(
+      <AppShell>
+        <div>Body</div>
+      </AppShell>
+    );
+    const warning = screen.getByTestId("statutory-gaw");
+    const legal = screen.getByRole("button", { name: /view general advice warning/i });
+    expect(within(warning).getByText(STATUTORY_GAW)).toHaveClass("sr-only");
+    fireEvent.click(legal);
+    expect(screen.getByRole("button", { name: /hide general advice warning/i })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+    expect(within(warning).getByText(STATUTORY_GAW)).not.toHaveClass("sr-only");
+    fireEvent.click(screen.getByRole("button", { name: /your privacy/i }));
+    expect(screen.getByRole("region", { name: /privacy details/i })).toHaveTextContent(
+      /removed in your browser/i
+    );
+    expect(within(warning).getByText(STATUTORY_GAW)).toHaveClass("sr-only");
+    fireEvent.click(screen.getByRole("button", { name: /your privacy/i }));
+    expect(screen.queryByRole("region", { name: /privacy details/i })).not.toBeInTheDocument();
   });
 
   describe("InputBar Component", () => {
@@ -282,12 +260,22 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
       expect(textarea).toHaveAttribute("placeholder");
     });
 
-    it("renders Cloudflare Turnstile protection widget or badge", () => {
-      render(<InputBar onSend={vi.fn()} isLoading={false} isThrottled={false} />);
-
-      const turnstile = screen.getByTestId("turnstile-widget");
-      expect(turnstile).toBeInTheDocument();
-      expect(turnstile).toHaveTextContent(/Turnstile/i);
+    it("submits the longest insurer option as a filter", () => {
+      const onSend = vi.fn();
+      render(<InputBar onSend={onSend} isLoading={false} isThrottled={false} />);
+      const select = screen.getByTestId("insurer-select");
+      expect(
+        screen.getByRole("option", { name: "Southern Cross Travel Insurance" })
+      ).toBeInTheDocument();
+      fireEvent.change(select, { target: { value: "SCTI" } });
+      fireEvent.change(screen.getByTestId("chat-input-textarea"), {
+        target: { value: "What is covered?" },
+      });
+      fireEvent.click(screen.getByTestId("send-button"));
+      expect(onSend).toHaveBeenCalledWith(
+        "What is covered?",
+        expect.objectContaining({ insurer: "SCTI" })
+      );
     });
 
     it("renders real Turnstile container element when turnstileSiteKey is provided and window.turnstile exists", () => {
@@ -398,6 +386,16 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
       expect(handleSend).not.toHaveBeenCalled();
     });
 
+    it("does not submit Enter while an IME composition is active", () => {
+      const onSend = vi.fn();
+      render(<InputBar onSend={onSend} isLoading={false} isThrottled={false} />);
+      const textarea = screen.getByTestId("chat-input-textarea");
+      fireEvent.change(textarea, { target: { value: "Composition" } });
+      fireEvent.keyDown(textarea, { key: "Enter", isComposing: true });
+      expect(onSend).not.toHaveBeenCalled();
+      expect(textarea).toHaveValue("Composition");
+    });
+
     it("disables send button and input elements when isLoading is true", () => {
       render(<InputBar onSend={vi.fn()} isLoading={true} isThrottled={false} />);
 
@@ -427,9 +425,9 @@ describe("Telemetry Header, Abuse Shield & Input Bar (Ticket 6)", () => {
 
       // Verify text-base on mobile to prevent iOS Safari auto-zoom (<16px triggers zoom)
       expect(textarea.className).toContain("text-base");
-      expect(textarea.className).toContain("sm:text-sm");
-      expect(select.className).toContain("text-base");
-      expect(select.className).toContain("sm:text-xs");
+      expect(select.className).toContain("h-11");
+      expect(select.className).toContain("w-11");
+      expect(select).toHaveAccessibleDescription("Selected insurer: All Insurers (39)");
 
       // Verify 44x44px minimum tap target for finger tap
       expect(sendButton.className).toContain("min-h-[44px]");

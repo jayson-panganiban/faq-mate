@@ -66,6 +66,10 @@ export interface UseChatStreamReturn {
   activeRefusal: RefusalPayload | null;
   sendMessage: (query: string, options?: SendMessageOptions) => Promise<void>;
   reset: () => void;
+  deleteTurn: (id: string) => void;
+  clearHistory: () => void;
+  undoHistoryDeletion: () => void;
+  canUndoHistoryDeletion: boolean;
 }
 
 export type { GroundedChunk };

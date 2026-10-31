@@ -1,9 +1,9 @@
-import { Activity, Columns, Radio, RotateCcw, Shield, Zap } from "lucide-react";
-import React from "react";
+import { Columns, History, Menu, MessageSquare, PanelLeft, Plus, Shield, X } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { RateLimitInfo, TelemetryInfo } from "../types/chat-ui";
-import { PiiAssuranceBadge } from "./PiiAssuranceBadge";
+import { ComplianceFooter } from "./ComplianceFooter";
+import { HistoryItem } from "./HistoryItem";
 import { RateLimitBadge } from "./RateLimitBadge";
-import { StatutoryGaw } from "./StatutoryGaw";
 
 export interface AppShellProps {
   telemetry?: TelemetryInfo;
@@ -13,164 +13,349 @@ export interface AppShellProps {
   hideFooterGaw?: boolean;
   onToggleComparison?: () => void;
   onReset?: () => void;
-  children: React.ReactNode;
+  historyItems?: { id: string; label: string }[];
+  onSelectHistory?: (id: string) => void;
+  onDeleteHistory?: (id: string) => void;
+  onClearHistory?: () => void;
+  onUndoHistoryDeletion?: () => void;
+  canUndoHistoryDeletion?: boolean;
+  children: ReactNode;
   className?: string;
 }
 
-/**
- * Global Application Shell for FAQ-Mate Edge RAG (Spec 05 Section 3).
- * Contains persistent edge telemetry header, Section 949A GAW footer, and client PII shield.
- */
+const actionClass =
+  "inline-flex min-h-[44px] min-w-[44px] items-center gap-2 rounded-lg px-3 text-sm font-medium cursor-pointer text-slate-700 hover:bg-teal-50 hover:text-teal-800 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500";
+
 export function AppShell({
-  telemetry,
   rateLimit,
   isThrottled = false,
   isComparisonMode = false,
-  hideFooterGaw = false,
   onToggleComparison,
   onReset,
+  historyItems = [],
+  onSelectHistory,
+  onDeleteHistory,
+  onClearHistory,
+  onUndoHistoryDeletion,
+  canUndoHistoryDeletion = false,
   children,
   className = "",
 }: AppShellProps) {
-  const retrievalMs = telemetry?.hybrid_retrieval_latency_ms ?? telemetry?.latencyMs;
-  const ttftMs = telemetry?.inference_ttft_ms ?? telemetry?.ttftMs;
-  const popLocation = telemetry?.popLocation || "Anycast (LOCAL)";
-  const popSuffix = popLocation.startsWith("Anycast ") ? popLocation.slice(8) : popLocation;
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState<number>();
+  const menuTrigger = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+  const desktopHistory = useRef<HTMLHeadingElement>(null);
+  const mobileHistory = useRef<HTMLHeadingElement>(null);
 
-  return (
-    <div
-      className={`min-h-[100dvh] h-[100dvh] flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 overflow-hidden ${className}`}
-    >
-      {/* Edge Telemetry & Compact Brand Header */}
-      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 shadow-2xs pt-[env(safe-area-inset-top,0px)]">
-        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-2.5">
-          {/* Brand Identity & PoP */}
-          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-            <div className="h-7 w-7 rounded-lg bg-slate-900 dark:bg-slate-100 flex items-center justify-center text-white dark:text-slate-900 shadow-2xs shrink-0">
-              <Shield className="w-3.5 h-3.5" aria-hidden="true" />
-            </div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xs sm:text-sm font-bold tracking-tight text-slate-900 dark:text-white leading-tight whitespace-nowrap">
-                FAQ-Mate Edge RAG
-              </h1>
-              <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700/80 shrink-0">
-                Australian Insurance Engine
-              </span>
-            </div>
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    requestAnimationFrame(() => menuTrigger.current?.focus());
+  }, []);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const update = () => setViewportHeight(viewport.scale === 1 ? viewport.height : undefined);
+    update();
+    viewport.addEventListener("resize", update);
+    return () => viewport.removeEventListener("resize", update);
+  }, []);
+  useEffect(() => {
+    if (!drawerOpen) return;
+    drawerRef.current?.querySelector<HTMLElement>("button")?.focus();
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeDrawer();
+      }
+      if (event.key !== "Tab") return;
+      const controls = Array.from(
+        drawerRef.current?.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), [tabindex='0']"
+        ) ?? []
+      );
+      if (!controls.length) return;
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (document.activeElement === mobileHistory.current) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", keydown);
+    return () => document.removeEventListener("keydown", keydown);
+  }, [drawerOpen, closeDrawer]);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(min-width: 1024px)");
+    const change = () => {
+      if (media.matches) setDrawerOpen(false);
+    };
+    media.addEventListener("change", change);
+    change();
+    return () => media.removeEventListener("change", change);
+  }, []);
 
-            {/* Cloudflare Anycast PoP Badge */}
-            <div
-              data-testid="cf-pop-badge"
-              className="inline-flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono font-medium bg-amber-50 text-amber-900 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 shadow-2xs shrink-0"
-              title="Cloudflare Anycast edge point-of-presence data center"
-            >
-              <Radio
-                className="w-3 h-3 text-amber-500 dark:text-amber-400 motion-safe:animate-pulse shrink-0"
-                aria-hidden="true"
-              />
-              <span className="hidden sm:inline">Anycast </span>
-              <span>{popSuffix}</span>
-            </div>
-          </div>
-
-          {/* Telemetry Metrics & Actions */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Hybrid Retrieval Latency Badge */}
-            {retrievalMs !== undefined && (
-              <span
-                data-testid="retrieval-latency-badge"
-                className="hidden sm:inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full text-xs font-mono font-medium tabular-nums bg-sky-50 text-sky-800 border border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800 shadow-2xs"
-                title="Cloudflare AI Search hybrid vector+BM25 retrieval latency"
-              >
-                <Activity className="w-3 h-3 text-sky-600 dark:text-sky-400" aria-hidden="true" />
-                <span>
-                  {retrievalMs}ms
-                  <span className="sr-only sm:not-sr-only"> retrieval</span>
-                </span>
-              </span>
-            )}
-
-            {/* Inference TTFT Badge */}
-            {ttftMs !== undefined && (
-              <span
-                data-testid="ttft-badge"
-                className="hidden sm:inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full text-xs font-mono font-medium tabular-nums bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800 shadow-2xs"
-                title="Time to First Token (sub-350ms budget)"
-              >
-                <Zap className="w-3 h-3 text-indigo-500" aria-hidden="true" />
-                <span>
-                  {ttftMs}ms
-                  <span className="sr-only sm:not-sr-only"> TTFT</span>
-                </span>
-              </span>
-            )}
-
-            {/* Live Rate Limit Badge */}
-            <RateLimitBadge rateLimit={rateLimit} isThrottled={isThrottled} />
-
-            {/* Policy Comparison View Toggle (Spec 05 US-15) */}
-            {onToggleComparison && (
-              <button
-                type="button"
-                data-testid="comparison-toggle"
-                onClick={onToggleComparison}
-                aria-pressed={isComparisonMode}
-                aria-label={
-                  isComparisonMode ? "Switch to chat view" : "Switch to policy comparison view"
-                }
-                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border cursor-pointer shadow-2xs transition-[color,background-color,border-color,box-shadow] duration-150 min-h-[36px] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:outline-hidden ${
-                  isComparisonMode
-                    ? "bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900"
-                    : "text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700"
-                }`}
-              >
-                <Columns className="w-3 h-3" aria-hidden="true" />
-                <span className="hidden sm:inline">
-                  {isComparisonMode ? "Chat View" : "Compare"}
-                </span>
-              </button>
-            )}
-
-            {/* Reset / New Chat Button */}
+  const navigation = (mobile: boolean) => {
+    const compact = !mobile && collapsed;
+    return (
+      <>
+        <div className="flex items-start gap-1 px-2 pt-4 pb-3">
+          <button
+            type="button"
+            data-testid={mobile ? undefined : "reset-chat-button"}
+            aria-label="Start new chat"
+            title="Start new chat"
+            onClick={() => {
+              onReset?.();
+              if (mobile) closeDrawer();
+            }}
+            className={`${actionClass} ${compact ? "justify-center px-0" : "flex-1 justify-start"}`}
+          >
+            <Plus size={20} aria-hidden="true" />
+            {!compact && "New Chat"}
+          </button>
+          {mobile && (
             <button
               type="button"
-              data-testid="reset-chat-button"
-              onClick={onReset}
-              aria-label="Start new chat"
-              title="New conversation"
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs transition-[color,background-color,border-color,box-shadow] duration-150 min-h-[36px] focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:outline-hidden"
+              aria-label="Close navigation"
+              onClick={closeDrawer}
+              className={actionClass}
             >
-              <RotateCcw
-                className="w-3 h-3 text-slate-500 dark:text-slate-400"
-                aria-hidden="true"
-              />
-              <span className="hidden sm:inline">New Chat</span>
+              <X size={20} />
             </button>
-          </div>
+          )}
         </div>
-      </header>
-
-      {/* Main Content Surface */}
-      <main className="flex-1 flex flex-col w-full max-w-5xl mx-auto px-3 sm:px-4 py-2 sm:py-4 overflow-hidden relative">
-        {children}
-      </main>
-
-      {/* Statutory Regulatory & Privacy Footer */}
-      <footer
-        role="contentinfo"
-        className="border-t border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 py-1.5 sm:py-2 px-3 sm:px-4 shadow-2xs pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+        <nav
+          aria-label={mobile ? "Mobile navigation" : "Main navigation"}
+          className="space-y-1 px-2"
+        >
+          <button
+            type="button"
+            aria-label="Chat"
+            title="Chat"
+            aria-current={!isComparisonMode ? "page" : undefined}
+            className={`${actionClass} w-full ${compact ? "justify-center px-0" : "justify-start"} ${!isComparisonMode ? "bg-teal-50 text-teal-800 dark:bg-teal-950" : ""}`}
+            onClick={() => {
+              if (isComparisonMode) onToggleComparison?.();
+              if (mobile) closeDrawer();
+            }}
+          >
+            <MessageSquare size={20} aria-hidden="true" />
+            {!compact && "Chat"}
+          </button>
+          {onToggleComparison && (
+            <button
+              type="button"
+              data-testid={mobile ? undefined : "comparison-toggle"}
+              aria-label={
+                isComparisonMode ? "Switch to chat view" : "Switch to policy comparison view"
+              }
+              title="Compare policies"
+              aria-pressed={isComparisonMode}
+              aria-current={isComparisonMode ? "page" : undefined}
+              className={`${actionClass} w-full ${compact ? "justify-center px-0" : "justify-start"} ${isComparisonMode ? "bg-teal-50 text-teal-800 dark:bg-teal-950" : ""}`}
+              onClick={() => {
+                if (!isComparisonMode) onToggleComparison();
+                if (mobile) closeDrawer();
+              }}
+            >
+              <Columns size={20} aria-hidden="true" />
+              {!compact && "Compare policies"}
+            </button>
+          )}
+        </nav>
+        {compact ? (
+          <button
+            type="button"
+            aria-label="History"
+            title="History"
+            className={`${actionClass} mx-2 mt-6 justify-center px-0`}
+            onClick={() => {
+              setCollapsed(false);
+              requestAnimationFrame(() => desktopHistory.current?.focus());
+            }}
+          >
+            <History size={20} aria-hidden="true" />
+          </button>
+        ) : (
+          <section className="min-h-0 flex flex-1 flex-col pt-6">
+            <div className="min-h-0 flex-1 overflow-y-auto px-2">
+              <h2
+                ref={mobile ? mobileHistory : desktopHistory}
+                tabIndex={-1}
+                className="px-3 pb-2 text-xs font-semibold text-slate-500 dark:text-slate-400"
+              >
+                History
+              </h2>
+              <p className="px-3 pb-2 text-xs text-slate-500 dark:text-slate-400">
+                This conversation
+              </p>
+              {historyItems.length === 0 ? (
+                <p className="px-3 text-sm text-slate-500 dark:text-slate-400">
+                  Your questions will appear here.
+                </p>
+              ) : (
+                historyItems.map((item, index) => (
+                  <HistoryItem
+                    mobile={mobile}
+                    key={item.id}
+                    {...item}
+                    onSelect={() => {
+                      onSelectHistory?.(item.id);
+                      if (mobile) closeDrawer();
+                    }}
+                    onDelete={() => {
+                      onDeleteHistory?.(item.id);
+                      const next = historyItems[index + 1] ?? historyItems[index - 1];
+                      requestAnimationFrame(() => {
+                        const container = mobile
+                          ? drawerRef.current
+                          : document.getElementById("desktop-sidebar");
+                        const row = next
+                          ? container?.querySelector<HTMLElement>(
+                              `[data-testid="history-item-${next.id}"] [data-history-select]`
+                            )
+                          : null;
+                        (row ?? (mobile ? mobileHistory.current : desktopHistory.current))?.focus();
+                      });
+                    }}
+                  />
+                ))
+              )}
+            </div>
+            <div className="shrink-0 px-5 pb-3">
+              {historyItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClearHistory?.();
+                    requestAnimationFrame(() =>
+                      (mobile ? drawerRef.current : document.getElementById("desktop-sidebar"))
+                        ?.querySelector<HTMLButtonElement>("[data-undo-history]")
+                        ?.focus()
+                    );
+                  }}
+                  className="block min-h-[44px] text-sm text-slate-500 hover:text-red-700 dark:text-slate-400 dark:hover:text-red-400"
+                >
+                  Clear all history
+                </button>
+              )}
+              {canUndoHistoryDeletion && (
+                <button
+                  type="button"
+                  data-undo-history
+                  onClick={onUndoHistoryDeletion}
+                  className="block min-h-[44px] text-sm text-slate-500 hover:text-teal-800 dark:text-slate-400 dark:hover:text-teal-400"
+                >
+                  Undo deletion
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+      </>
+    );
+  };
+  return (
+    <div
+      className={`chat-app h-[100dvh] flex overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 ${className}`}
+      style={viewportHeight === undefined ? undefined : { height: viewportHeight }}
+    >
+      <aside
+        id="desktop-sidebar"
+        data-collapsed={collapsed}
+        className={`hidden lg:flex ${collapsed ? "w-16" : "w-64"} shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900`}
       >
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
-          {!hideFooterGaw && (
-            <div className="flex-1 min-w-0">
-              <StatutoryGaw variant="footer" compact />
+        {navigation(false)}
+      </aside>
+      <div inert={drawerOpen || undefined} className="min-w-0 flex flex-1 flex-col">
+        <header className="shrink-0 z-30 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 pt-[env(safe-area-inset-top,0px)]">
+          <div className="relative flex items-center justify-between gap-2 px-3 py-2 sm:px-4">
+            <div className="flex min-w-0 items-center gap-2">
+              <button
+                ref={menuTrigger}
+                type="button"
+                aria-label="Open navigation"
+                aria-expanded={drawerOpen}
+                aria-controls="mobile-navigation"
+                onClick={() => setDrawerOpen(true)}
+                className={`${actionClass} lg:hidden`}
+              >
+                <Menu size={20} />
+              </button>
+              <button
+                id="sidebar-toggle"
+                type="button"
+                aria-label="Toggle sidebar"
+                aria-expanded={!collapsed}
+                aria-controls="desktop-sidebar"
+                onClick={() => setCollapsed((value) => !value)}
+                className={`${actionClass} hidden lg:inline-flex`}
+              >
+                <PanelLeft size={20} />
+              </button>
+              <Shield className="hidden sm:block h-5 w-5 shrink-0" aria-hidden="true" />
+              <div>
+                <h1 className="text-sm font-bold">FAQ-Mate</h1>
+                <p className="hidden sm:block text-xs text-slate-600 dark:text-slate-400">
+                  Australian insurance, explained
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {!isThrottled && <RateLimitBadge rateLimit={rateLimit} />}
+              <button
+                type="button"
+                id="mobile-new-chat-button"
+                data-testid="mobile-new-chat-button"
+                aria-label="Start new chat"
+                onClick={onReset}
+                className={`${actionClass} justify-center px-0 lg:hidden`}
+              >
+                <Plus size={20} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+          {isThrottled && (
+            <div className="max-w-[800px] mx-auto px-3 pb-2">
+              <RateLimitBadge rateLimit={rateLimit} isThrottled />
             </div>
           )}
-          <div className="shrink-0 flex items-center ml-auto">
-            <PiiAssuranceBadge />
-          </div>
+        </header>
+        <main className="min-h-0 flex-1 flex flex-col w-full max-w-[800px] mx-auto px-3 sm:px-4 lg:pt-4 overflow-hidden relative">
+          {children}
+        </main>
+        <ComplianceFooter />
+      </div>
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            aria-label="Close navigation backdrop"
+            tabIndex={-1}
+            onClick={closeDrawer}
+            className="absolute inset-0 w-full bg-slate-950/50"
+          />
+          <aside
+            ref={drawerRef}
+            id="mobile-navigation"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation"
+            className="relative flex h-full w-64 max-w-[85vw] flex-col pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] bg-white shadow-xl dark:bg-slate-900"
+          >
+            {navigation(true)}
+          </aside>
         </div>
-      </footer>
+      )}
     </div>
   );
 }

@@ -35,14 +35,13 @@ describe("UserMessage Component (Ticket 5)", () => {
     expect(screen.getByText("10:42 AM")).toBeInTheDocument();
   });
 
-  it("has accessible container semantics and user avatar icon", () => {
+  it("has accessible container semantics without an avatar", () => {
     render(<UserMessage query="Testing accessibility" />);
 
     const article = screen.getByRole("article", { name: /user message/i });
     expect(article).toBeInTheDocument();
-    // User icon is rendered within the avatar container
     const avatar = article.querySelector('[data-testid="user-avatar"]');
-    expect(avatar).toBeInTheDocument();
+    expect(avatar).not.toBeInTheDocument();
   });
 
   it("sanitizes raw PII in user query and displays sanitized indicator badge", () => {
@@ -287,8 +286,158 @@ describe("AssistantMessage Component (Ticket 5)", () => {
     });
   });
 
-  describe("Operative Sources Shelf (Answer Engine Dossier)", () => {
-    it("renders Sources Shelf at the top of the dossier when grounded chunks are provided", () => {
+  it("submits a related question when selected", () => {
+    const onSelectFollowUp = vi.fn();
+    render(
+      <AssistantMessage
+        message="Policy response."
+        showGaw={false}
+        suggestedFollowUps={["What is covered?"]}
+        onSelectFollowUp={onSelectFollowUp}
+      />
+    );
+    expect(screen.getByText("Related questions")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "What is covered?" }));
+    expect(onSelectFollowUp).toHaveBeenCalledWith("What is covered?");
+  });
+
+  describe("Standalone provenance references", () => {
+    it("keeps citation-only list entries readable instead of reducing them to inline markers", () => {
+      const onSelectCitation = vi.fn();
+      render(
+        <AssistantMessage
+          message={[
+            "### 5. PROVENANCE CITATIONS, NO PERSONAL ADVICE & STATUTORY DISCLAIMER",
+            "- [Source: Suncorp Classic Home PDS, Section 3: Sub-limits]",
+            "- [Source: Insurance Contracts Act 1984, Section 99]",
+            "- Official Source URL: https://www.suncorp.com.au/home-contents-pds.pdf",
+            "-",
+          ].join("\n")}
+          chunks={mockChunks}
+          showGaw={false}
+          onSelectCitation={onSelectCitation}
+        />
+      );
+      const article = screen.getByRole("article", { name: "Assistant message" });
+      const referenceList = within(article)
+        .getByText(/Official Source URL:/)
+        .closest("ul");
+      if (!referenceList) throw new Error("Expected provenance reference list");
+      const known = within(referenceList).getByRole("button", {
+        name: "View source: Suncorp Classic Home PDS, Section 3: Sub-limits",
+      });
+      expect(known).toHaveTextContent(/^Suncorp Classic Home PDS$/);
+      const unknown = within(referenceList).getByRole("button", {
+        name: "View source: Insurance Contracts Act 1984, Section 99",
+      });
+      expect(unknown).toHaveTextContent(/^Insurance Contracts Act 1984, Section 99$/);
+      fireEvent.click(known);
+      expect(onSelectCitation).toHaveBeenCalledWith(mockChunks[0]);
+      fireEvent.click(unknown);
+      expect(onSelectCitation).toHaveBeenLastCalledWith(
+        "[Source: Insurance Contracts Act 1984, Section 99]"
+      );
+      expect(
+        within(article).getByRole("link", { name: "Suncorp Home & Contents PDS" })
+      ).toBeInTheDocument();
+      expect(within(article).queryByText(/^[-*+]$/)).not.toBeInTheDocument();
+    });
+
+    it("keeps citations embedded in prose compact and preserves the full sentence", () => {
+      render(
+        <AssistantMessage
+          message="The policy defines flood in accordance with [Source: Suncorp Classic Home PDS, Section 3: Sub-limits]."
+          chunks={mockChunks}
+          showGaw={false}
+        />
+      );
+      const marker = screen.getByRole("button", {
+        name: "View citation source: Suncorp Classic Home PDS, Section 3: Sub-limits",
+      });
+      expect(marker.querySelector('[data-testid="citation-index-badge"]')).toHaveTextContent("[1]");
+      expect(screen.getByText(/The policy defines flood in accordance with/)).toHaveTextContent(
+        /accordance with.*\./
+      );
+    });
+  });
+
+  describe("Descriptive links", () => {
+    it("renders bare document URLs and punctuation with their exact destination", () => {
+      const url = "https://www.suncorp.com.au/docs/home-and-contents-pds.pdf?version=1&x=2";
+      render(<AssistantMessage message={`Read ${url}.`} showGaw={false} />);
+      expect(screen.getByRole("link", { name: "Suncorp Home & Contents PDS" })).toHaveAttribute(
+        "href",
+        url
+      );
+      expect(screen.getByText(/Read/).textContent).toContain("PDS.");
+      expect(screen.getByText(/Read/).textContent).not.toContain(url);
+    });
+
+    it("recognizes markdown links before citations and renders links in tables", () => {
+      const message =
+        "**Cover** [Source: Suncorp Classic Home PDS, Section 3: Sub-limits] and [Suncorp PDS](https://suncorp.com.au/policy).\n\n| Document | Details |\n| --- | --- |\n| [Policy PDS](https://example.com/pds) | <https://example.com/doc> |";
+      render(<AssistantMessage message={message} chunks={mockChunks} showGaw={false} />);
+      expect(screen.getByRole("link", { name: "Suncorp PDS" })).toHaveAttribute(
+        "href",
+        "https://suncorp.com.au/policy"
+      );
+      expect(screen.getByRole("link", { name: "Policy PDS" })).toHaveAttribute(
+        "href",
+        "https://example.com/pds"
+      );
+      expect(screen.getByRole("link", { name: "example.com document" })).toHaveAttribute(
+        "href",
+        "https://example.com/doc"
+      );
+      expect(screen.getByTestId("citation-index-badge")).toHaveTextContent("[1]");
+    });
+
+    it("preserves emphasis around links and underscores in URLs", () => {
+      const first = "https://www.suncorp.com.au/home-contents-pds.pdf";
+      const second = "https://www.suncorp.com.au/home_contents_pds.pdf";
+      render(
+        <AssistantMessage
+          message={`**[Suncorp Home & Contents PDS](${first})** and *${second}*.`}
+          showGaw={false}
+        />
+      );
+      const links = screen.getAllByRole("link", { name: "Suncorp Home & Contents PDS" });
+      expect(links[0]).toHaveAttribute("href", first);
+      expect(links[0].closest("strong")).toBeInTheDocument();
+      expect(links[1]).toHaveAttribute("href", second);
+      expect(links[1].closest("em")).toBeInTheDocument();
+      expect(links[1].parentElement?.parentElement?.textContent).toContain("PDS.");
+    });
+
+    it("keeps document types accurate and replaces URL-containing link labels", () => {
+      const url = "https://www.suncorp.com.au/home-contents-tmd.pdf";
+      render(<AssistantMessage message={`[Read ${url}](${url})`} showGaw={false} />);
+      const link = screen.getByRole("link", { name: "Suncorp Home & Contents TMD" });
+      expect(link).toHaveAttribute("href", url);
+      expect(link.textContent).not.toContain("https://");
+    });
+
+    it("rejects malformed explicit HTTP destinations", () => {
+      render(<AssistantMessage message="[PDS](https://[invalid)" showGaw={false} />);
+      expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    });
+
+    it("does not turn unsafe destinations into links or mislabel lookalike hosts", () => {
+      render(
+        <AssistantMessage
+          message="[PDS](javascript:alert(1)) https://suncorp.evil.example/home-contents-pds.pdf"
+          showGaw={false}
+        />
+      );
+      expect(screen.queryByRole("link", { name: "PDS" })).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "suncorp.evil.example document" })
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("Plain source list", () => {
+    it("renders document links and excerpts without icons, counters or metadata badges", () => {
       const onSelectCitation = vi.fn();
       render(
         <AssistantMessage
@@ -298,32 +447,51 @@ describe("AssistantMessage Component (Ticket 5)", () => {
           isStreaming={false}
         />
       );
-
-      const shelf = screen.getByTestId("sources-shelf");
-      expect(shelf).toBeInTheDocument();
-      expect(shelf).toHaveAttribute("aria-label", "Operative Policy Sources");
-      expect(within(shelf).getByText(/Operative Sources/i)).toBeInTheDocument();
-      expect(screen.getByTestId("sources-count-badge")).toHaveTextContent("2");
-
-      // Source Card 0 (Suncorp)
-      const card0 = screen.getByTestId("source-card-0");
-      expect(card0).toBeInTheDocument();
-      expect(within(card0).getByText("SUNCORP")).toBeInTheDocument();
-      expect(within(card0).getByText("Suncorp Classic Home PDS")).toBeInTheDocument();
-      expect(within(card0).getByText("Section 3: Sub-limits")).toBeInTheDocument();
-      expect(within(card0).getByText("95% match")).toBeInTheDocument();
-
-      // Source Card 1 (NRMA)
-      const card1 = screen.getByTestId("source-card-1");
-      expect(card1).toBeInTheDocument();
-      expect(within(card1).getByText("NRMA")).toBeInTheDocument();
-      expect(within(card1).getByText("NRMA Home Building PDS")).toBeInTheDocument();
-      expect(within(card1).getByText("Section 1: Insured Events")).toBeInTheDocument();
-      expect(within(card1).getByText("91% match")).toBeInTheDocument();
-
-      // Clicking a source card invokes onSelectCitation
-      fireEvent.click(card0);
+      const shelf = screen.getByRole("region", { name: "Sources" });
+      expect(within(shelf).getByRole("heading", { name: "Sources" })).toBeInTheDocument();
+      expect(within(shelf).getAllByRole("listitem")).toHaveLength(2);
+      expect(shelf.querySelector("svg")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("sources-count-badge")).not.toBeInTheDocument();
+      expect(within(shelf).queryByText(/% match/)).not.toBeInTheDocument();
+      expect(within(shelf).queryByText("SUNCORP")).not.toBeInTheDocument();
+      const first = within(shelf).getByRole("button", {
+        name: "View source: Suncorp Classic Home PDS, Section 3: Sub-limits",
+      });
+      expect(first).toHaveTextContent(mockChunks[0].content);
+      fireEvent.click(first);
       expect(onSelectCitation).toHaveBeenCalledWith(mockChunks[0]);
+      fireEvent.click(
+        within(shelf).getByRole("button", {
+          name: "View source: NRMA Home Building PDS, Section 1: Insured Events",
+        })
+      );
+      expect(onSelectCitation).toHaveBeenLastCalledWith(mockChunks[1]);
+    });
+
+    it("turns Markdown snippets into readable plain text while keeping the original source intact", () => {
+      const onSelectCitation = vi.fn();
+      const chunk = {
+        ...mockChunks[0],
+        content:
+          "### Cover details ###\n**Storm damage** and _glass_ terms. [Read the policy](https://example.com/policy).\n- Check `limits`.",
+      };
+      render(
+        <AssistantMessage
+          message="Answer."
+          chunks={[chunk]}
+          showGaw={false}
+          onSelectCitation={onSelectCitation}
+        />
+      );
+      const shelf = screen.getByRole("region", { name: "Sources" });
+      expect(
+        within(shelf).getByText(
+          "Cover details Storm damage and glass terms. Read the policy. Check limits."
+        )
+      ).toBeInTheDocument();
+      expect(shelf.textContent).not.toMatch(/###|\*\*|https:\/\//);
+      fireEvent.click(within(shelf).getByRole("button"));
+      expect(onSelectCitation).toHaveBeenCalledWith(chunk);
     });
 
     it("does not render Sources Shelf when chunks is undefined or empty", () => {

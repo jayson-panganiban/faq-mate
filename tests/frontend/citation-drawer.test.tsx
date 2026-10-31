@@ -61,10 +61,13 @@ describe("CitationPill Component", () => {
     expect(screen.getByText("[Source: Suncorp Classic Home PDS, Section 1]")).toBeInTheDocument();
   });
 
-  it("renders an icon representing document or source", () => {
-    const { container } = render(<CitationPill chunk={mockChunk1} />);
-    const icon = container.querySelector("svg");
-    expect(icon).toBeInTheDocument();
+  it("renders a compact index and accessible source without an icon", () => {
+    const { container } = render(<CitationPill chunk={mockChunk1} index={1} />);
+    expect(container.querySelector("svg")).not.toBeInTheDocument();
+    expect(screen.getByTestId("citation-index-badge")).toHaveTextContent("[1]");
+    expect(
+      screen.getByRole("button", { name: /Suncorp Classic Home PDS, Section 1/i })
+    ).toBeInTheDocument();
   });
 
   it("triggers onClick when clicked", () => {
@@ -164,7 +167,7 @@ describe("CitationDrawer Component", () => {
   it("renders chunk ID and docType badges", () => {
     render(<CitationDrawer isOpen={true} onClose={onClose} chunks={[mockChunk1]} />);
 
-    expect(screen.getByText(/chunk-suncorp-01/i)).toBeInTheDocument();
+    expect(screen.queryByText(/chunk-suncorp-01/i)).not.toBeInTheDocument();
     expect(screen.getByText("PDS")).toBeInTheDocument();
   });
 

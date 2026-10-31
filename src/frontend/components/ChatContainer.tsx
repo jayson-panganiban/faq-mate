@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUpRight, Bot, Search, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChatMessage, GroundedChunk, StreamState } from "../types/chat-ui";
 import { AssistantMessage } from "./AssistantMessage";
 import { EmergencyBanner } from "./EmergencyBanner";
@@ -48,6 +48,7 @@ export const STARTER_PROMPTS: StarterPrompt[] = [
 ];
 
 export interface ChatContainerProps {
+  scrollToMessage?: { id: string; sequence: number };
   messages: ChatMessage[];
   status: StreamState;
   citations: GroundedChunk[];
@@ -80,6 +81,7 @@ function formatTime(timestamp?: number): string | undefined {
  */
 export function ChatContainer({
   messages,
+  scrollToMessage,
   status,
   citations,
   onSelectCitation,
@@ -87,126 +89,95 @@ export function ChatContainer({
   className = "",
 }: ChatContainerProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const bottomSentinelRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const isUserScrolledUpRef = useRef(false);
 
-  // Monitor scroll position to anchor streaming or show "Scroll to bottom"
-  const handleScroll = () => {
+  const hasMessagesRef = useRef(messages.length > 0);
+
+  const updateScrollState = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
-
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    const isScrolledUp = distanceFromBottom > 80;
-
+    const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isScrolledUp = hasMessagesRef.current && distance > 80;
     isUserScrolledUpRef.current = isScrolledUp;
     setShowScrollButton(isScrolledUp);
-  };
+  }, []);
 
-  // Auto-scroll when new messages arrive or content streams, unless user scrolled up
+  const syncScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    // Scroll only this feed. scrollIntoView also moves overflow-hidden ancestors,
+    // and smooth scrolling emits intermediate events that look like manual scrolling.
+    if (!hasMessagesRef.current) container.scrollTop = 0;
+    else if (!isUserScrolledUpRef.current) container.scrollTop = container.scrollHeight;
+    updateScrollState();
+  }, [updateScrollState]);
+
+  useLayoutEffect(() => {
+    hasMessagesRef.current = messages.length > 0;
+    syncScroll();
+  }, [messages, syncScroll]);
+
   useEffect(() => {
-    if (!isUserScrolledUpRef.current) {
-      bottomSentinelRef.current?.scrollIntoView?.({ behavior: "smooth" });
+    const container = scrollContainerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(syncScroll);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [syncScroll]);
+
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!scrollToMessage || !container) return;
+    const element = Array.from(container.querySelectorAll<HTMLElement>("[data-message-id]")).find(
+      (node) => node.dataset.messageId === scrollToMessage.id
+    );
+    if (element) {
+      container.scrollTop +=
+        element.getBoundingClientRect().top - container.getBoundingClientRect().top;
+      updateScrollState();
     }
-  }, [messages, status]);
+  }, [scrollToMessage, updateScrollState]);
 
   const scrollToBottom = () => {
-    isUserScrolledUpRef.current = false;
-    setShowScrollButton(false);
-    bottomSentinelRef.current?.scrollIntoView?.({ behavior: "smooth" });
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+    updateScrollState();
   };
 
   const isEmpty = messages.length === 0;
-
-  // Identify the latest message that renders an inline StatutoryGaw banner so multi-turn chats
-  // never stack duplicate GAW banners across historical turns.
-  let lastGawMessageIdx = -1;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m.role === "user") continue;
-    if (m.refusal?.code === "ADVICE_BOUNDARY_VIOLATION") {
-      lastGawMessageIdx = i;
-      break;
-    }
-    if (m.refusal?.code === "EMERGENCY_INTERCEPTION") {
-      continue;
-    }
-    const isLast = i === messages.length - 1;
-    const isActiveStream =
-      isLast &&
-      (status === "CONNECTING" || status === "METADATA_RECEIVED" || status === "STREAMING");
-    if (!isActiveStream && m.content.trim().length > 0) {
-      lastGawMessageIdx = i;
-      break;
-    }
-  }
 
   return (
     <div className={`relative flex-1 flex flex-col min-h-0 overflow-hidden ${className}`}>
       {/* Scrollable Message List Canvas */}
       <div
         ref={scrollContainerRef}
-        onScroll={handleScroll}
+        onScroll={updateScrollState}
         data-testid="chat-scroll-container"
         role="log"
         aria-label="Insurance Policy Chat History"
         aria-live="polite"
-        className="flex-1 overflow-y-auto px-2 sm:px-4 py-4 space-y-4 scroll-smooth focus:outline-hidden"
+        className={`flex-1 overflow-y-auto px-2 sm:px-4 pt-4 pb-0 lg:pb-4 focus:outline-none ${isEmpty ? "flex flex-col" : "space-y-4"}`}
         tabIndex={0}
       >
-        {/* Empty State: Clean Search-First Canvas & Vertical Quick Prompts */}
+        {/* Empty State: Clean Search-First Canvas & Vertical Try a question */}
         {isEmpty && (
-          <div className="relative max-w-2xl mx-auto my-auto py-1 sm:py-2 px-2 sm:px-4 flex flex-col items-start w-full space-y-2.5 sm:space-y-3.5">
-            {/* Faint Vector Compass Watermark in Background */}
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden opacity-[0.03] dark:opacity-[0.04]"
-            >
-              <svg
-                aria-hidden="true"
-                focusable="false"
-                className="w-72 h-72 sm:w-96 sm:h-96 text-slate-900 dark:text-slate-100"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="0.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <title>Australian General Insurance Radar</title>
-                <circle cx="12" cy="12" r="10" />
-                <polygon
-                  points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"
-                  fill="currentColor"
-                  fillOpacity="0.15"
-                />
-                <circle cx="12" cy="12" r="2" />
-                <line x1="12" y1="2" x2="12" y2="4" />
-                <line x1="12" y1="20" x2="12" y2="22" />
-                <line x1="2" y1="12" x2="4" y2="12" />
-                <line x1="20" y1="12" x2="22" y2="12" />
-              </svg>
-            </div>
-
+          <div className="relative max-w-2xl mx-auto mt-0 py-0 lg:py-2 px-2 sm:px-4 flex flex-col items-start w-full space-y-2.5 sm:space-y-3.5">
             {/* Header: Search-first typography without marketing bloat */}
             <div className="relative z-10 space-y-1 text-left w-full">
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-                Where would you like to start?
+                Understand your insurance cover
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                Grounded in operative Product Disclosure Statements across 39 licensed Australian
-                insurers.
+                Ask a question, compare policy wording, and check the sources.
               </p>
             </div>
 
-            {/* Quick Prompts: Compact Vertical List */}
+            {/* Try a question: Compact Vertical List */}
             <div className="relative z-10 w-full space-y-2">
               <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1">
-                <span>Quick Prompts</span>
-                <span className="font-normal lowercase text-slate-400 dark:text-slate-500">
-                  pds verified
-                </span>
+                <span>Try a question</span>
               </div>
 
               <div className="flex flex-col gap-1.5 sm:gap-2 w-full">
@@ -226,10 +197,10 @@ export function ChatContainer({
                         />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200 line-clamp-2 sm:truncate group-hover:text-teal-700 dark:group-hover:text-teal-300 transition-colors">
+                        <p className="text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200 break-words group-hover:text-teal-700 dark:group-hover:text-teal-300 transition-colors">
                           {prompt.query}
                         </p>
-                        <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate hidden sm:block">
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">
                           {prompt.description}
                         </p>
                       </div>
@@ -237,7 +208,7 @@ export function ChatContainer({
 
                     <div className="flex items-center gap-2 shrink-0">
                       {prompt.insurer && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
+                        <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
                           {prompt.insurer}
                         </span>
                       )}
@@ -261,12 +232,13 @@ export function ChatContainer({
           messages.map((msg, idx) => {
             if (msg.role === "user") {
               return (
-                <UserMessage
-                  key={msg.id}
-                  query={msg.content}
-                  insurer={msg.insurer}
-                  timestamp={formatTime(msg.timestamp)}
-                />
+                <div key={msg.id} data-message-id={msg.id}>
+                  <UserMessage
+                    query={msg.content}
+                    insurer={msg.insurer}
+                    timestamp={formatTime(msg.timestamp)}
+                  />
+                </div>
               );
             }
 
@@ -278,7 +250,7 @@ export function ChatContainer({
                   code={msg.refusal.code}
                   message={msg.refusal.message}
                   reason={msg.refusal.reason}
-                  showGaw={idx === lastGawMessageIdx}
+                  showGaw={false}
                 />
               );
             }
@@ -322,8 +294,8 @@ export function ChatContainer({
                       <Sparkles className="w-3.5 h-3.5 text-sky-500 motion-safe:animate-pulse" />
                       <span>
                         {status === "METADATA_RECEIVED"
-                          ? "Grounded chunks retrieved. Generating response..."
-                          : "Retrieving operative PDS terms via hybrid search..."}
+                          ? "Preparing your answer..."
+                          : "Looking for relevant policy wording..."}
                       </span>
                     </div>
                     {status === "METADATA_RECEIVED" && citations.length > 0 && (
@@ -354,26 +326,26 @@ export function ChatContainer({
                 suggestedFollowUps={msg.metadata?.suggestedFollowUps}
                 onSelectFollowUp={onSelectStarterQuery}
                 onSelectCitation={onSelectCitation}
-                showGaw={idx === lastGawMessageIdx}
+                showGaw={false}
               />
             );
           })}
 
-        <div ref={bottomSentinelRef} className="h-px w-full" aria-hidden="true" />
+        <div className="h-px w-full" aria-hidden="true" />
       </div>
 
-      {/* Floating "Scroll to bottom" button */}
+      {/* Reserve a separate row so the control never covers readable text. */}
       {showScrollButton && (
-        <div className="absolute bottom-3 left-0 right-0 flex justify-center pointer-events-none z-20">
+        <div className="flex shrink-0 justify-center py-1">
           <button
             type="button"
             data-testid="scroll-to-bottom-button"
             onClick={scrollToBottom}
             aria-label="Scroll to bottom"
-            className="pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-xs font-semibold shadow-lg hover:shadow-xl transition-[transform,box-shadow,background-color] duration-150 cursor-pointer active:scale-95 border border-slate-700 dark:border-slate-300 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:outline-hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer focus-visible:outline-2 focus-visible:outline-teal-600"
           >
             <ArrowDown className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>Scroll to bottom</span>
+            <span className="sr-only">Scroll to bottom</span>
           </button>
         </div>
       )}

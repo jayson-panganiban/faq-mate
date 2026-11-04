@@ -740,6 +740,24 @@ export const POLICY_COMPARISON_DIMENSIONS: readonly PolicyComparisonDimension[] 
   },
 ] as const;
 
+/**
+ * Word-boundary keyword matchers for the benchmark dimensions.
+ * Plain `String.includes("dam")` also matched "damage", letting an
+ * accidental-damage chunk masquerade as flood evidence.
+ */
+const DIMENSION_KEYWORD_PATTERNS = new Map(
+  POLICY_COMPARISON_DIMENSIONS.map((dimension) => [
+    dimension.id,
+    dimension.keywords.map(
+      (keyword) =>
+        new RegExp(
+          `(^|[^a-z0-9])${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=$|[^a-z0-9])`,
+          "i"
+        )
+    ),
+  ])
+);
+
 const CURATED_BENCHMARK_OVERRIDES: Record<
   string,
   Record<PolicyComparisonDimension["id"], string>
@@ -787,6 +805,16 @@ const CURATED_BENCHMARK_OVERRIDES: Record<
   },
 };
 
+const PDS_SCHEDULE_FALLBACK =
+  "Subject to published Product Disclosure Statement (PDS) schedule terms.";
+
+const LIFE_DIMENSION_DISCLOSURES: Record<PolicyComparisonDimension["id"], string> = {
+  flood: "Not applicable to life risk products — no property flood cover.",
+  jewellery: "Not applicable to life risk products — no contents or jewellery sub-limits.",
+  accidental: "Not applicable to life risk products — accidental injury benefits are separate.",
+  runoff: "Not applicable to life risk products — no storm or rainwater run-off cover.",
+};
+
 const TRAVEL_DIMENSION_DISCLOSURES: Record<
   PolicyComparisonDimension["id"],
   (profile: InsurerProfile) => string
@@ -816,6 +844,25 @@ const GENERAL_DIMENSION_DISCLOSURES: Record<
 };
 
 /**
+ * Single waterfall for the four benchmark dimensions: travel, life and general
+ * product lines each expose a different statutory disclosure vocabulary.
+ * Shared by the comparison matrix and the canonical PDS source builder so the
+ * two surfaces can never drift apart.
+ */
+function dimensionDisclosure(
+  dimensionId: PolicyComparisonDimension["id"],
+  profile: InsurerProfile
+): string {
+  if (profile.category === "travel-specialists") {
+    return TRAVEL_DIMENSION_DISCLOSURES[dimensionId]?.(profile) ?? PDS_SCHEDULE_FALLBACK;
+  }
+  if (profile.category === "life-insurers") {
+    return LIFE_DIMENSION_DISCLOSURES[dimensionId] ?? PDS_SCHEDULE_FALLBACK;
+  }
+  return GENERAL_DIMENSION_DISCLOSURES[dimensionId]?.(profile) ?? PDS_SCHEDULE_FALLBACK;
+}
+
+/**
  * Resolves operative comparison terms for any of the 39 primary insurers across the 4 benchmark dimensions,
  * prioritizing active retrieved chunks before falling back to curated & underwriter category disclosures.
  */
@@ -837,13 +884,13 @@ export function resolvePolicyComparisonCell(
   }
 
   // 2. Check session chunks if matching keywords exist for this insurer
-  const dim = POLICY_COMPARISON_DIMENSIONS.find((d) => d.id === dimensionId);
-  if (dim && sessionChunks.length > 0) {
+  const keywordPatterns = DIMENSION_KEYWORD_PATTERNS.get(dimensionId);
+  if (keywordPatterns && sessionChunks.length > 0) {
     const match = sessionChunks.find(
       (c) =>
         c.source.insurer.toLowerCase() ===
           (profile?.name.toLowerCase() ?? insurerInput.toLowerCase()) &&
-        dim.keywords.some((kw) => c.content.toLowerCase().includes(kw))
+        keywordPatterns.some((pattern) => pattern.test(c.content))
     );
     if (match) {
       const cleanExcerpt = match.content
@@ -856,25 +903,10 @@ export function resolvePolicyComparisonCell(
 
   // 3. Category-aware statutory disclosure fallback for all 39 insurers
   if (!profile) {
-    return "Subject to published Product Disclosure Statement (PDS) schedule terms.";
+    return PDS_SCHEDULE_FALLBACK;
   }
 
-  if (profile.category === "travel-specialists") {
-    return (
-      TRAVEL_DIMENSION_DISCLOSURES[dimensionId]?.(profile) ??
-      "Subject to published Product Disclosure Statement (PDS) schedule terms."
-    );
-  }
-
-  if (profile.category === "life-insurers") {
-    return `${profile.name} (${profile.underwriter}) issues Life, TPD, Trauma & Income Protection PDS policies; property perils and general contents sub-limits do not apply.`;
-  }
-
-  // Suncorp Group / Challengers / Auto Clubs general insurers
-  return (
-    GENERAL_DIMENSION_DISCLOSURES[dimensionId]?.(profile) ??
-    "Subject to published Product Disclosure Statement (PDS) schedule terms."
-  );
+  return dimensionDisclosure(dimensionId, profile);
 }
 
 // ============================================================================
@@ -1566,11 +1598,7 @@ export function getCanonicalPdsSources(insurerInput: string): GroundedChunk[] {
     CURATED_BENCHMARK_OVERRIDES[code]?.flood ??
     def?.excerpt ??
     (profile
-      ? isTravel
-        ? TRAVEL_DIMENSION_DISCLOSURES.flood(profile)
-        : isLife
-          ? `${profile.name} (${underwriter}) issues Life, TPD, and Income Protection PDS policies. General property perils do not apply.`
-          : GENERAL_DIMENSION_DISCLOSURES.flood(profile)
+      ? dimensionDisclosure("flood", profile)
       : "Covers the covering of normally dry land by water escaping from natural watercourses subject to 72-hour embargo.");
 
   const floodChunk = buildChunk("", floodSection, floodExcerpt, def?.clauseId ?? "2.1");
@@ -1584,11 +1612,7 @@ export function getCanonicalPdsSources(insurerInput: string): GroundedChunk[] {
   const jewelleryExcerpt =
     CURATED_BENCHMARK_OVERRIDES[code]?.jewellery ??
     (profile
-      ? isTravel
-        ? TRAVEL_DIMENSION_DISCLOSURES.jewellery(profile)
-        : isLife
-          ? `${profile.name} (${underwriter}) issues Life and TPD risk policies; general contents and jewellery sub-limits do not apply.`
-          : GENERAL_DIMENSION_DISCLOSURES.jewellery(profile)
+      ? dimensionDisclosure("jewellery", profile)
       : "Standard portable valuables and jewellery sub-limits apply unless specified on policy schedule.");
 
   const jewelleryChunk = buildChunk("jewellery", jewellerySection, jewelleryExcerpt, "3.1");
@@ -1602,11 +1626,7 @@ export function getCanonicalPdsSources(insurerInput: string): GroundedChunk[] {
   const accidentalExcerpt =
     CURATED_BENCHMARK_OVERRIDES[code]?.accidental ??
     (profile
-      ? isTravel
-        ? TRAVEL_DIMENSION_DISCLOSURES.accidental(profile)
-        : isLife
-          ? `${profile.name} policy schedules provide defined accidental injury and terminal illness lump sums.`
-          : GENERAL_DIMENSION_DISCLOSURES.accidental(profile)
+      ? dimensionDisclosure("accidental", profile)
       : "Covered under comprehensive collision and optional home accidental damage clauses.");
 
   const accidentalChunk = buildChunk("accidental", accidentalSection, accidentalExcerpt, "4.1");
@@ -1620,11 +1640,7 @@ export function getCanonicalPdsSources(insurerInput: string): GroundedChunk[] {
   const runoffExcerpt =
     CURATED_BENCHMARK_OVERRIDES[code]?.runoff ??
     (profile
-      ? isTravel
-        ? TRAVEL_DIMENSION_DISCLOSURES.runoff(profile)
-        : isLife
-          ? "Statutory life insurance benefit schedules apply independently of weather or property perils."
-          : GENERAL_DIMENSION_DISCLOSURES.runoff(profile)
+      ? dimensionDisclosure("runoff", profile)
       : "Storm and rainwater run-off assessed separately from riverine flood; actions of the sea excluded.");
 
   const runoffChunk = buildChunk("runoff", runoffSection, runoffExcerpt, "5.1");

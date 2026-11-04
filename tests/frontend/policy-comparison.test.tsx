@@ -167,15 +167,15 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
     expect(within(nrmaSourceBtns[0]).getByText(/nrma.*pds/i)).toBeInTheDocument();
   });
 
-  it("renders direct 'View clause' actions on each comparison dimension cell", () => {
+  it("renders each canonical PDS source exactly once (no duplicated per-cell clause links)", () => {
     const handleSelectCitation = vi.fn();
     render(<PolicyComparisonView onSelectCitation={handleSelectCitation} />);
 
-    const viewClauseBtns = screen.getAllByRole("button", { name: /view .* source clause/i });
-    expect(viewClauseBtns.length).toBe(8); // 4 dimensions x 2 insurers
-
-    fireEvent.click(viewClauseBtns[0]);
-    expect(handleSelectCitation).toHaveBeenCalledTimes(1);
+    // The matrix no longer repeats a "View clause" affordance per cell; the
+    // Policy sources list is the single citation surface.
+    expect(screen.queryAllByRole("button", { name: /source clause/i })).toHaveLength(0);
+    expect(screen.getAllByRole("button", { name: /read source: suncorp.*pds/i })).toHaveLength(4);
+    expect(screen.getAllByRole("button", { name: /read source: nrma.*pds/i })).toHaveLength(4);
   });
 
   it("does not bleed conversational chat history chunks into comparison sources list", () => {
@@ -234,16 +234,36 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
     expect(screen.queryByText("NRMA sources")).not.toBeInTheDocument();
   });
 
-  it("triggers comparative query when clicking quick launch prompt", () => {
+  it("triggers comparative query when clicking a follow-up prompt", () => {
     const handleSelectQuery = vi.fn();
     render(<PolicyComparisonView onSelectQuery={handleSelectQuery} />);
 
-    const compareFloodButton = screen.getByRole("button", { name: /compare flood definitions/i });
-    fireEvent.click(compareFloodButton);
+    const exclusionsButton = screen.getByRole("button", {
+      name: /compare general exclusions/i,
+    });
+    fireEvent.click(exclusionsButton);
 
     expect(handleSelectQuery).toHaveBeenCalledWith(
-      "Compare flood definitions between SUNCORP and NRMA"
+      "Compare general exclusions between SUNCORP and NRMA"
     );
+  });
+
+  it("explains life product-line inapplicability once instead of repeating it per dimension", () => {
+    render(<PolicyComparisonView />);
+
+    fireEvent.click(screen.getByTestId("insurer-a-trigger"));
+    fireEvent.click(screen.getByRole("option", { name: "TAL" }));
+
+    const notice = screen.getByTestId("life-product-notice");
+    expect(notice).toHaveTextContent(/TAL .*Life, TPD, Trauma and Income Protection/i);
+    expect(notice).toHaveTextContent(/do not apply to that product line/i);
+
+    const flood = screen.getByRole("region", { name: "Flood Definition" });
+    expect(within(flood).getByText(/not applicable to life risk products/i)).toBeInTheDocument();
+    // The shared long-form sentence is gone from the matrix cells.
+    expect(
+      screen.queryByText(/property perils and general contents sub-limits do not apply/i)
+    ).not.toBeInTheDocument();
   });
 
   it("triggers onClose callback when clicking Back link", () => {

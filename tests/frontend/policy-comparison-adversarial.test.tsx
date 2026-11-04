@@ -409,24 +409,32 @@ describe("Adversarial Verification: R1 (Canonical PDS Sources) & Policy Comparis
       const handleSelectQuery = vi.fn();
       render(<PolicyComparisonView onSelectQuery={handleSelectQuery} />);
 
-      // Initial: Suncorp vs NRMA
-      let floodPrompt = screen.getByRole("button", {
-        name: "Compare flood definitions between Suncorp and NRMA",
+      // Initial: Suncorp vs NRMA. Prompts drill into mechanics the matrix does
+      // not restate, so they never duplicate the four comparison dimensions.
+      let exclusionsPrompt = screen.getByRole("button", {
+        name: "Compare general exclusions between Suncorp and NRMA",
       });
-      let jewelleryPrompt = screen.getByRole("button", {
-        name: "What are jewellery sub-limits under Suncorp vs NRMA?",
+      let excessPrompt = screen.getByRole("button", {
+        name: "What excesses apply under Suncorp and NRMA?",
       });
-      let damagePrompt = screen.getByRole("button", {
-        name: "How does accidental damage compare between Suncorp and NRMA?",
+      let embargoPrompt = screen.getByRole("button", {
+        name: "Explain the 72-hour flood embargo for Suncorp and NRMA",
       });
-      expect(floodPrompt).toBeInTheDocument();
-      expect(jewelleryPrompt).toBeInTheDocument();
-      expect(damagePrompt).toBeInTheDocument();
+      expect(exclusionsPrompt).toBeInTheDocument();
+      expect(excessPrompt).toBeInTheDocument();
+      expect(embargoPrompt).toBeInTheDocument();
 
-      // Click flood prompt
-      fireEvent.click(floodPrompt);
+      // Every prompt must be absent from the comparison matrix copy so the
+      // page never asks a question it already answers.
+      const matrix = screen.getByTestId("policy-comparison-view");
+      expect(within(matrix).queryAllByRole("button", { name: /flood definitions/i })).toHaveLength(
+        0
+      );
+
+      // Click exclusions prompt
+      fireEvent.click(exclusionsPrompt);
       expect(handleSelectQuery).toHaveBeenCalledWith(
-        "Compare flood definitions between SUNCORP and NRMA"
+        "Compare general exclusions between SUNCORP and NRMA"
       );
 
       handleSelectQuery.mockClear();
@@ -435,33 +443,31 @@ describe("Adversarial Verification: R1 (Canonical PDS Sources) & Policy Comparis
       fireEvent.click(screen.getByTestId("insurer-a-trigger"));
       fireEvent.click(screen.getByRole("option", { name: "Allianz" }));
 
-      floodPrompt = screen.getByRole("button", {
-        name: "Compare flood definitions between Allianz and NRMA",
+      exclusionsPrompt = screen.getByRole("button", {
+        name: "Compare general exclusions between Allianz and NRMA",
       });
-      jewelleryPrompt = screen.getByRole("button", {
-        name: "What are jewellery sub-limits under Allianz vs NRMA?",
+      excessPrompt = screen.getByRole("button", {
+        name: "What excesses apply under Allianz and NRMA?",
       });
-      damagePrompt = screen.getByRole("button", {
-        name: "How does accidental damage compare between Allianz and NRMA?",
+      embargoPrompt = screen.getByRole("button", {
+        name: "Explain the 72-hour flood embargo for Allianz and NRMA",
       });
-      expect(floodPrompt).toBeInTheDocument();
-      expect(jewelleryPrompt).toBeInTheDocument();
-      expect(damagePrompt).toBeInTheDocument();
+      expect(exclusionsPrompt).toBeInTheDocument();
+      expect(excessPrompt).toBeInTheDocument();
+      expect(embargoPrompt).toBeInTheDocument();
 
       // Click each updated prompt
-      fireEvent.click(floodPrompt);
+      fireEvent.click(exclusionsPrompt);
       expect(handleSelectQuery).toHaveBeenCalledWith(
-        "Compare flood definitions between ALLIANZ and NRMA"
+        "Compare general exclusions between ALLIANZ and NRMA"
       );
 
-      fireEvent.click(jewelleryPrompt);
-      expect(handleSelectQuery).toHaveBeenCalledWith(
-        "What are jewellery sub-limits under ALLIANZ vs NRMA?"
-      );
+      fireEvent.click(excessPrompt);
+      expect(handleSelectQuery).toHaveBeenCalledWith("What excesses apply under ALLIANZ and NRMA?");
 
-      fireEvent.click(damagePrompt);
+      fireEvent.click(embargoPrompt);
       expect(handleSelectQuery).toHaveBeenCalledWith(
-        "How does accidental damage compare between ALLIANZ and NRMA?"
+        "Explain the 72-hour flood embargo for ALLIANZ and NRMA"
       );
     });
   });

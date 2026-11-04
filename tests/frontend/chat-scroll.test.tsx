@@ -86,6 +86,16 @@ describe("Chat scrolling", () => {
     expect(screen.queryByTestId("scroll-to-bottom-button")).not.toBeInTheDocument();
   });
 
+  it("top-aligns the empty state so its heading stays reachable on short viewports", () => {
+    render(<ChatContainer {...props} messages={[]} />);
+    const feed = screen.getByTestId("chat-scroll-container");
+    // Flex centring an overflowing canvas pushes the heading above scrollTop 0,
+    // where it can never be scrolled back into view. The empty state centres
+    // itself with auto margins instead, which collapse to the top on overflow.
+    expect(feed.className).not.toContain("justify-center");
+    expect(screen.getByText("Understand your insurance cover")).toBeInTheDocument();
+  });
+
   it("returns to the actual feed bottom when the user requests it", () => {
     render(<ChatContainer {...props} messages={base} />);
     const feed = screen.getByTestId("chat-scroll-container");

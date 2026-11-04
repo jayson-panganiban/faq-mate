@@ -10,7 +10,6 @@ export interface StarterPrompt {
   query: string;
   insurer?: string;
   tag: string;
-  description: string;
 }
 
 export const STARTER_PROMPTS: StarterPrompt[] = [
@@ -18,37 +17,21 @@ export const STARTER_PROMPTS: StarterPrompt[] = [
     query: "What is Suncorp's flood definition?",
     insurer: "SUNCORP",
     tag: "Flood Cover",
-    description: "Inspect standard flood definitions and rainwater run-off exclusions.",
   },
   {
     query: "NRMA vs Allianz comprehensive motor comparison",
     insurer: "NRMA",
     tag: "Motor",
-    description: "Compare accidental damage, agreed value, and choice of repairer.",
   },
   {
     query: "Explain jewelry sub-limits under Allianz",
     insurer: "ALLIANZ",
     tag: "Sub-limits",
-    description: "Review per-item and total collection monetary limits for high-value items.",
   },
   {
     query: "What is QBE's accidental damage cover for glass?",
     insurer: "QBE",
     tag: "Accidental Damage",
-    description: "Examine fixed glass, skylights, and solar panel breakage terms.",
-  },
-  {
-    query: "Does NRMA cover rainwater run-off?",
-    insurer: "NRMA",
-    tag: "Water Damage",
-    description: "Compare escape of liquid vs storm surge and surface water run-off.",
-  },
-  {
-    query: "What is AAMI's 72-hour bushfire embargo?",
-    insurer: "AAMI",
-    tag: "Bushfire Embargo",
-    description: "Review waiting periods and exclusions within 72 hours of policy purchase.",
   },
 ];
 
@@ -157,6 +140,9 @@ export function ChatContainer({
   return (
     <div className={`relative flex-1 flex flex-col min-h-0 overflow-hidden ${className}`}>
       {/* Scrollable Message List Canvas */}
+      {/* Empty state relies on `my-auto` so it centres when it fits and
+          top-aligns once it overflows; `justify-center` would clip the heading
+          above scrollTop 0 on short viewports. */}
       <div
         ref={scrollContainerRef}
         onScroll={updateScrollState}
@@ -164,7 +150,7 @@ export function ChatContainer({
         role="log"
         aria-label="Insurance Policy Chat History"
         aria-live="polite"
-        className={`flex-1 overflow-y-auto px-2 sm:px-4 pt-4 pb-0 lg:pb-4 focus:outline-none ${isEmpty ? "flex flex-col justify-center" : "space-y-4"}`}
+        className={`flex-1 overflow-y-auto px-2 sm:px-4 pt-4 pb-0 lg:pb-4 focus:outline-none ${isEmpty ? "flex flex-col" : "space-y-4"}`}
         tabIndex={0}
       >
         {/* Empty State: Clean Search-First Canvas & Modern Two-Column Prompts */}
@@ -206,9 +192,6 @@ export function ChatContainer({
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 leading-normal">
-                        {prompt.description}
-                      </p>
                     </div>
                   </button>
                 ))}

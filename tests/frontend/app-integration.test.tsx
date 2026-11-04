@@ -74,11 +74,18 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
     expect(screen.getByTestId("rate-limit-badge")).toBeInTheDocument();
     expect(screen.getByTestId("reset-chat-button")).toBeInTheDocument();
 
-    // Starter query prompt cards in empty state
+    // Starter query prompt cards in empty state (limited to four)
     expect(screen.getByText(/What is Suncorp's flood definition\?/i)).toBeInTheDocument();
+    expect(screen.getByText(/NRMA vs Allianz comprehensive motor comparison/i)).toBeInTheDocument();
     expect(screen.getByText(/Explain jewelry sub-limits under Allianz/i)).toBeInTheDocument();
-    expect(screen.getByText(/Does NRMA cover rainwater run-off\?/i)).toBeInTheDocument();
-    expect(screen.getByText(/What is AAMI's 72-hour bushfire embargo\?/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/What is QBE's accidental damage cover for glass\?/i)
+    ).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-testid^="starter-prompt-"]')).toHaveLength(4);
+    expect(screen.queryByText(/Does NRMA cover rainwater run-off\?/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/What is AAMI's 72-hour bushfire embargo\?/i)
+    ).not.toBeInTheDocument();
 
     // Input bar ready
     expect(screen.getByTestId("chat-input-textarea")).toBeInTheDocument();
@@ -838,7 +845,7 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
 
     // Click follow-up comparison prompt
     const promptBtn = screen.getByRole("button", {
-      name: /compare flood definitions between allianz and nrma/i,
+      name: /compare general exclusions between allianz and nrma/i,
     });
     await act(async () => {
       fireEvent.click(promptBtn);

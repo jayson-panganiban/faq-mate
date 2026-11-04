@@ -169,9 +169,9 @@ export function InputBar({
           aria-label="Insurance policy question"
           aria-describedby="composer-hint"
           rows={1}
-          className="block min-h-[56px] max-h-[min(200px,25dvh)] w-full resize-none bg-transparent px-4 pt-3 pb-2 text-base leading-7 text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-50 dark:text-slate-100 dark:placeholder:text-slate-500 font-normal"
+          className="block min-h-[44px] max-h-[min(200px,25dvh)] w-full resize-none bg-transparent px-4 pt-2 pb-1 text-base leading-6 text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-50 dark:text-slate-100 dark:placeholder:text-slate-500 font-normal sm:min-h-[56px] sm:pt-3 sm:pb-2 sm:leading-7"
         />
-        <div className="flex items-center justify-between px-2 pb-2">
+        <div className="flex items-center justify-between px-2 pb-1 sm:pb-2">
           <InsurerFilterMenu
             value={selectedInsurer}
             onSelect={setSelectedInsurer}

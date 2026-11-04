@@ -115,14 +115,23 @@ textarea,
 [data-testid="chat-scroll-container"]::-webkit-scrollbar-thumb:hover {
   background-color: rgba(100, 116, 139, 0.65);
 }
+.dark [data-testid="chat-scroll-container"] {
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+.dark [data-testid="chat-scroll-container"]::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.4);
+}
+.dark [data-testid="chat-scroll-container"]::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(203, 213, 225, 0.6);
+}
 @media (prefers-color-scheme: dark) {
-  [data-testid="chat-scroll-container"] {
+  :root:not(.light) [data-testid="chat-scroll-container"] {
     scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
   }
-  [data-testid="chat-scroll-container"]::-webkit-scrollbar-thumb {
+  :root:not(.light) [data-testid="chat-scroll-container"]::-webkit-scrollbar-thumb {
     background-color: rgba(148, 163, 184, 0.4);
   }
-  [data-testid="chat-scroll-container"]::-webkit-scrollbar-thumb:hover {
+  :root:not(.light) [data-testid="chat-scroll-container"]::-webkit-scrollbar-thumb:hover {
     background-color: rgba(203, 213, 225, 0.6);
   }
 }
@@ -166,9 +175,13 @@ textarea,
   display: none;
 }
 
-/* Keep secondary chat controls as easy to tap as the composer and navigation. */
+/* Keep secondary chat controls as easy to tap as the composer and navigation,
+   while exempting content links, citations, and inline message actions. */
 @media (max-width: 1023px) {
-  .chat-app button {
+  .chat-app
+    button:not(.citation-inline):not(.citation-standalone):not([data-follow-up]):not(
+      [data-compact-action]
+    ) {
     min-width: 44px;
     min-height: 44px;
   }
@@ -186,6 +199,21 @@ button.citation-inline,
   font-size: 11px;
   line-height: 1;
   vertical-align: super;
+}
+
+/* Standalone list citations, related follow-up prompts, comparison cards, and message body buttons preserve natural line height */
+button.citation-standalone,
+[data-follow-up],
+[data-compact-action],
+[data-testid="suggested-follow-ups"] button,
+[data-testid="assistant-feedback-controls"] button,
+.chat-app button.citation-standalone,
+.chat-app [data-follow-up],
+.chat-app [data-compact-action],
+.chat-app [data-testid="suggested-follow-ups"] button,
+.chat-app [data-testid="assistant-feedback-controls"] button {
+  min-width: 0;
+  min-height: 0;
 }
 
 /* Standard-parsed derived markdown (MarkdownText): headers, tables, anchors.
@@ -296,34 +324,64 @@ button.citation-inline,
   border-color: #e2e8f0;
   margin: 0.75rem 0;
 }
+.dark .markdown-text {
+  color: #cbd5e1;
+}
+.dark .markdown-text :is(h1, h2, h3, h4, h5, h6, strong, th) {
+  color: #f1f5f9;
+}
+.dark .markdown-text a {
+  color: #2dd4bf;
+}
+.dark .markdown-text a:visited {
+  color: #45d0c6;
+}
+.dark .markdown-text blockquote {
+  border-color: #334155;
+  color: #94a3b8;
+}
+.dark .markdown-text code {
+  background: #1e293b;
+}
+.dark .markdown-text pre {
+  background: #020617;
+  color: #e2e8f0;
+}
+.dark .markdown-text :is(th, td) {
+  border-color: #1e293b;
+}
+.dark .markdown-text hr {
+  border-color: #1e293b;
+}
+
 @media (prefers-color-scheme: dark) {
-  .markdown-text {
+  :root:not(.light) .markdown-text {
     color: #cbd5e1;
   }
-  .markdown-text :is(h1, h2, h3, h4, h5, h6, strong, th) {
+  :root:not(.light) .markdown-text :is(h1, h2, h3, h4, h5, h6, strong, th) {
     color: #f1f5f9;
   }
-  .markdown-text a {
+  :root:not(.light) .markdown-text a {
     color: #2dd4bf;
   }
-  .markdown-text a:visited {
+  :root:not(.light) .markdown-text a:visited {
     color: #45d0c6;
   }
-  .markdown-text blockquote {
+  :root:not(.light) .markdown-text blockquote {
     border-color: #334155;
     color: #94a3b8;
   }
-  .markdown-text code {
+  :root:not(.light) .markdown-text code {
     background: #1e293b;
   }
-  .markdown-text pre {
+  :root:not(.light) .markdown-text pre {
     background: #020617;
     color: #e2e8f0;
   }
-  .markdown-text :is(th, td) {
+  :root:not(.light) .markdown-text :is(th, td) {
     border-color: #1e293b;
   }
-  .markdown-text hr {
+  :root:not(.light) .markdown-text hr {
     border-color: #1e293b;
   }
 }

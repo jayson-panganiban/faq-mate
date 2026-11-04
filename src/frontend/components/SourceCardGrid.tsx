@@ -47,7 +47,9 @@ export function SourceCardGrid({ chunks, onSelectCitation, className = "" }: Sou
       aria-label="Sources"
       className={`mb-4 min-w-0 ${className}`}
     >
-      <h4 className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">Sources</h4>
+      <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+        Sources
+      </h4>
       <ul className="space-y-1">
         {chunks.map((chunk, index) => {
           const title = plainSnippet(formatProductDoc(chunk.source.product, chunk.source.docType));

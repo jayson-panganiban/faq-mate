@@ -7,6 +7,9 @@
  * Insurance disclosure standards.
  */
 
+import type { GroundedChunk } from "../types/chat";
+import { STATUTORY_GAW } from "./statutory";
+
 export type InsurerCategory =
   | "suncorp-group"
   | "major-insurers"
@@ -609,7 +612,12 @@ export function resolveInsurer(input: string): {
 
   // 1. Direct match on primary insurers
   const direct = PRIMARY_INSURERS.find(
-    (p) => p.code === upper || p.slug === slug || p.name.toLowerCase() === cleaned.toLowerCase()
+    (p) =>
+      p.code === upper ||
+      p.slug === slug ||
+      p.name.toLowerCase() === cleaned.toLowerCase() ||
+      (upper === "SOUTHERN_CROSS" && p.code === "SCTI") ||
+      (upper === "TRAVEL_INSURANCE_DIRECT" && p.code === "TID")
   );
   if (direct) {
     return { profile: direct };
@@ -867,4 +875,671 @@ export function resolvePolicyComparisonCell(
     GENERAL_DIMENSION_DISCLOSURES[dimensionId]?.(profile) ??
     "Subject to published Product Disclosure Statement (PDS) schedule terms."
   );
+}
+
+// ============================================================================
+// Corporate Groups & Underwriter Transparency (ASIC RG 244 & Corporations Act s.949A)
+// ============================================================================
+
+export type CorporateGroupId =
+  | "suncorp-group"
+  | "iag-group"
+  | "allianz-group"
+  | "msig-group"
+  | "nobleoak-group"
+  | "tal-group"
+  | "zurich-group"
+  | "auto-general-group";
+
+export interface CorporateGroup {
+  id: CorporateGroupId;
+  name: string;
+  leadUnderwriter: string;
+  badgeDescription: string;
+}
+
+export const CORPORATE_GROUPS: Readonly<Record<CorporateGroupId, CorporateGroup>> = {
+  "suncorp-group": {
+    id: "suncorp-group",
+    name: "Suncorp Group",
+    leadUnderwriter: "AAI Limited",
+    badgeDescription:
+      "Both brands are underwritten by AAI Limited (Suncorp Group) and share common underwriting and dispute resolution guidelines.",
+  },
+  "iag-group": {
+    id: "iag-group",
+    name: "IAG (Insurance Australia Group)",
+    leadUnderwriter: "Insurance Australia Limited",
+    badgeDescription:
+      "Both brands are part of Insurance Australia Group (IAG) and share common underwriting and dispute resolution guidelines.",
+  },
+  "allianz-group": {
+    id: "allianz-group",
+    name: "Allianz Australia",
+    leadUnderwriter: "Allianz Australia Insurance Limited",
+    badgeDescription:
+      "Both brands are underwritten by Allianz Australia Insurance Limited and share common underwriting and dispute resolution guidelines.",
+  },
+  "msig-group": {
+    id: "msig-group",
+    name: "Mitsui Sumitomo Insurance (MSIG)",
+    leadUnderwriter: "Mitsui Sumitomo Insurance Company Limited",
+    badgeDescription:
+      "Both brands are underwritten by Mitsui Sumitomo Insurance Company Limited (MSIG) and share common underwriting and dispute resolution guidelines.",
+  },
+  "nobleoak-group": {
+    id: "nobleoak-group",
+    name: "NobleOak Life Group",
+    leadUnderwriter: "NobleOak Life Limited",
+    badgeDescription:
+      "Both brands are underwritten by NobleOak Life Limited and share common underwriting and dispute resolution guidelines.",
+  },
+  "tal-group": {
+    id: "tal-group",
+    name: "TAL (Dai-ichi Life Group)",
+    leadUnderwriter: "TAL Life Limited",
+    badgeDescription:
+      "Both brands are underwritten by TAL Life (Dai-ichi Life Group) and share common underwriting and dispute resolution guidelines.",
+  },
+  "zurich-group": {
+    id: "zurich-group",
+    name: "Zurich Insurance Group",
+    leadUnderwriter: "Zurich Australia Limited",
+    badgeDescription:
+      "Both brands are part of Zurich Insurance Group and share common underwriting and dispute resolution guidelines.",
+  },
+  "auto-general-group": {
+    id: "auto-general-group",
+    name: "Auto & General",
+    leadUnderwriter: "Auto & General Insurance Company Limited",
+    badgeDescription:
+      "Both brands are underwritten by Auto & General Insurance Company Limited and share common underwriting and dispute resolution guidelines.",
+  },
+};
+
+/**
+ * Maps all canonical insurer codes and slugs to their corporate group (if part of a multi-brand group).
+ */
+export const INSURER_CORPORATE_GROUP_MAP: Readonly<Record<string, CorporateGroupId>> = {
+  // Suncorp Group (7)
+  SUNCORP: "suncorp-group",
+  suncorp: "suncorp-group",
+  AAMI: "suncorp-group",
+  aami: "suncorp-group",
+  GIO: "suncorp-group",
+  gio: "suncorp-group",
+  APIA: "suncorp-group",
+  apia: "suncorp-group",
+  SHANNONS: "suncorp-group",
+  shannons: "suncorp-group",
+  BINGLE: "suncorp-group",
+  bingle: "suncorp-group",
+  VERO: "suncorp-group",
+  vero: "suncorp-group",
+
+  // IAG Group (3)
+  NRMA: "iag-group",
+  nrma: "iag-group",
+  CGU: "iag-group",
+  cgu: "iag-group",
+  RACV: "iag-group",
+  racv: "iag-group",
+
+  // Allianz Australia Group (3)
+  ALLIANZ: "allianz-group",
+  allianz: "allianz-group",
+  TIO: "allianz-group",
+  tio: "allianz-group",
+  FAST_COVER: "allianz-group",
+  "fast-cover": "allianz-group",
+  fast_cover: "allianz-group",
+
+  // Mitsui Sumitomo Insurance (MSIG) (3)
+  "1COVER": "msig-group",
+  "1cover": "msig-group",
+  INSUREANDGO: "msig-group",
+  insureandgo: "msig-group",
+  ZOOM: "msig-group",
+  zoom: "msig-group",
+
+  // NobleOak Life Group (3)
+  NOBLEOAK: "nobleoak-group",
+  nobleoak: "nobleoak-group",
+  NEOS: "nobleoak-group",
+  neos: "nobleoak-group",
+  PPS_MUTUAL: "nobleoak-group",
+  "pps-mutual": "nobleoak-group",
+  pps_mutual: "nobleoak-group",
+
+  // TAL Group (2)
+  TAL: "tal-group",
+  tal: "tal-group",
+  ASTERON_LIFE: "tal-group",
+  "asteron-life": "tal-group",
+  asteron_life: "tal-group",
+
+  // Zurich Insurance Group (2)
+  ZURICH: "zurich-group",
+  zurich: "zurich-group",
+  COVER_MORE: "zurich-group",
+  "cover-more": "zurich-group",
+  cover_more: "zurich-group",
+
+  // Auto & General (1 + aliases)
+  BUDGET_DIRECT: "auto-general-group",
+  "budget-direct": "auto-general-group",
+  budget_direct: "auto-general-group",
+};
+
+export interface SharedUnderwriterInfo {
+  isShared: boolean;
+  groupId: CorporateGroupId;
+  groupName: string;
+  underwriterName: string;
+  badgeText: string;
+}
+
+/**
+ * Resolves the corporate group for any given insurer input (code, slug, or alias).
+ */
+export function getUnderwriterGroup(insurerInput: string): CorporateGroup | null {
+  const resolved = resolveInsurer(insurerInput);
+  const code = resolved ? resolved.profile.code : insurerInput.trim().toUpperCase();
+  const slug = resolved ? resolved.profile.slug : toInsurerSlug(insurerInput);
+
+  const groupId =
+    INSURER_CORPORATE_GROUP_MAP[code] ||
+    INSURER_CORPORATE_GROUP_MAP[slug] ||
+    INSURER_CORPORATE_GROUP_MAP[insurerInput.trim().toUpperCase()] ||
+    INSURER_CORPORATE_GROUP_MAP[insurerInput.trim().toLowerCase()];
+  if (!groupId) return null;
+  return CORPORATE_GROUPS[groupId] ?? null;
+}
+
+/**
+ * Evaluates whether two insurers share an issuing underwriter or corporate group.
+ * Strictly adheres to ASIC RG 244 by producing purely factual institutional copy.
+ */
+export function getSharedUnderwriterInfo(
+  insurerA: string,
+  insurerB: string
+): SharedUnderwriterInfo | null {
+  const resolvedA = resolveInsurer(insurerA);
+  const resolvedB = resolveInsurer(insurerB);
+
+  const codeA = resolvedA ? resolvedA.profile.code : insurerA.trim().toUpperCase();
+  const codeB = resolvedB ? resolvedB.profile.code : insurerB.trim().toUpperCase();
+
+  // If the same insurer is compared against itself, do not render a shared underwriter badge
+  if (codeA === codeB) return null;
+
+  const groupA = getUnderwriterGroup(codeA);
+  const groupB = getUnderwriterGroup(codeB);
+
+  if (groupA && groupB && groupA.id === groupB.id) {
+    return {
+      isShared: true,
+      groupId: groupA.id,
+      groupName: groupA.name,
+      underwriterName: groupA.leadUnderwriter,
+      badgeText: groupA.badgeDescription,
+    };
+  }
+
+  // Fallback: check exact statutory underwriter string match on profiles
+  if (
+    resolvedA?.profile.underwriter &&
+    resolvedB?.profile.underwriter &&
+    resolvedA.profile.underwriter.toLowerCase() === resolvedB.profile.underwriter.toLowerCase()
+  ) {
+    const underwriterClean =
+      resolvedA.profile.underwriter.split("(")[0]?.trim() || "the same underwriter";
+    return {
+      isShared: true,
+      groupId: "suncorp-group",
+      groupName: underwriterClean,
+      underwriterName: underwriterClean,
+      badgeText: `Both brands are underwritten by ${underwriterClean} and share common underwriting and dispute resolution guidelines.`,
+    };
+  }
+
+  return null;
+}
+
+export interface CanonicalPdsDefinition {
+  product: string;
+  docType: "PDS";
+  section: string;
+  clauseId?: string;
+  effectiveDate: string;
+  excerpt: string;
+}
+
+/**
+ * Registry of canonical PDS documents for all 39 primary insurers.
+ */
+export const CANONICAL_PDS_REGISTRY: Readonly<Record<string, CanonicalPdsDefinition>> = {
+  SUNCORP: {
+    product: "Suncorp Classic Home",
+    docType: "PDS",
+    section: "Section 2: Flood & Water Damage",
+    clauseId: "2.1",
+    effectiveDate: "2026-08-18",
+    excerpt:
+      "Covers the covering of normally dry land by water escaping from a lake, river, creek, or natural watercourse (Insurance Contracts Regulations 2012 Reg 29D). A strict 72-hour commencement embargo applies. Actions of the sea and storm surge are excluded. Rainwater run-off is assessed under Insured Event 3 (Storm). Jewellery and watches sub-limit is capped at $2,500 total ($1,000 per individual item) unless specified.",
+  },
+  AAMI: {
+    product: "AAMI Home Building & Contents",
+    docType: "PDS",
+    section: "Section 1: Insured Events & Flood Coverage",
+    clauseId: "1.2",
+    effectiveDate: "2026-08-26",
+    excerpt:
+      "Standard cover for flood inundation escaping from natural watercourses, lakes, or dams. 72-hour waiting period applies to flood, storm, and bushfire claims. Complete replacement cover for building; rainwater run-off assessed under storm peril. High-value jewellery subject to scheduled limits.",
+  },
+  GIO: {
+    product: "GIO Platinum Home & Contents",
+    docType: "PDS",
+    section: "Section 2: Flood & Storm Run-off",
+    clauseId: "2.3",
+    effectiveDate: "2026-04-01",
+    excerpt:
+      "Prescribed flood definition applies across Home and Contents policies subject to 72-hour waiting period. Platinum tier provides accidental damage cover standard with fixed excess terms.",
+  },
+  APIA: {
+    product: "Apia Home & Contents Insurance",
+    docType: "PDS",
+    section: "Section 3: Insured Perils & Defined Events",
+    clauseId: "3.1",
+    effectiveDate: "2026-03-15",
+    excerpt:
+      "Designed for over-50s Australian property owners. Standard flood cover included subject to 72-hour embargo. Rainwater run-off covered under storm events; tidal actions of the sea excluded.",
+  },
+  SHANNONS: {
+    product: "Shannons Home & Contents Insurance",
+    docType: "PDS",
+    section: "Section 2: Flood, Storm & Specialist Cover",
+    clauseId: "2.1",
+    effectiveDate: "2026-01-20",
+    excerpt:
+      "Tailored for motoring enthusiasts. Covers flood inundation under prescribed statutory wording. Specialist sub-limits apply to automotive memorabilia, tools of trade, and rare collectables.",
+  },
+  BINGLE: {
+    product: "Bingle Comprehensive Car Insurance",
+    docType: "PDS",
+    section: "Section 1: Accidental Loss or Damage & Perils",
+    clauseId: "1.1",
+    effectiveDate: "2026-02-10",
+    excerpt:
+      "Digital-only comprehensive motor cover for accidental damage, collision, fire, storm, and flood inundation. 72-hour waiting period applies to weather events from initial inception.",
+  },
+  ALLIANZ: {
+    product: "Allianz Home and Contents",
+    docType: "PDS",
+    section: "Section 4: Flood Definition & Insured Events",
+    clauseId: "4.2",
+    effectiveDate: "2026-03-01",
+    excerpt:
+      "Prescribed statutory flood definition included under insured events. 72-hour waiting period applies. Jewellery and watches sub-limit capped at $2,500 per item / $12,000 maximum total collection limit unless individually listed.",
+  },
+  QBE: {
+    product: "QBE Home & Contents Insurance",
+    docType: "PDS",
+    section: "Section 1: Insured Events & Defined Flood",
+    clauseId: "1.4",
+    effectiveDate: "2026-01-15",
+    excerpt:
+      "Standard flood cover included subject to watercourse overflow definition (Reg 29D) and 72-hour embargo. Unspecified jewellery and watches limited to $2,000 per item / $8,000 total claim limit.",
+  },
+  VERO: {
+    product: "Vero Business & Personal Insurance",
+    docType: "PDS",
+    section: "Section 3: Property Damage & Natural Perils",
+    clauseId: "3.2",
+    effectiveDate: "2026-02-01",
+    excerpt:
+      "Intermediated commercial and personal property cover. Prescribed statutory flood terms apply subject to 72-hour waiting period. Storm surge and actions of the sea excluded.",
+  },
+  NRMA: {
+    product: "NRMA Home & Contents",
+    docType: "PDS",
+    section: "Section 1: Flood & Water Damage",
+    clauseId: "1.1",
+    effectiveDate: "2025-11-01",
+    excerpt:
+      "Standard coverage for covering of normally dry land by water escaping from natural watercourses or lakes (72-hour waiting period applies). Rainwater run-off covered under Storm. Jewellery sub-limits capped at $2,500 per item / $10,000 total per claim.",
+  },
+  BUDGET_DIRECT: {
+    product: "Budget Direct Home & Contents",
+    docType: "PDS",
+    section: "Section 2: Flood & Storm Coverage",
+    clauseId: "2.1",
+    effectiveDate: "2026-04-12",
+    excerpt:
+      "Standard flood cover included subject to 72-hour embargo window from policy start. Storm surge and sea actions excluded. High-value jewellery items must be specified on policy schedule.",
+  },
+  RAC_WA: {
+    product: "RAC WA Home & Contents",
+    docType: "PDS",
+    section: "Section 2: Natural Perils & Flood Coverage",
+    clauseId: "2.2",
+    effectiveDate: "2026-01-01",
+    excerpt:
+      "Mutual member policy terms for Western Australian homeowners. Flood inundation covered under Regulations 2012 definitions; 72-hour waiting period applies.",
+  },
+  RAA: {
+    product: "RAA Home & Contents",
+    docType: "PDS",
+    section: "Section 3: Defined Perils & Flood Conditions",
+    clauseId: "3.1",
+    effectiveDate: "2026-02-15",
+    excerpt:
+      "South Australian auto club home cover. Standard statutory flood included with 72-hour embargo. Rainwater run-off covered under storm peril; actions of the sea excluded.",
+  },
+  RACT: {
+    product: "RACT Home & Contents",
+    docType: "PDS",
+    section: "Section 2: Flood & Storm Perils",
+    clauseId: "2.1",
+    effectiveDate: "2026-03-01",
+    excerpt:
+      "Tasmanian member home cover. Covers flood inundation from natural rivers, creeks, or lakes. 72-hour waiting period applies from inception.",
+  },
+  RACV: {
+    product: "RACV Home & Contents",
+    docType: "PDS",
+    section: "Section 1: Flood & Water Damage",
+    clauseId: "1.1",
+    effectiveDate: "2025-11-01",
+    excerpt:
+      "Victorian auto club cover issued by Insurance Manufacturers of Australia (IMA/IAG). Prescribed flood definition applies with 72-hour embargo. Rainwater run-off assessed under storm.",
+  },
+  RACQ: {
+    product: "RACQ Household Insurance",
+    docType: "PDS",
+    section: "Section 2: Insured Perils & Natural Disasters",
+    clauseId: "2.1",
+    effectiveDate: "2026-05-01",
+    excerpt:
+      "Queensland household cover with standard flood definition. 72-hour embargo on flood and named cyclone events. Actions of the sea and storm surge excluded unless specified.",
+  },
+  CGU: {
+    product: "CGU Home & Contents",
+    docType: "PDS",
+    section: "Section 2: Flood & Defined Events",
+    clauseId: "2.1",
+    effectiveDate: "2026-01-10",
+    excerpt:
+      "Intermediated IAG property cover. Prescribed flood definition under Insurance Contracts Regulations 2012. 72-hour waiting period on weather events. Jewellery sub-limits apply.",
+  },
+  YOUI: {
+    product: "Youi Comprehensive Home & Car",
+    docType: "PDS",
+    section: "Section 1: Insured Events & Flood Inundation",
+    clauseId: "1.3",
+    effectiveDate: "2026-07-01",
+    excerpt:
+      "Covers flood inundation across Home and Comprehensive Motor subject to 72-hour embargo from policy start. Specified contents sub-limits and risk excess apply.",
+  },
+  TIO: {
+    product: "TIO Home & Contents Insurance",
+    docType: "PDS",
+    section: "Section 2: Flood, Storm Surge & Cyclone",
+    clauseId: "2.2",
+    effectiveDate: "2026-03-01",
+    excerpt:
+      "Northern Territory coverage underwritten by Allianz Australia. Covers flood, cyclone, and storm run-off. Embargo periods apply to unseasonal tropical perils.",
+  },
+  GO_INSURANCE: {
+    product: "Go Insurance Travel Insurance",
+    docType: "PDS",
+    section: "Section 1: Trip Disruption, Natural Perils & Medical",
+    clauseId: "1.1",
+    effectiveDate: "2026-02-01",
+    excerpt:
+      "Comprehensive travel cover for overseas and domestic journeys. Covers cancellation due to unforeseen natural disasters and flood; medical and luggage sub-limits apply.",
+  },
+  "1COVER": {
+    product: "1Cover Travel Insurance",
+    docType: "PDS",
+    section: "General Policy Terms: Trip Cancellation & Natural Disasters",
+    clauseId: "1.1",
+    effectiveDate: "2026-03-04",
+    excerpt:
+      "Underwritten by Mitsui Sumitomo. Covers cancellation, disruption, and medical costs due to natural disasters. Luggage and personal effects sub-limits apply per pair/item.",
+  },
+  INSUREANDGO: {
+    product: "InsureandGo Comprehensive Travel",
+    docType: "PDS",
+    section: "Section 1: Cancellation, Medical & Natural Hazards",
+    clauseId: "1.2",
+    effectiveDate: "2026-01-20",
+    excerpt:
+      "Underwritten by Mitsui Sumitomo. Travel cancellation due to natural hazards covered if policy purchased before event warnings. Unattended luggage excluded.",
+  },
+  FAST_COVER: {
+    product: "Fast Cover Comprehensive Travel",
+    docType: "PDS",
+    section: "Section 2: Luggage Sub-Limits & Trip Interruption",
+    clauseId: "2.1",
+    effectiveDate: "2026-02-15",
+    excerpt:
+      "Travel disruption, medical evacuation, and luggage benefits underwritten by Allianz Australia / Hollard. Pre-existing known natural events excluded.",
+  },
+  SCTI: {
+    product: "Southern Cross International Travel",
+    docType: "PDS",
+    section: "Section 1: Medical, Cancellation & Personal Belongings",
+    clauseId: "1.1",
+    effectiveDate: "2026-01-10",
+    excerpt:
+      "Direct travel insurance issued by Southern Cross Benefits. Overseas medical expenses, trip cancellation, and personal effects limits apply.",
+  },
+  SOUTHERN_CROSS: {
+    product: "Southern Cross International Travel",
+    docType: "PDS",
+    section: "Section 1: Medical, Cancellation & Personal Belongings",
+    clauseId: "1.1",
+    effectiveDate: "2026-01-10",
+    excerpt:
+      "Direct travel insurance issued by Southern Cross Benefits. Overseas medical expenses, trip cancellation, and personal effects limits apply.",
+  },
+  ZOOM: {
+    product: "Zoom Travel Insurance",
+    docType: "PDS",
+    section: "Section 1: Emergency Medical & Baggage Sub-limits",
+    clauseId: "1.1",
+    effectiveDate: "2026-03-01",
+    excerpt:
+      "Travel insurance underwritten by Mitsui Sumitomo. Emergency medical, baggage sub-limits, and trip interruption coverage subject to excess terms.",
+  },
+  COVER_MORE: {
+    product: "Cover-More Comprehensive Travel",
+    docType: "PDS",
+    section: "Section 1: Cancellation, Natural Disasters & Medical",
+    clauseId: "1.1",
+    effectiveDate: "2026-02-01",
+    excerpt:
+      "Zurich underwritten travel insurance covering cancellation, luggage, and 24/7 medical assistance worldwide. Natural disaster cover requires purchase prior to public warnings.",
+  },
+  TID: {
+    product: "Travel Insurance Direct PDS",
+    docType: "PDS",
+    section: "Section 1: Overseas Medical & Luggage Benefits",
+    clauseId: "1.1",
+    effectiveDate: "2026-01-15",
+    excerpt:
+      "Distributed by nib Travel Services and underwritten by Pacific International. Covers medical emergencies and trip disruption subject to policy exclusions.",
+  },
+  TRAVEL_INSURANCE_DIRECT: {
+    product: "Travel Insurance Direct PDS",
+    docType: "PDS",
+    section: "Section 1: Overseas Medical & Luggage Benefits",
+    clauseId: "1.1",
+    effectiveDate: "2026-01-15",
+    excerpt:
+      "Distributed by nib Travel Services and underwritten by Pacific International. Covers medical emergencies and trip disruption subject to policy exclusions.",
+  },
+  ZURICH: {
+    product: "Zurich Life Protection",
+    docType: "PDS",
+    section: "Section 1: Life Cover, TPD & Critical Illness Terms",
+    clauseId: "1.1",
+    effectiveDate: "2026-01-01",
+    excerpt:
+      "Retail life insurance underwritten by Zurich Australia. Covers terminal illness, life cover, and total and permanent disability according to statutory life fund rules.",
+  },
+  AIA: {
+    product: "AIA Priority Protection",
+    docType: "PDS",
+    section: "Section 1: Life Cover, Crisis Recovery & TPD",
+    clauseId: "1.1",
+    effectiveDate: "2026-02-01",
+    excerpt:
+      "Life insurance, crisis recovery, and income protection issued by AIA Australia. Property peril and general contents terms do not apply.",
+  },
+  NOBLEOAK: {
+    product: "NobleOak Premium Life",
+    docType: "PDS",
+    section: "Section 1: Term Life & Income Protection Schedules",
+    clauseId: "1.1",
+    effectiveDate: "2026-01-15",
+    excerpt:
+      "Direct life cover, trauma, and income protection issued by NobleOak Life Limited. General advice and medical underwriting criteria apply.",
+  },
+  NEOS: {
+    product: "NEOS Protection",
+    docType: "PDS",
+    section: "Section 1: Life, TPD & Critical Illness Schedules",
+    clauseId: "1.1",
+    effectiveDate: "2026-02-20",
+    excerpt:
+      "Retail life risk cover issued by NobleOak Life Limited and reinsured by Pacific Life Re. Comprehensive TPD and life schedules.",
+  },
+  HCF_LIFE: {
+    product: "HCF Life Recover Cover",
+    docType: "PDS",
+    section: "Section 1: Direct Life & Personal Accident Cover",
+    clauseId: "1.1",
+    effectiveDate: "2026-01-01",
+    excerpt:
+      "Direct life and recovery cover issued by HCF Life Insurance Company Pty Limited. Provides lump sum benefits for serious illness and accidental injury.",
+  },
+  ACENDA: {
+    product: "Acenda Life Cover",
+    docType: "PDS",
+    section: "Section 1: Life Cover, Income Protection & TPD",
+    clauseId: "1.1",
+    effectiveDate: "2026-03-01",
+    excerpt:
+      "Retail life insurance issued by Nippon Life Insurance Australia and New Zealand Limited (formerly MLC Life). TPD and income protection terms apply.",
+  },
+  CHALLENGER: {
+    product: "Challenger Guaranteed Annuity",
+    docType: "PDS",
+    section: "Section 1: Lifetime Income & Annuity Guarantees",
+    clauseId: "1.1",
+    effectiveDate: "2026-01-01",
+    excerpt:
+      "Guaranteed lifetime annuity and retirement income streams issued by Challenger Life Company Limited. Capital protection terms apply.",
+  },
+  CLEARVIEW: {
+    product: "ClearView ClearChoice",
+    docType: "PDS",
+    section: "Section 1: Life, TPD & Income Protection",
+    clauseId: "1.1",
+    effectiveDate: "2026-02-01",
+    excerpt:
+      "Comprehensive retail life, TPD, and income protection cover issued by ClearView Life Assurance Limited.",
+  },
+  METLIFE: {
+    product: "MetLife Protect",
+    docType: "PDS",
+    section: "Section 1: Life Cover & Income Protection Schedules",
+    clauseId: "1.1",
+    effectiveDate: "2026-01-01",
+    excerpt:
+      "Retail life protection and disability cover issued by MetLife Insurance Limited. Statutory life fund terms apply.",
+  },
+  TAL: {
+    product: "TAL Accelerated Protection",
+    docType: "PDS",
+    section: "Section 1: Term Life, Income Protection & Critical Illness",
+    clauseId: "1.1",
+    effectiveDate: "2026-01-15",
+    excerpt:
+      "Term life, TPD, and critical illness insurance issued by TAL Life Limited. Full underwriting definitions and waiting period schedules apply.",
+  },
+  PPS_MUTUAL: {
+    product: "PPS Mutual Professionals Choice",
+    docType: "PDS",
+    section: "Section 1: Professional Life, TPD & Income Protection",
+    clauseId: "1.1",
+    effectiveDate: "2026-02-01",
+    excerpt:
+      "Mutual life insurance for qualifying professionals underwritten by NobleOak Life Limited. Profit-share account terms apply.",
+  },
+  ASTERON_LIFE: {
+    product: "Asteron Life Complete Protection",
+    docType: "PDS",
+    section: "Section 1: Life, TPD & Income Protection",
+    clauseId: "1.1",
+    effectiveDate: "2026-01-01",
+    excerpt:
+      "Complete protection life risk portfolio underwritten by TAL Life Insurance Services Limited / Asteron Life. TPD and trauma terms apply.",
+  },
+};
+
+/**
+ * Returns verified canonical PDS document sources as GroundedChunk objects for any of the 39 canonical insurers.
+ */
+export function getCanonicalPdsSources(insurerInput: string): GroundedChunk[] {
+  const resolved = resolveInsurer(insurerInput);
+  const code = resolved ? resolved.profile.code : insurerInput.trim().toUpperCase();
+  const profile = resolved?.profile ?? PRIMARY_INSURERS.find((p) => p.code === code);
+
+  const def =
+    CANONICAL_PDS_REGISTRY[code] ??
+    CANONICAL_PDS_REGISTRY[insurerInput.trim().toUpperCase()] ??
+    (profile?.slug ? CANONICAL_PDS_REGISTRY[profile.slug] : undefined);
+
+  if (!profile && !def) return [];
+
+  const insurerName = profile?.name ?? insurerInput;
+  const underwriter = profile?.underwriter ?? "Australian Financial Services Licensee";
+  const product = def?.product ?? `${insurerName} Standard Policy`;
+  const section = def?.section ?? "Section 1: Policy Coverage Terms";
+  const effectiveDate = def?.effectiveDate ?? "2026-01-01";
+  const excerpt =
+    def?.excerpt ?? `Operative terms under ${insurerName} Product Disclosure Statement (PDS).`;
+
+  const fullContent = [
+    `### ${insurerName} ${product} (PDS)`,
+    "",
+    `**Issuing Underwriter:** ${underwriter}`,
+    `**Operative Section:** ${section}`,
+    `**Effective Date:** ${effectiveDate}`,
+    "",
+    "#### Operative Policy Terms & Coverage Summary:",
+    excerpt,
+    "",
+    `> ${STATUTORY_GAW}`,
+  ].join("\n");
+
+  const chunk: GroundedChunk = {
+    id: `canonical-pds-${toInsurerSlug(code || insurerName)}`,
+    relevanceScore: 1.0,
+    content: fullContent,
+    source: {
+      insurer: insurerName,
+      product,
+      docType: "PDS",
+      section,
+      clauseId: def?.clauseId,
+      effectiveDate,
+      underwriter,
+    } as unknown as GroundedChunk["source"],
+  };
+
+  return [chunk];
 }

@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUpRight, Search } from "lucide-react";
+import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChatMessage, GroundedChunk, StreamState } from "../types/chat-ui";
 import { AssistantMessage } from "./AssistantMessage";
@@ -43,6 +43,12 @@ export const STARTER_PROMPTS: StarterPrompt[] = [
     insurer: "NRMA",
     tag: "Water Damage",
     description: "Compare escape of liquid vs storm surge and surface water run-off.",
+  },
+  {
+    query: "What is AAMI's 72-hour bushfire embargo?",
+    insurer: "AAMI",
+    tag: "Bushfire Embargo",
+    description: "Review waiting periods and exclusions within 72 hours of policy purchase.",
   },
 ];
 
@@ -158,67 +164,51 @@ export function ChatContainer({
         role="log"
         aria-label="Insurance Policy Chat History"
         aria-live="polite"
-        className={`flex-1 overflow-y-auto px-2 sm:px-4 pt-4 pb-0 lg:pb-4 focus:outline-none ${isEmpty ? "flex flex-col" : "space-y-4"}`}
+        className={`flex-1 overflow-y-auto px-2 sm:px-4 pt-4 pb-0 lg:pb-4 focus:outline-none ${isEmpty ? "flex flex-col justify-center" : "space-y-4"}`}
         tabIndex={0}
       >
-        {/* Empty State: Clean Search-First Canvas & Vertical Try a question */}
+        {/* Empty State: Clean Search-First Canvas & Modern Two-Column Prompts */}
         {isEmpty && (
-          <div className="relative max-w-2xl mx-auto mt-0 py-0 lg:py-2 px-2 sm:px-4 flex flex-col items-start w-full space-y-2.5 sm:space-y-3.5">
+          <div className="relative max-w-2xl mx-auto my-auto py-6 sm:py-8 lg:py-10 px-2 sm:px-4 flex flex-col items-start w-full space-y-4 sm:space-y-5">
             {/* Header: Search-first typography without marketing bloat */}
-            <div className="relative z-10 space-y-1 text-left w-full">
+            <div className="space-y-1.5 text-left w-full">
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
                 Understand your insurance cover
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
                 Ask a question, compare policy wording, and check the sources.
               </p>
             </div>
 
-            {/* Try a question: Compact Vertical List */}
-            <div className="relative z-10 w-full space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1">
+            {/* Try a question: Clean Two-Column Agentic Grid */}
+            <div className="w-full space-y-2.5">
+              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 px-0.5">
                 <span>Try a question</span>
               </div>
 
-              <div className="flex flex-col gap-1.5 sm:gap-2 w-full">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5 w-full">
                 {STARTER_PROMPTS.map((prompt, idx) => (
                   <button
                     key={prompt.query}
                     type="button"
                     data-testid={`starter-prompt-${idx}`}
                     onClick={() => onSelectStarterQuery?.(prompt.query, prompt.insurer)}
-                    className="group w-full flex items-center justify-between gap-3 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800/90 bg-white/80 dark:bg-slate-900/70 backdrop-blur-xs hover:border-teal-500/50 dark:hover:border-teal-400/50 hover:bg-white dark:hover:bg-slate-800/90 shadow-2xs hover:shadow-xs transition-[border-color,background-color,box-shadow,transform] text-left cursor-pointer active:scale-[0.995] focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:outline-hidden"
+                    className="group flex flex-col justify-between p-3 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-white/70 dark:bg-slate-900/60 hover:bg-white dark:hover:bg-slate-800/80 hover:border-teal-500/40 dark:hover:border-teal-400/40 shadow-2xs hover:shadow-xs transition-[border-color,background-color,box-shadow,transform] duration-150 text-left cursor-pointer active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:outline-hidden"
                   >
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800/90 flex items-center justify-center shrink-0 group-hover:bg-teal-50 dark:group-hover:bg-teal-950/50 transition-colors">
-                        <Search
-                          className="w-3.5 h-3.5 text-slate-400 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors"
-                          aria-hidden="true"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200 break-words group-hover:text-teal-700 dark:group-hover:text-teal-300 transition-colors">
+                    <div className="w-full">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200 group-hover:text-teal-700 dark:group-hover:text-teal-300 transition-colors leading-snug">
                           {prompt.query}
                         </p>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">
-                          {prompt.description}
-                        </p>
+                        {prompt.insurer && (
+                          <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60 tracking-wide">
+                            {prompt.insurer}
+                          </span>
+                        )}
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {prompt.insurer && (
-                        <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
-                          {prompt.insurer}
-                        </span>
-                      )}
-                      <span className="hidden md:inline-block text-[11px] font-medium text-slate-400 dark:text-slate-500">
-                        {prompt.tag}
-                      </span>
-                      <ArrowUpRight
-                        className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-300 dark:text-slate-600 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors shrink-0"
-                        aria-hidden="true"
-                      />
+                      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 leading-normal">
+                        {prompt.description}
+                      </p>
                     </div>
                   </button>
                 ))}

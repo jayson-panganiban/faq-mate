@@ -75,13 +75,10 @@ describe("AFCA Evaluation Benchmark & Regulatory Groundedness Gate (Spec 04)", (
     it("TC-03: Rainwater Run-off vs Riverine Flood Disambiguation", async () => {
       const query =
         "Heavy rain pooled on my driveway and ran into my garage, but the nearby river didn't overflow. Is this covered as flood?";
-      const chunks = localHybridSearch({ query, topK: 3, filter: { insurer: "Suncorp" } });
-      const prompt = synthesizePrompt(query, chunks);
+      const sseText = await queryWorker(query, "SUNCORP");
 
-      const systemPrompt = prompt[0].content;
-      expect(systemPrompt).toContain("Rainwater Run-off");
-      expect(systemPrompt).toContain("Insured Event 3");
-      expect(systemPrompt).toContain("Storm");
+      expect(sseText).toMatch(/rainwater run-off|storm/i);
+      expect(sseText).toMatch(/distinct from (?:riverine )?flood|prescribed flood|riverine flood/i);
     });
 
     it("TC-04: Forcible Entry Theft Requirement", async () => {

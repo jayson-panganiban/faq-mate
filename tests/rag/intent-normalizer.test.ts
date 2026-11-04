@@ -25,6 +25,16 @@ describe("Sub-ms Voice & Colloquial Intent Normalizer (Ticket 03 & Spec 07)", ()
       expect(result.cleanedQuery).not.toMatch(/\bactually\b/i);
       expect(result.cleanedQuery).toContain("pipe burst in my ensuite");
     });
+
+    it("strips mid-sentence 'like' speech-to-text filler words", () => {
+      const normalized = normalizeIntent("The pipe was like ruined by water");
+      expect(normalized.cleanedQuery).toBe("The pipe was ruined by water");
+    });
+
+    it("strips compound voice fillers mid-sentence", () => {
+      const normalized = normalizeIntent("The roof was so basically like leaking yesterday");
+      expect(normalized.cleanedQuery).toBe("The roof was leaking yesterday");
+    });
   });
 
   describe("Colloquial to Statutory Peril Token Mapping", () => {
@@ -136,6 +146,11 @@ describe("Sub-ms Voice & Colloquial Intent Normalizer (Ticket 03 & Spec 07)", ()
       expect(insurer).toBeDefined();
       expect(insurer?.toLowerCase()).toContain("suncorp");
     });
+
+    it("returns undefined for multi-brand comparison queries to prevent biased single-insurer filtering", () => {
+      const result = extractInsurerFromQuery("How do Suncorp and Allianz treat storm surge?");
+      expect(result).toBeUndefined();
+    });
   });
 
   describe("Multi-Turn Context Retrieval Enrichment (Spec 07 Problem 2)", () => {
@@ -150,6 +165,23 @@ describe("Sub-ms Voice & Colloquial Intent Normalizer (Ticket 03 & Spec 07)", ()
 
       expect(enriched).toContain("second day");
       expect(enriched.toLowerCase()).toMatch(/flood|suncorp/i);
+    });
+
+    it("enriches follow-up pronoun inquiries using concepts introduced in assistant turns", () => {
+      const history = [
+        {
+          role: "user" as const,
+          content: "What is flood cover?",
+        },
+        {
+          role: "assistant" as const,
+          content:
+            "Suncorp provides flood cover subject to a 72-hour embargo after policy purchase.",
+        },
+      ];
+
+      const enriched = enrichRetrievalQuery("Does that 72-hour rule apply to renewals?", history);
+      expect(enriched.toLowerCase()).toContain("72-hour embargo");
     });
   });
 

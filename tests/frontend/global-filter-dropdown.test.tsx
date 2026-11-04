@@ -91,7 +91,7 @@ describe("GlobalFilterDropdown — the single approved dropdown system", () => {
     expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
   });
 
-  it("locks the shared internal UI: sticky hairline search, small-caps headers, hairline rows with the gray block and checkmark", () => {
+  it("locks the shared internal UI: sticky hairline search, small-caps headers, rounded combobox rows with gliding highlight and checkmark", () => {
     render(<Harness />);
     fireEvent.click(screen.getByTestId("domain-prefix-trigger"));
 
@@ -110,16 +110,16 @@ describe("GlobalFilterDropdown — the single approved dropdown system", () => {
     expect(header.className).toContain("uppercase");
     expect(header.className).toContain("text-slate-500");
 
-    // The active selection: deepened gray block + teal checkmark, hairline row.
+    // The active selection: rounded combobox item + teal checkmark.
     const selected = screen.getByRole("option", { name: "Alpha One" });
-    expect(selected.className).toContain("border-b");
-    expect(selected.className).toContain("border-slate-200/70");
-    expect(selected.className).toContain("bg-slate-200");
+    expect(selected.className).toContain("rounded-lg");
+    expect(selected.className).toContain("bg-slate-100");
     expect(selected).toHaveAttribute("aria-selected", "true");
     expect(selected.querySelector("svg")).not.toBeNull();
 
-    // The unselected aesthetic: light-gray hover on a hairline target.
+    // The unselected aesthetic: rounded combobox item with hover highlight.
     const unselected = screen.getByRole("option", { name: "Beta Two" });
+    expect(unselected.className).toContain("rounded-lg");
     expect(unselected.className).toContain("hover:bg-slate-50");
     expect(unselected.getAttribute("title")).toBeNull();
     expect(unselected.querySelector("svg")).toBeNull();
@@ -159,18 +159,21 @@ describe("GlobalFilterDropdown — the single approved dropdown system", () => {
     expect(onSelect).toHaveBeenCalledWith("GAMMA");
   });
 
-  it("mounts the portalled bottom sheet below the breakpoint with prefix-scoped testids", () => {
+  it("renders the floating combobox menu consistently across responsive viewports without a bottom sheet", () => {
     overrideMatchMedia(false);
     render(<Harness />);
     fireEvent.click(screen.getByTestId("domain-prefix-trigger"));
 
     expect(screen.getByTestId("domain-prefix-scroll")).toBeInTheDocument();
-    expect(screen.getByTestId("domain-prefix-drag-handle")).toBeInTheDocument();
-    expect(document.body.contains(screen.getByTestId("domain-prefix-menu"))).toBe(true);
-    // The palette wrapper must not be mounted simultaneously.
+    expect(screen.queryByTestId("domain-prefix-drag-handle")).not.toBeInTheDocument();
+    const menu = screen.getByTestId("domain-prefix-menu");
+    expect(menu).toBeInTheDocument();
+    expect(menu.className).toContain("rounded-xl");
+    expect(menu.className).toContain("shadow-lg");
+    // Exactly one combobox dialog is mounted
     expect(document.querySelectorAll("[role='dialog']").length).toBe(1);
 
-    fireEvent.click(screen.getByTestId("domain-prefix-backdrop"));
+    fireEvent.mouseDown(screen.getByTestId("outside-surface"));
     expect(screen.queryByTestId("domain-prefix-menu")).not.toBeInTheDocument();
   });
 });

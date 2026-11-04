@@ -1,7 +1,9 @@
-import { ArrowLeft, ArrowRight, BookOpen } from "lucide-react";
+import { ArrowLeft, BookOpen, Info } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
+  getCanonicalPdsSources,
   getGroupedInsurerOptions,
+  getSharedUnderwriterInfo,
   POLICY_COMPARISON_DIMENSIONS,
   type PrimaryInsurerCode,
   resolveInsurer,
@@ -11,6 +13,7 @@ import type { GroundedChunk } from "../types/chat-ui";
 import { formatProductDoc } from "../utils/citations";
 import { GlobalFilterDropdown } from "./GlobalFilterDropdown";
 import { MarkdownText } from "./MarkdownText";
+import { RelatedQuestions } from "./RelatedQuestions";
 
 export interface PolicyComparisonViewProps {
   /**
@@ -54,6 +57,14 @@ export function PolicyComparisonView({
   const [insurerA, setInsurerA] = useState<PrimaryInsurerCode>("SUNCORP");
   const [insurerB, setInsurerB] = useState<PrimaryInsurerCode>("NRMA");
 
+  const sharedUnderwriter = useMemo(
+    () => getSharedUnderwriterInfo(insurerA, insurerB),
+    [insurerA, insurerB]
+  );
+
+  const sourcesA = useMemo(() => getCanonicalPdsSources(insurerA), [insurerA]);
+  const sourcesB = useMemo(() => getCanonicalPdsSources(insurerB), [insurerB]);
+
   // Partition retrieved chunks by canonical insurer code & uppercase name
   const chunksByInsurer = useMemo(() => {
     const map = new Map<string, GroundedChunk[]>();
@@ -95,83 +106,120 @@ export function PolicyComparisonView({
     []
   );
   const linkClass =
-    "inline-flex min-h-[44px] items-center gap-1.5 text-sm text-slate-600 hover:text-teal-700 dark:text-slate-400 dark:hover:text-teal-400 focus-visible:outline-2 focus-visible:outline-teal-600 cursor-pointer";
+    "inline-flex min-h-[44px] items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-teal-700 dark:text-slate-400 dark:hover:text-teal-400 focus-visible:outline-2 focus-visible:outline-teal-600 cursor-pointer";
 
   return (
     <div
       data-testid="policy-comparison-view"
-      className={`min-h-0 flex-1 overflow-y-auto px-1 pt-1 pb-6 sm:px-2 ${className}`}
+      className={`min-h-0 flex-1 overflow-y-auto px-1 pt-2 pb-12 sm:px-2 sm:pt-3 sm:pb-16 ${className}`}
     >
       {onClose && (
-        <button
-          type="button"
-          data-testid="close-comparison-button"
-          onClick={onClose}
-          className={linkClass}
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          Back
-        </button>
+        <div className="mb-2">
+          <button
+            type="button"
+            data-testid="close-comparison-button"
+            onClick={onClose}
+            className={`${linkClass} -ml-1 px-1 py-1 text-xs sm:text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors`}
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Back
+          </button>
+        </div>
       )}
-      <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-        Compare Policies
-      </h2>
-
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
-        {[
-          { id: "a", label: "Primary insurer", value: insurerA, other: insurerB, set: setInsurerA },
-          {
-            id: "b",
-            label: "Comparison insurer",
-            value: insurerB,
-            other: insurerA,
-            set: setInsurerB,
-          },
-        ].map(({ id, label, value, other, set }) => (
-          <div key={id} className="min-w-0">
-            <label
-              htmlFor={`insurer-${id}-trigger`}
-              className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300"
-            >
-              {label}
-            </label>
-            <GlobalFilterDropdown
-              triggerId={`insurer-${id}-trigger`}
-              testIdPrefix={`insurer-${id}`}
-              variant="field"
-              ariaLabel={label}
-              value={value}
-              onSelect={(next) => set(next as PrimaryInsurerCode)}
-              groups={filterGroups}
-              disabledOptionValues={[other]}
-            />
-          </div>
-        ))}
+      <div className="mb-4 sm:mb-6">
+        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+          Compare Policies
+        </h2>
+        <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+          Side-by-side policy terms, insured perils, and exclusions across Australian insurers.
+        </p>
       </div>
 
-      <div className="mt-8">
+      <div className="rounded-xl border border-slate-200/80 bg-white/60 p-3 sm:p-4 dark:border-slate-800 dark:bg-slate-900/40 backdrop-blur-xs shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
+          {/* Primary Insurer Picker */}
+          <div className="flex-1 min-w-0">
+            <label
+              htmlFor="insurer-a-trigger"
+              className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400"
+            >
+              Primary insurer
+            </label>
+            <GlobalFilterDropdown
+              triggerId="insurer-a-trigger"
+              testIdPrefix="insurer-a"
+              variant="field"
+              ariaLabel="Primary insurer"
+              value={insurerA}
+              onSelect={(next) => setInsurerA(next as PrimaryInsurerCode)}
+              groups={filterGroups}
+              disabledOptionValues={[insurerB]}
+            />
+          </div>
+
+          {/* Comparison Insurer Picker */}
+          <div className="flex-1 min-w-0">
+            <label
+              htmlFor="insurer-b-trigger"
+              className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400"
+            >
+              Comparison insurer
+            </label>
+            <GlobalFilterDropdown
+              triggerId="insurer-b-trigger"
+              testIdPrefix="insurer-b"
+              variant="field"
+              ariaLabel="Comparison insurer"
+              value={insurerB}
+              onSelect={(next) => setInsurerB(next as PrimaryInsurerCode)}
+              groups={filterGroups}
+              disabledOptionValues={[insurerA]}
+            />
+          </div>
+        </div>
+
+        {/* Underwriter Group Transparency Badge */}
+        {sharedUnderwriter && (
+          <div
+            data-testid="underwriter-transparency-badge"
+            role="status"
+            className="mt-3.5 flex items-start gap-2.5 rounded-lg border border-sky-200/80 bg-sky-50/70 p-3 text-xs text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-200 leading-relaxed shadow-2xs"
+          >
+            <Info
+              className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400 mt-0.5"
+              aria-hidden="true"
+            />
+            <p>{sharedUnderwriter.badgeText}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-5 sm:mt-7">
         {POLICY_COMPARISON_DIMENSIONS.map((dimension) => (
           <section
             key={dimension.id}
             aria-labelledby={`comparison-${dimension.id}`}
-            className="border-b border-slate-200 py-6 first:pt-0 dark:border-slate-800"
+            className="border-b border-slate-200/80 py-4 sm:py-5 first:pt-0 last:border-b-0 dark:border-slate-800/80"
           >
             <h3
               id={`comparison-${dimension.id}`}
-              className="text-base font-bold text-slate-900 dark:text-slate-100"
+              className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100"
             >
               {dimension.category}
             </h3>
-            <dl className="mt-4 space-y-5">
+            <dl className="mt-2.5 sm:mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
               {[
                 { code: insurerA, name: nameA, chunks: chunksA },
                 { code: insurerB, name: nameB, chunks: chunksB },
               ].map(({ code, name, chunks: insurerChunks }) => (
-                <div key={code}>
-                  <dt className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                <div
+                  key={code}
+                  className="flex flex-col rounded-lg border border-slate-200/80 bg-white/70 p-3 text-sm dark:border-slate-800 dark:bg-slate-900/60 shadow-2xs"
+                >
+                  <dt className="text-xs font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-400">
                     {name}
                   </dt>
-                  <dd className="mt-1 break-words">
+                  <dd className="mt-1 flex-1 text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed break-words">
                     <MarkdownText
                       markdown={resolvePolicyComparisonCell(dimension.id, code, insurerChunks)}
                     />
@@ -183,82 +231,82 @@ export function PolicyComparisonView({
         ))}
       </div>
 
-      {(chunksA.length > 0 || chunksB.length > 0) && (
-        <section aria-labelledby="comparison-sources" className="mt-8 space-y-5">
-          <h3
-            id="comparison-sources"
-            className="text-base font-bold text-slate-900 dark:text-slate-100"
-          >
-            Policy sources
-          </h3>
-          {[
-            { code: insurerA, name: nameA, chunks: chunksA },
-            { code: insurerB, name: nameB, chunks: chunksB },
-          ].map(({ code, name, chunks: insurerChunks }) => (
-            <div key={code} className="space-y-3">
-              <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {name} sources
-              </h4>
-              {insurerChunks.length === 0 ? (
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  No sources yet for {name}.
-                </p>
-              ) : (
-                insurerChunks.map((chunk) => (
-                  <div key={chunk.id} className="space-y-1 text-sm">
-                    <p className="font-medium text-slate-800 dark:text-slate-200">
-                      {formatProductDoc(chunk.source.product, chunk.source.docType)}
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {chunk.source.section}
-                    </p>
-                    <MarkdownText markdown={chunk.content} />
-                    <button
-                      type="button"
-                      onClick={() => onSelectCitation?.(chunk)}
-                      className={linkClass}
-                    >
-                      <BookOpen className="h-4 w-4" aria-hidden="true" />
-                      Read source
-                    </button>
-                  </div>
-                ))
-              )}
+      <section
+        aria-labelledby="comparison-sources"
+        className="mt-6 sm:mt-8 space-y-4 sm:space-y-5 border-t border-slate-200/80 pt-5 dark:border-slate-800/80"
+      >
+        <h3
+          id="comparison-sources"
+          className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100"
+        >
+          Policy sources
+        </h3>
+        {[
+          { code: insurerA, name: nameA, sources: sourcesA },
+          { code: insurerB, name: nameB, sources: sourcesB },
+        ].map(({ code, name, sources }) => (
+          <div key={code} className="space-y-2.5">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+              {name} sources
+            </h4>
+            <div className="flex flex-col gap-1.5 sm:gap-2">
+              {sources.map((chunk) => {
+                const docName = formatProductDoc(chunk.source.product, chunk.source.docType);
+                return (
+                  <button
+                    key={chunk.id}
+                    type="button"
+                    data-compact-action
+                    onClick={() => onSelectCitation?.(chunk)}
+                    aria-label={`Read source: ${docName}, ${chunk.source.section}`}
+                    className="group flex w-full items-center justify-between gap-2.5 rounded-lg border border-slate-200/80 bg-white/70 px-3 py-2 text-left transition-colors hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700 dark:hover:bg-slate-900 cursor-pointer shadow-2xs min-h-[44px]"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <span className="block truncate text-xs sm:text-sm font-medium text-slate-800 group-hover:text-teal-700 dark:text-slate-200 dark:group-hover:text-teal-300 underline decoration-slate-300 underline-offset-2 transition-colors">
+                        {docName}
+                      </span>
+                      <span className="block truncate text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        {chunk.source.section}
+                      </span>
+                    </div>
+                    <BookOpen
+                      className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-teal-700 dark:text-slate-500 dark:group-hover:text-teal-400 transition-colors"
+                      aria-hidden="true"
+                    />
+                  </button>
+                );
+              })}
             </div>
-          ))}
-        </section>
-      )}
+          </div>
+        ))}
+      </section>
 
       {onSelectQuery && (
-        <section aria-labelledby="comparison-follow-ups" className="mt-8">
-          <h3
+        <section
+          aria-labelledby="comparison-follow-ups"
+          className="mt-6 sm:mt-8 border-t border-slate-200/80 pt-5 dark:border-slate-800/80"
+        >
+          <RelatedQuestions
             id="comparison-follow-ups"
-            className="text-base font-bold text-slate-900 dark:text-slate-100"
-          >
-            Ask a follow-up
-          </h3>
-          <div className="mt-2 flex flex-col items-start gap-1">
-            <button
-              type="button"
-              onClick={() =>
-                onSelectQuery(`Compare flood definitions between ${insurerA} and ${insurerB}`)
-              }
-              className={linkClass}
-            >
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-              Compare flood definitions
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                onSelectQuery(`What are jewellery sub-limits under ${insurerA} vs ${insurerB}?`)
-              }
-              className={linkClass}
-            >
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-              Compare jewellery sub-limits
-            </button>
-          </div>
+            title="Related questions"
+            dataTestId="comparison-follow-ups"
+            className="mt-0 pt-0 border-t-0"
+            questions={[
+              {
+                label: `Compare flood definitions between ${nameA} and ${nameB}`,
+                query: `Compare flood definitions between ${insurerA} and ${insurerB}`,
+              },
+              {
+                label: `What are jewellery sub-limits under ${nameA} vs ${nameB}?`,
+                query: `What are jewellery sub-limits under ${insurerA} vs ${insurerB}?`,
+              },
+              {
+                label: `How does accidental damage compare between ${nameA} and ${nameB}?`,
+                query: `How does accidental damage compare between ${insurerA} and ${insurerB}?`,
+              },
+            ]}
+            onSelectQuestion={onSelectQuery}
+          />
         </section>
       )}
     </div>

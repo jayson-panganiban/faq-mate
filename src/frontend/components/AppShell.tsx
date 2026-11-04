@@ -1,17 +1,12 @@
-import {
-  ChevronLeft,
-  Columns,
-  History,
-  MessageSquare,
-  PanelLeft,
-  Plus,
-  Shield,
-} from "lucide-react";
+import { ChevronLeft, Columns, History, MessageSquare, PanelLeft, Plus } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type Theme, useTheme } from "../hooks/useTheme";
 import type { RateLimitInfo, TelemetryInfo } from "../types/chat-ui";
+import { AppIcon } from "./AppIcon";
 import { ComplianceFooter } from "./ComplianceFooter";
 import { HistoryItem } from "./HistoryItem";
 import { RateLimitBadge } from "./RateLimitBadge";
+import { ThemeSwitcher } from "./ThemeSwitcher";
 
 export interface AppShellProps {
   telemetry?: TelemetryInfo;
@@ -31,6 +26,10 @@ export interface AppShellProps {
   debugMode?: boolean;
   /** Flips the debug mode switch; omitting it hides the control. */
   onToggleDebugMode?: () => void;
+  /** Active UI color theme: "light" | "dark" | "system". */
+  theme?: Theme;
+  /** Callback fired when theme is switched. */
+  onThemeChange?: (theme: Theme) => void;
   children: ReactNode;
   className?: string;
 }
@@ -47,6 +46,8 @@ const navItemClass =
   "inline-flex min-h-[44px] min-w-[44px] w-full items-center gap-2 rounded-lg px-3 text-sm font-medium cursor-pointer text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-500";
 
 export function AppShell({
+  theme,
+  onThemeChange,
   rateLimit,
   isThrottled = false,
   isComparisonMode = false,
@@ -63,6 +64,10 @@ export function AppShell({
   children,
   className = "",
 }: AppShellProps) {
+  const fallbackTheme = useTheme(theme);
+  const activeTheme = theme ?? fallbackTheme.theme;
+  const handleThemeChange = onThemeChange ?? fallbackTheme.setTheme;
+
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   /**
@@ -149,22 +154,36 @@ export function AppShell({
       <>
         <div
           className={`flex shrink-0 items-center pt-3 pb-3 ${
-            compact ? "justify-center px-2" : "justify-between px-2"
+            mobile ? "justify-end px-2" : compact ? "justify-center px-2" : "justify-between px-2"
           }`}
         >
           {!mobile && (
             <div
               role="img"
               aria-label="FAQ-Mate"
-              className={`flex min-w-0 items-center ${compact ? "" : "gap-2 px-2.5"}`}
+              className={`flex min-w-0 items-center ${compact ? "hidden" : "gap-2 px-2.5"}`}
             >
-              <Shield size={24} className="shrink-0 text-teal-700 dark:text-teal-400" aria-hidden />
+              <AppIcon size={24} className="shrink-0 text-teal-700 dark:text-teal-400" />
               {!compact && (
                 <span className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">
                   FAQ-Mate
                 </span>
               )}
             </div>
+          )}
+          {!mobile && (
+            <button
+              id="sidebar-toggle"
+              type="button"
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!collapsed}
+              aria-controls="desktop-sidebar"
+              onClick={() => setCollapsed((value) => !value)}
+              className={`${actionClass} h-11 w-11 shrink-0 justify-center px-0`}
+            >
+              <PanelLeft size={20} aria-hidden="true" />
+            </button>
           )}
           {mobile && (
             <button
@@ -173,7 +192,7 @@ export function AppShell({
               title="Close navigation"
               onClick={closeDrawer}
               // Keep a full 44x44 hit area while centering the close glyph.
-              className={`${actionClass} h-11 w-11 shrink-0 justify-center px-0`}
+              className={`${actionClass} ml-auto h-11 w-11 shrink-0 justify-center px-0`}
             >
               <ChevronLeft size={20} aria-hidden="true" />
             </button>
@@ -253,7 +272,7 @@ export function AppShell({
               <h2
                 ref={mobile ? mobileHistory : desktopHistory}
                 tabIndex={-1}
-                className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300"
               >
                 History
               </h2>
@@ -343,7 +362,7 @@ export function AppShell({
         {navigation(false)}
       </aside>
       <div inert={drawerOpen || undefined} className="min-w-0 flex flex-1 flex-col">
-        <header className="shrink-0 z-30 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 pt-[env(safe-area-inset-top,0px)]">
+        <header className="shrink-0 z-30 bg-slate-50 dark:bg-slate-950 pt-[env(safe-area-inset-top,0px)]">
           <div className="relative flex items-center justify-between gap-2 px-3 py-2 sm:px-4">
             <div className="flex min-w-0 items-center gap-2">
               <button
@@ -358,29 +377,14 @@ export function AppShell({
               >
                 <PanelLeft size={20} aria-hidden="true" />
               </button>
-              <button
-                id="sidebar-toggle"
-                type="button"
-                aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                aria-expanded={!collapsed}
-                aria-controls="desktop-sidebar"
-                onClick={() => setCollapsed((value) => !value)}
-                className={`${actionClass} hidden md:inline-flex`}
-              >
-                <PanelLeft size={20} aria-hidden="true" />
-              </button>
               <div className="flex min-w-0 items-center gap-2 md:hidden">
-                <Shield
-                  size={24}
-                  className="shrink-0 text-teal-700 dark:text-teal-400"
-                  aria-hidden="true"
-                />
+                <AppIcon size={24} className="shrink-0 text-teal-700 dark:text-teal-400" />
                 <h1 className="text-sm font-bold">FAQ-Mate</h1>
               </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               {!isThrottled && <RateLimitBadge rateLimit={rateLimit} />}
+              <ThemeSwitcher theme={activeTheme} onThemeChange={handleThemeChange} />
             </div>
           </div>
           {isThrottled && (

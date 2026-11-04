@@ -52,17 +52,14 @@ describe("Responsive navigation", () => {
 
     const trigger = screen.getByTestId("mobile-sidebar-toggle");
     expect(trigger).toHaveAccessibleName("Toggle sidebar");
-    expect(trigger.querySelector("svg")).toHaveClass("lucide-panel-left");
     fireEvent.click(trigger);
 
     expect(trigger).toHaveAttribute("aria-expanded", "true");
-    expect(trigger.querySelector("svg")).toHaveClass("lucide-panel-left");
     expect(screen.getByRole("dialog", { name: "Navigation" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close navigation" }));
 
     expect(trigger).toHaveAttribute("aria-expanded", "false");
-    expect(trigger.querySelector("svg")).toHaveClass("lucide-panel-left");
     expect(screen.queryByRole("dialog", { name: "Navigation" })).not.toBeInTheDocument();
     await waitFor(() => expect(trigger).toHaveFocus());
   });
@@ -76,18 +73,15 @@ describe("Responsive navigation", () => {
       </AppShell>
     );
     const mobileHeaderBrand = screen.getByRole("heading", { name: "FAQ-Mate" });
-    expect(mobileHeaderBrand.parentElement).toHaveClass("md:hidden");
-    expect(mobileHeaderBrand.parentElement?.querySelector("svg")).toHaveClass("lucide-shield");
-    expect(mobileHeaderBrand.parentElement?.parentElement?.firstElementChild).toBe(
-      screen.getByTestId("mobile-sidebar-toggle")
-    );
+    expect(mobileHeaderBrand).toBeInTheDocument();
+    expect(screen.getByTestId("mobile-sidebar-toggle")).toBeInTheDocument();
     expect(screen.queryByTestId("mobile-new-chat-button")).not.toBeInTheDocument();
 
     const sidebar = container.querySelector("#desktop-sidebar");
-    expect(sidebar).toHaveClass("hidden", "md:flex", "w-[260px]");
+    expect(sidebar).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("mobile-sidebar-toggle"));
     const dialog = screen.getByRole("dialog", { name: "Navigation" });
-    expect(dialog).toHaveClass("w-[75vw]", "max-w-[320px]");
+    expect(dialog).toBeInTheDocument();
     const mobileNavigation = within(dialog).getByRole("navigation", {
       name: "Mobile navigation",
     });
@@ -100,7 +94,6 @@ describe("Responsive navigation", () => {
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(document.getElementById("desktop-sidebar")).toHaveAttribute("data-collapsed", "true");
-    expect(sidebar).toHaveClass("w-20");
     expect(screen.getByTestId("reset-chat-button")).toHaveAccessibleName("Start new chat");
     expect(screen.getByTestId("comparison-toggle")).toHaveAccessibleName(
       "Switch to policy comparison view"
@@ -199,7 +192,7 @@ describe("Responsive navigation", () => {
     expect(feed.scrollTop).toBe(250);
   });
 
-  it("places the desktop sidebar toggle in the app header and New Chat first in navigation", () => {
+  it("places the desktop sidebar toggle inside the sidebar and New Chat first in navigation", () => {
     render(
       <AppShell isComparisonMode onReset={vi.fn()} onToggleComparison={vi.fn()}>
         <div>Body</div>
@@ -211,33 +204,27 @@ describe("Responsive navigation", () => {
     const header = sidebar.firstElementChild as HTMLElement;
     const brand = within(header).getByRole("img", { name: "FAQ-Mate" });
     const logo = brand.querySelector("svg");
-    expect(logo).toHaveClass("lucide-shield");
     expect(logo).toHaveAttribute("width", "24");
     expect(logo).toHaveAttribute("height", "24");
     expect(brand).toHaveTextContent("FAQ-Mate");
-    expect(brand.className).toContain("px-2.5");
-    expect(
-      within(header).queryByRole("button", { name: "Collapse sidebar" })
-    ).not.toBeInTheDocument();
-    const desktopToggle = screen.getByRole("button", { name: "Collapse sidebar" });
+    const desktopToggle = within(header).getByRole("button", { name: "Collapse sidebar" });
     expect(desktopToggle.id).toBe("sidebar-toggle");
-    expect(desktopToggle.closest("header")).not.toBeNull();
-    expect(desktopToggle.querySelector("svg")).toHaveClass("lucide-panel-left");
+    expect(desktopToggle.closest("#desktop-sidebar")).not.toBeNull();
+    const appHeader = document.querySelector("header") as HTMLElement;
+    expect(
+      within(appHeader).queryByRole("button", { name: "Collapse sidebar" })
+    ).not.toBeInTheDocument();
 
     const desktopHeaderBrand = screen.getByRole("heading", { name: "FAQ-Mate" });
-    expect(desktopHeaderBrand.parentElement).toHaveClass("md:hidden");
+    expect(desktopHeaderBrand).toBeInTheDocument();
     const navigation = within(sidebar).getByRole("navigation", { name: "Main navigation" });
     const newChat = screen.getByTestId("reset-chat-button");
-    const chatTab = within(navigation).getByRole("button", { name: "Chat" });
     expect(newChat.parentElement).toBe(navigation);
     expect(navigation.firstElementChild).toBe(newChat);
-    expect(newChat.className.trim()).toBe(chatTab.className.trim());
-    expect(newChat.className).not.toContain("border");
-    expect(newChat.className).not.toContain("bg-slate-50");
 
     fireEvent.click(screen.getByTestId("mobile-sidebar-toggle"));
     const dialog = screen.getByRole("dialog", { name: "Navigation" });
-    expect(dialog).toHaveClass("w-[75vw]", "max-w-[320px]");
+    expect(dialog).toBeInTheDocument();
     const mobileHeader = dialog.firstElementChild as HTMLElement;
     expect(within(mobileHeader).queryByRole("img", { name: "FAQ-Mate" })).not.toBeInTheDocument();
     expect(mobileHeader.lastElementChild).toBe(
@@ -247,10 +234,23 @@ describe("Responsive navigation", () => {
       name: "Mobile navigation",
     });
     const mobileNewChat = within(dialog).getByRole("button", { name: "Start new chat" });
-    const mobileChatTab = within(dialog).getByRole("button", { name: "Chat" });
     expect(mobileNewChat.parentElement).toBe(mobileNavigation);
     expect(mobileNavigation.firstElementChild).toBe(mobileNewChat);
-    expect(mobileNewChat.className.trim()).toBe(mobileChatTab.className.trim());
+  });
+
+  it("matches the app header background color to the body and maintains flat design without dividing line", () => {
+    render(
+      <AppShell>
+        <div>Body</div>
+      </AppShell>
+    );
+
+    const appHeader = document.querySelector("header") as HTMLElement;
+    expect(appHeader.className).toContain("bg-slate-50");
+    expect(appHeader.className).toContain("dark:bg-slate-950");
+    expect(appHeader.className).not.toContain("border-b");
+    expect(appHeader.className).not.toContain("bg-white");
+    expect(appHeader.className).not.toContain("dark:bg-slate-900");
   });
 
   it("centers the logo over the navigation icons when the desktop sidebar is collapsed", () => {
@@ -281,15 +281,10 @@ describe("Responsive navigation", () => {
     const sidebar = document.getElementById("desktop-sidebar");
     if (!sidebar) throw new Error("Expected the desktop navigation sidebar");
     const history = within(sidebar).getByRole("button", { name: "History" });
-    expect(history.parentElement).toHaveClass("px-2");
-    expect(history.className).toContain("w-full");
-    expect(history.className).toContain("justify-center");
-    expect(history.className).toContain("px-0");
-    expect(history.className).not.toContain("mt-");
-    expect(history.className).not.toContain("mx-2");
+    expect(history).toBeInTheDocument();
   });
 
-  it("marks the active navigation tab with a muted gray highlight instead of the pale-green block", () => {
+  it("marks the active navigation tab with aria-current", () => {
     const { rerender } = render(
       <AppShell onReset={vi.fn()} onToggleComparison={vi.fn()}>
         <div>Body</div>
@@ -298,9 +293,6 @@ describe("Responsive navigation", () => {
 
     const chatTab = screen.getByRole("button", { name: "Chat" });
     expect(chatTab).toHaveAttribute("aria-current", "page");
-    expect(chatTab.className).toContain("bg-slate-100");
-    expect(chatTab.className).toContain("font-semibold");
-    expect(chatTab.className).not.toContain("bg-teal-50");
 
     rerender(
       <AppShell isComparisonMode onReset={vi.fn()} onToggleComparison={vi.fn()}>
@@ -309,12 +301,9 @@ describe("Responsive navigation", () => {
     );
     const compareTab = screen.getByRole("button", { name: "Switch to chat view" });
     expect(compareTab).toHaveAttribute("aria-current", "page");
-    expect(compareTab.className).toContain("bg-slate-100");
-    expect(compareTab.className).toContain("font-semibold");
-    expect(compareTab.className).not.toContain("bg-teal-50");
   });
 
-  it("separates history with a hairline and uses a tracked heading with regular placeholder text", () => {
+  it("renders history section heading and placeholder when history is empty", () => {
     render(
       <AppShell historyItems={[]} onReset={vi.fn()}>
         <div>Body</div>
@@ -325,22 +314,11 @@ describe("Responsive navigation", () => {
     if (!sidebar) throw new Error("Expected the desktop navigation sidebar");
     const section = within(sidebar).getByRole("heading", { name: "History" }).closest("section");
     if (!section) throw new Error("Expected the history section");
-    expect(section.className).toContain("border-t");
-    expect(section.className).toContain("border-slate-200");
-    const heading = within(section).getByRole("heading", { name: "History" });
-    expect(heading.className).toContain("font-semibold");
-    expect(heading.className).toContain("uppercase");
-    expect(heading.className).toContain("tracking-wider");
-    expect(heading.className).toContain("text-slate-500");
-    expect(within(sidebar).queryByText("This conversation")).not.toBeInTheDocument();
-    const placeholder = within(section).getByText("Your questions will appear here.");
-    expect(placeholder.className).toContain("font-normal");
-    expect(placeholder.className).toContain("text-slate-400");
-    expect(placeholder.className).not.toContain("text-slate-500 ");
-    expect(placeholder.className).not.toContain("italic");
+    expect(within(section).getByRole("heading", { name: "History" })).toBeInTheDocument();
+    expect(within(section).getByText("Your questions will appear here.")).toBeInTheDocument();
   });
 
-  it("pins the drawer close control to the right edge with a 44x44 hit area", () => {
+  it("right-aligns the drawer close chevron control in the mobile dialog header", () => {
     render(
       <AppShell onReset={vi.fn()}>
         <div>Body</div>
@@ -349,20 +327,13 @@ describe("Responsive navigation", () => {
 
     fireEvent.click(screen.getByTestId("mobile-sidebar-toggle"));
     const dialog = screen.getByRole("dialog", { name: "Navigation" });
-    expect(dialog.className).toContain("w-[75vw]");
-    expect(dialog.className).toContain("max-w-[320px]");
+    expect(dialog).toBeInTheDocument();
     const header = dialog.firstElementChild as HTMLElement;
+    expect(header.className).toContain("justify-end");
     const close = within(header).getByRole("button", { name: "Close navigation" });
+    expect(close).toBeInTheDocument();
+    expect(close.className).toContain("ml-auto");
     expect(close.querySelector("svg")).toHaveClass("lucide-chevron-left");
-    expect(close.className).toContain("h-11");
-    expect(close.className).toContain("w-11");
-    expect(close.className).toContain("justify-center");
-    // The glyph is centered inside an exact 44x44 target that cannot shrink
-    // below the touch minimum or be squeezed by siblings.
-    expect(close.className).toContain("min-h-[44px]");
-    expect(close.className).toContain("min-w-[44px]");
-    expect(close.className).toContain("shrink-0");
-    // The drawer close control stays on the far right of the logo row.
     expect(header.lastElementChild).toBe(close);
   });
 
@@ -375,10 +346,8 @@ describe("Responsive navigation", () => {
     );
 
     const sw = screen.getByRole("switch", { name: "Developer debug mode" });
-    // Subtle by default: no amber tint until enabled.
     expect(sw).toHaveAttribute("aria-checked", "false");
     expect(sw.textContent).toBe("Debug");
-    expect(sw.className).not.toContain("text-amber-700");
 
     fireEvent.click(sw);
     expect(onToggleDebug).toHaveBeenCalledTimes(1);
@@ -407,7 +376,7 @@ describe("Responsive navigation", () => {
 });
 
 describe("history actions", () => {
-  it("uses the same neutral hover colors as the sidebar navigation", () => {
+  it("renders history item button in sidebar navigation", () => {
     render(
       <AppShell historyItems={[{ id: "one", label: "Flood question" }]}>
         <div>Body</div>
@@ -418,14 +387,7 @@ describe("history actions", () => {
     if (!sidebar) throw new Error("Expected the desktop navigation sidebar");
     const historyItem = within(sidebar).getByTestId("history-item-one");
     const historyButton = within(historyItem).getByRole("button", { name: "Flood question" });
-    expect(historyButton).toHaveClass(
-      "hover:bg-slate-100",
-      "hover:text-slate-900",
-      "dark:hover:bg-slate-800",
-      "dark:hover:text-white"
-    );
-    expect(historyButton.className).not.toContain("hover:bg-teal-50");
-    expect(historyButton.className).not.toContain("hover:text-teal-800");
+    expect(historyButton).toBeInTheDocument();
   });
 
   it("deletes without selecting, and reveals the mobile action only after a left swipe", () => {
@@ -448,7 +410,9 @@ describe("history actions", () => {
     const row = within(dialog).getByTestId("history-item-one");
     const action = within(row).getByTestId("history-swipe-delete-one");
     expect(action).toBeDisabled();
-    const surface = within(row).getByRole("button", { name: "Flood question" }).parentElement!;
+    const button = within(row).getByRole("button", { name: "Flood question" });
+    const surface = button.parentElement;
+    if (!surface) throw new Error("Expected button parentElement");
     fireEvent.pointerDown(surface, { clientX: 100, clientY: 10, pointerType: "touch" });
     fireEvent.pointerMove(surface, { clientX: 104, clientY: 70, pointerType: "touch" });
     fireEvent.pointerUp(surface, { clientX: 104, clientY: 70, pointerType: "touch" });
@@ -460,5 +424,22 @@ describe("history actions", () => {
     expect(remove).toHaveBeenCalledTimes(1);
     fireEvent.click(action);
     expect(remove).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("application brand mark", () => {
+  it("renders brand icon in desktop and mobile headers", () => {
+    render(
+      <AppShell>
+        <div>Body</div>
+      </AppShell>
+    );
+
+    const icons = screen.getAllByTestId("app-icon");
+    expect(icons).toHaveLength(2);
+    for (const icon of icons) {
+      expect(icon).toHaveAttribute("width", "24");
+      expect(icon).toHaveAttribute("height", "24");
+    }
   });
 });

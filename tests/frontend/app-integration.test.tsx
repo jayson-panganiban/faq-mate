@@ -78,6 +78,7 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
     expect(screen.getByText(/What is Suncorp's flood definition\?/i)).toBeInTheDocument();
     expect(screen.getByText(/Explain jewelry sub-limits under Allianz/i)).toBeInTheDocument();
     expect(screen.getByText(/Does NRMA cover rainwater run-off\?/i)).toBeInTheDocument();
+    expect(screen.getByText(/What is AAMI's 72-hour bushfire embargo\?/i)).toBeInTheDocument();
 
     // Input bar ready
     expect(screen.getByTestId("chat-input-textarea")).toBeInTheDocument();
@@ -764,14 +765,114 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
     const toggleBtn = screen.getByTestId("comparison-toggle");
     fireEvent.click(toggleBtn);
 
-    // Verify comparison matrix is rendered
-    expect(screen.getByTestId("policy-comparison-view")).toBeInTheDocument();
+    // Verify comparison matrix is rendered as standalone with canonical policy sources
+    const comparisonView = screen.getByTestId("policy-comparison-view");
+    expect(comparisonView).toBeInTheDocument();
     expectFooterWarning();
     expect(screen.getByText("Compare Policies")).toBeInTheDocument();
+    expect(within(comparisonView).getByText(/Policy sources/i)).toBeInTheDocument();
+    expect(within(comparisonView).getByText(/Suncorp sources/i)).toBeInTheDocument();
+    expect(within(comparisonView).getByText(/NRMA sources/i)).toBeInTheDocument();
 
     // Return to chat through sidebar navigation
     fireEvent.click(screen.getByRole("button", { name: "Chat" }));
     expect(screen.queryByTestId("policy-comparison-view")).not.toBeInTheDocument();
+  });
+
+  it("opens CitationDrawer with document, underwriter, and section details when canonical PDS source is clicked in comparison view", async () => {
+    render(<App />);
+
+    // Switch to comparison view
+    fireEvent.click(screen.getByTestId("comparison-toggle"));
+    const comparisonView = screen.getByTestId("policy-comparison-view");
+    expect(comparisonView).toBeInTheDocument();
+
+    // Click Suncorp canonical PDS source button
+    const suncorpSourceBtn = within(comparisonView).getByRole("button", {
+      name: /read source: suncorp.*pds/i,
+    });
+    await act(async () => {
+      fireEvent.click(suncorpSourceBtn);
+    });
+
+    // Drawer opens
+    const drawer = await screen.findByRole("dialog", { name: /policy sources/i });
+    expect(drawer).toBeInTheDocument();
+    expect(within(drawer).getByText("Suncorp Classic Home PDS")).toBeInTheDocument();
+    expect(within(drawer).getByTestId("statutory-underwriter-trail")).toHaveTextContent(
+      /AAI Limited/i
+    );
+
+    // Close drawer via backdrop
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("citation-drawer-backdrop"));
+    });
+    expect(screen.queryByRole("dialog", { name: /policy sources/i })).not.toBeInTheDocument();
+  });
+
+  it("updates insurer selections and triggers comparative follow-up query with selected parameters", async () => {
+    const mockSse = [
+      `event: token\ndata: ${JSON.stringify({ text: "Comparison response between ALLIANZ and NRMA." })}\n\n`,
+      `event: done\ndata: ${JSON.stringify({ finish_reason: "stop" })}\n\n`,
+    ];
+
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(createSseStream(mockSse), {
+        status: 200,
+        headers: new Headers({ "Content-Type": "text/event-stream" }),
+      })
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId("comparison-toggle"));
+    expect(screen.getByTestId("policy-comparison-view")).toBeInTheDocument();
+
+    // Select Allianz as Primary
+    fireEvent.click(screen.getByTestId("insurer-a-trigger"));
+    fireEvent.click(screen.getByRole("option", { name: "Allianz" }));
+
+    // Primary is now Allianz, Comparison is NRMA
+    expect(screen.getByTestId("insurer-a-trigger")).toHaveTextContent("Allianz");
+    expect(screen.getByTestId("insurer-b-trigger")).toHaveTextContent("NRMA");
+
+    // Click follow-up comparison prompt
+    const promptBtn = screen.getByRole("button", {
+      name: /compare flood definitions between allianz and nrma/i,
+    });
+    await act(async () => {
+      fireEvent.click(promptBtn);
+    });
+
+    // Returns to chat and dispatches query
+    expect(screen.queryByTestId("policy-comparison-view")).not.toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/chat",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining("ALLIANZ and NRMA"),
+      })
+    );
+  });
+
+  it("surfaces underwriter transparency badge in comparison view when switching to shared group", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId("comparison-toggle"));
+    expect(screen.queryByTestId("underwriter-transparency-badge")).not.toBeInTheDocument();
+
+    // Select AAMI (shares AAI Limited / Suncorp Group with Suncorp)
+    fireEvent.click(screen.getByTestId("insurer-b-trigger"));
+    fireEvent.click(screen.getByRole("option", { name: "AAMI" }));
+
+    expect(screen.getByTestId("underwriter-transparency-badge")).toBeInTheDocument();
+    expect(screen.getByText(/AAI Limited \(Suncorp Group\)/i)).toBeInTheDocument();
+
+    // Select Allianz (different underwriter) -> badge disappears
+    fireEvent.click(screen.getByTestId("insurer-b-trigger"));
+    fireEvent.click(screen.getByRole("option", { name: "Allianz" }));
+
+    expect(screen.queryByTestId("underwriter-transparency-badge")).not.toBeInTheDocument();
   });
 });
 

@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { resolveInsurer } from "../../constants/insurers";
 import type { GroundedChunk } from "../../types/chat";
 import type { TelemetryInfo } from "../types/chat-ui";
 import { formatProductDoc } from "../utils/citations";
@@ -129,6 +130,13 @@ export function CitationDrawer({
   const productDoc = currentChunk
     ? formatProductDoc(currentChunk.source.product, currentChunk.source.docType)
     : "";
+
+  // Resolve statutory issuing underwriter
+  const underwriter =
+    (currentChunk?.source as { underwriter?: string })?.underwriter ||
+    (currentChunk?.source.insurer
+      ? resolveInsurer(currentChunk.source.insurer)?.profile.underwriter
+      : undefined);
 
   // Calculate percentage match
   const matchPercentage = currentChunk
@@ -292,6 +300,19 @@ export function CitationDrawer({
                     )}
                   </nav>
                 </div>
+
+                {/* Statutory Underwriter Trail */}
+                {underwriter && (
+                  <div
+                    data-testid="statutory-underwriter-trail"
+                    className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-2.5 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300"
+                  >
+                    <span className="font-semibold text-slate-700 dark:text-slate-200">
+                      Statutory Underwriter:{" "}
+                    </span>
+                    <span className="break-words">{underwriter}</span>
+                  </div>
+                )}
 
                 {/* Evidence Badges — all confidence numbers belong to the
                     debug overlay; consumers get plain document facts. */}

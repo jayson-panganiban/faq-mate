@@ -72,7 +72,7 @@ describe("InsurerFilterMenu (Ticket 6 responsive insurer filter)", () => {
       expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
     });
 
-    it("shares internal UI: sticky hairline search bar, small-caps group headers and flat full-width rows", () => {
+    it("shares internal UI: sticky hairline search bar, small-caps group headers and combobox rows", () => {
       render(<Harness />);
       openMenu();
 
@@ -89,9 +89,7 @@ describe("InsurerFilterMenu (Ticket 6 responsive insurer filter)", () => {
       const nrma = screen.getByRole("option", { name: "NRMA" });
       expect(nrma.className).toContain("w-full");
       expect(nrma.className).toContain("h-11");
-      // Faint 1px divider defines each touch target.
-      expect(nrma.className).toContain("border-b");
-      expect(nrma.className).toContain("border-slate-200/70");
+      expect(nrma.className).toContain("rounded-lg");
     });
 
     it("filters grouped insurers by label or code and shows an empty state", () => {
@@ -127,7 +125,7 @@ describe("InsurerFilterMenu (Ticket 6 responsive insurer filter)", () => {
       fireEvent.click(trigger);
       const nrma = screen.getByRole("option", { name: "NRMA" });
       expect(nrma).toHaveAttribute("aria-selected", "true");
-      expect(nrma.className).toContain("bg-slate-200");
+      expect(nrma.className).toContain("bg-slate-100");
       expect(nrma.querySelector("svg")).not.toBeNull();
       expect(screen.getByRole("option", { name: "Allianz" })).toHaveAttribute(
         "aria-selected",
@@ -193,40 +191,33 @@ describe("InsurerFilterMenu (Ticket 6 responsive insurer filter)", () => {
     });
   });
 
-  describe("Mobile viewport (bottom sheet)", () => {
+  describe("Responsive viewport (EasyUI combobox floating popover)", () => {
     beforeEach(() => {
       overrideMatchMedia(false);
     });
 
-    it("renders the menu as a bottom sheet with a muted drag handle and full-width targets", () => {
+    it("renders the floating combobox palette with search, gliding highlight, and options", () => {
       render(<Harness />);
       const menu = openMenu();
 
-      expect(menu.className).toContain("inset-x-0");
-      expect(menu.className).toContain("bottom-0");
-      expect(menu.className).toContain("max-h-[min(75dvh,36rem)]");
-
-      const handle = screen.getByTestId("insurer-filter-drag-handle");
-      expect(handle).toBeInTheDocument();
-      expect(handle.className).toContain("bg-slate-300");
+      expect(menu.className).toContain("rounded-xl");
+      expect(menu.className).toContain("shadow-lg");
+      expect(screen.queryByTestId("insurer-filter-drag-handle")).not.toBeInTheDocument();
 
       const nrma = screen.getByRole("option", { name: "NRMA" });
       expect(nrma.className).toContain("w-full");
-
-      // The sheet scrolls without the desktop-style scrollbar track.
       expect(screen.getByTestId("insurer-filter-scroll")).toBeInTheDocument();
-
-      // The palette wrapper must not be mounted simultaneously.
       expect(document.querySelectorAll("[data-testid='insurer-filter-menu']").length).toBe(1);
     });
 
-    it("closes via backdrop tap and Escape with focus restored to the trigger", async () => {
+    it("closes via outside click and Escape with focus restored to the trigger", async () => {
       render(<Harness />);
       const trigger = screen.getByTestId("insurer-filter-trigger");
       trigger.focus();
       fireEvent.click(trigger);
 
-      fireEvent.click(screen.getByTestId("insurer-filter-backdrop"));
+      expect(screen.getByTestId("insurer-filter-menu")).toBeInTheDocument();
+      fireEvent.mouseDown(document.body);
       await waitFor(() =>
         expect(screen.queryByTestId("insurer-filter-menu")).not.toBeInTheDocument()
       );
@@ -239,29 +230,7 @@ describe("InsurerFilterMenu (Ticket 6 responsive insurer filter)", () => {
       );
     });
 
-    it("commits dismissal when dragged past the threshold and snaps back otherwise", async () => {
-      render(<Harness />);
-      openMenu();
-      const grip = screen.getByTestId("insurer-filter-grip");
-
-      fireEvent.pointerDown(grip, { pointerId: 1, isPrimary: true, clientY: 10 });
-      fireEvent.pointerMove(grip, { pointerId: 1, isPrimary: true, clientY: 40 });
-      const menu = screen.getByTestId("insurer-filter-menu");
-      expect(menu.style.transform).toBe("translateY(30px)");
-      fireEvent.pointerUp(grip, { pointerId: 1, isPrimary: true, clientY: 40 });
-
-      expect(screen.getByTestId("insurer-filter-menu")).toBeInTheDocument();
-
-      fireEvent.pointerDown(grip, { pointerId: 2, isPrimary: true, clientY: 10 });
-      fireEvent.pointerMove(grip, { pointerId: 2, isPrimary: true, clientY: 160 });
-      fireEvent.pointerUp(grip, { pointerId: 2, isPrimary: true, clientY: 160 });
-
-      await waitFor(() =>
-        expect(screen.queryByTestId("insurer-filter-menu")).not.toBeInTheDocument()
-      );
-      await waitFor(() => expect(screen.getByTestId("insurer-filter-trigger")).toHaveFocus());
-    });
-    it("still opens the bottom sheet when the trigger is container-anchored", () => {
+    it("anchors above the composer when container-anchored", () => {
       render(
         <div className="relative">
           <InsurerFilterMenu value="" onSelect={vi.fn()} anchorTo="container" />
@@ -271,10 +240,9 @@ describe("InsurerFilterMenu (Ticket 6 responsive insurer filter)", () => {
       const menu = openMenu();
       expect(menu).toBeInTheDocument();
       expect(screen.getByTestId("insurer-filter-scroll")).toBeInTheDocument();
-      expect(screen.getByTestId("insurer-filter-drag-handle")).toBeInTheDocument();
-      // Tapping the toolbar filter never surfaces a floating palette on mobile
-      expect(menu.className).toContain("inset-x-0");
-      expect(menu.className).toContain("bottom-0");
+      expect(screen.queryByTestId("insurer-filter-drag-handle")).not.toBeInTheDocument();
+      expect(menu.className).toContain("bottom-full");
+      expect(menu.className).toContain("rounded-xl");
     });
   });
 });

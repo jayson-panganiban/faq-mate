@@ -153,10 +153,10 @@ export function InputBar({
   };
 
   return (
-    <div className={`w-full sticky bottom-0 ${className}`}>
+    <div className={`w-full sticky bottom-0 z-30 ${className}`}>
       <div
         data-testid="composer-field"
-        className="relative rounded-xl border border-slate-200 bg-white shadow-sm focus-within:border-teal-600 dark:border-slate-800 dark:bg-slate-900"
+        className="relative z-30 rounded-2xl border border-slate-200/90 dark:border-slate-800/90 bg-white/95 dark:bg-slate-900/95 shadow-2xs focus-within:border-teal-600/70 dark:focus-within:border-teal-400/70 focus-within:ring-1 focus-within:ring-teal-600/20 dark:focus-within:ring-teal-400/20 transition-all duration-200 backdrop-blur-xs"
       >
         <textarea
           ref={textareaRef}
@@ -169,7 +169,7 @@ export function InputBar({
           aria-label="Insurance policy question"
           aria-describedby="composer-hint"
           rows={1}
-          className="block min-h-[56px] max-h-[min(200px,25dvh)] w-full resize-none bg-transparent px-4 pt-3 pb-2 text-base leading-7 text-slate-900 placeholder:text-slate-500 focus:outline-none disabled:opacity-50 dark:text-slate-100 dark:placeholder:text-slate-400"
+          className="block min-h-[56px] max-h-[min(200px,25dvh)] w-full resize-none bg-transparent px-4 pt-3 pb-2 text-base leading-7 text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:opacity-50 dark:text-slate-100 dark:placeholder:text-slate-500 font-normal"
         />
         <div className="flex items-center justify-between px-2 pb-2">
           <InsurerFilterMenu
@@ -184,7 +184,11 @@ export function InputBar({
             onClick={handleSend}
             disabled={isSendDisabled}
             aria-label="Send message"
-            className={`flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${isSendDisabled ? "cursor-not-allowed bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400" : "cursor-pointer bg-teal-700 text-white hover:bg-teal-800 dark:bg-teal-400 dark:text-slate-950 dark:hover:bg-teal-300"}`}
+            className={`flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 active:scale-95 ${
+              isSendDisabled
+                ? "cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600"
+                : "cursor-pointer bg-teal-700 text-white hover:bg-teal-800 dark:bg-teal-400 dark:text-slate-950 dark:hover:bg-teal-300 shadow-2xs"
+            }`}
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />

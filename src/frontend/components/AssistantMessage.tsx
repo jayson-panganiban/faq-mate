@@ -9,6 +9,7 @@ import {
 import type { GroundedChunk } from "../../types/chat";
 import { findMatchingChunk } from "../utils/citations";
 import { CitationPill } from "./CitationPill";
+import { RelatedQuestions } from "./RelatedQuestions";
 import { SourceCardGrid } from "./SourceCardGrid";
 import { StatutoryGaw } from "./StatutoryGaw";
 
@@ -931,26 +932,11 @@ export function AssistantMessage({
 
         {/* Dynamic Follow-Up Prompt Suggestions (Spec 07 Section 6) */}
         {!isStreaming && suggestedFollowUps && suggestedFollowUps.length > 0 && (
-          <div
-            className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800"
-            data-testid="suggested-follow-ups"
-          >
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">
-              Related questions
-            </p>
-            <div className="flex flex-col items-start gap-1">
-              {suggestedFollowUps.map((prompt, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => onSelectFollowUp?.(prompt)}
-                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:underline focus-visible:outline-2 focus-visible:outline-teal-600 text-left cursor-pointer"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
+          <RelatedQuestions
+            questions={suggestedFollowUps}
+            onSelectQuestion={(prompt) => onSelectFollowUp?.(prompt)}
+            dataTestId="suggested-follow-ups"
+          />
         )}
 
         {/* Statutory Section 949A GAW banner rendered at bottom of completed assistant response */}

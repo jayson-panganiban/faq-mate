@@ -9,10 +9,25 @@
       name="description"
       content="Understand Australian insurance cover, compare policy wording, and check sources."
     />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="16x16 32x32" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <title>FAQ-Mate — Australian insurance, explained</title>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("faq_mate_theme") || "system";
+          var d =
+            t === "dark" ||
+            (t === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (d) document.documentElement.classList.add("dark");
+          else document.documentElement.classList.remove("dark");
+        } catch (_) {}
+      })();
+    </script>
   </head>
-  <body class="bg-slate-50 text-slate-900 antialiased w-full overflow-hidden">
+  <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 antialiased w-full overflow-hidden">
     <div id="root"></div>
     <script type="module" src="/src/frontend/main.tsx"></script>
   </body>

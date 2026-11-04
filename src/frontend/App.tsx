@@ -5,6 +5,7 @@ import { CitationDrawer } from "./components/CitationDrawer";
 import { InputBar } from "./components/InputBar";
 import { PolicyComparisonView } from "./components/PolicyComparisonView";
 import { useChatStream } from "./hooks/useChatStream";
+import { useTheme } from "./hooks/useTheme";
 import type { ChatMessage, GroundedChunk } from "./types/chat-ui";
 import { findMatchingChunk } from "./utils/citations";
 import { sanitizeClientPii } from "./utils/client-pii-scrubber";
@@ -71,6 +72,7 @@ export function App() {
     rateLimit,
     telemetry,
     citations,
+    selectedCitation,
     setSelectedCitation,
     sendMessage,
     reset,
@@ -84,6 +86,7 @@ export function App() {
   const [selectedChunkId, setSelectedChunkId] = useState<string | undefined>(undefined);
   const [isComparisonMode, setIsComparisonMode] = useState(false);
   const [historySelection, setHistorySelection] = useState<{ id: string; sequence: number }>();
+  const { theme, setTheme } = useTheme();
   /**
    * Developer debug mode (frontend-only override of the PDS Stage 8 debug
    * instrumentation): persisted in localStorage so a reviewer's session keeps
@@ -159,13 +162,21 @@ export function App() {
     setIsDrawerOpen(false);
   }, []);
 
+  // Assemble drawer chunks, guaranteeing that any custom selected citation (e.g. from canonical comparison) is present
+  const drawerChunks = useMemo(() => {
+    if (selectedCitation && !allChunks.some((c) => c.id === selectedCitation.id)) {
+      return [selectedCitation, ...allChunks];
+    }
+    return allChunks;
+  }, [allChunks, selectedCitation]);
+
   const handleSelectDrawerChunk = useCallback(
     (id: string) => {
       setSelectedChunkId(id);
-      const chunk = allChunks.find((c) => c.id === id) || null;
+      const chunk = drawerChunks.find((c) => c.id === id) || null;
       setSelectedCitation(chunk);
     },
-    [allChunks, setSelectedCitation]
+    [drawerChunks, setSelectedCitation]
   );
 
   const handleReset = useCallback(() => {
@@ -196,6 +207,8 @@ export function App() {
 
   return (
     <AppShell
+      theme={theme}
+      onThemeChange={setTheme}
       telemetry={telemetry}
       rateLimit={rateLimit}
       isThrottled={isThrottled}
@@ -228,7 +241,6 @@ export function App() {
     >
       {isComparisonMode && (
         <PolicyComparisonView
-          chunks={allChunks}
           onSelectCitation={handleSelectCitation}
           onSelectQuery={(q, ins) => {
             setIsComparisonMode(false);
@@ -251,7 +263,7 @@ export function App() {
         />
 
         {/* User Input Bar & Insurer Filter */}
-        <div className="lg:pt-3.5 shrink-0 bg-transparent">
+        <div className="lg:pt-3.5 shrink-0 bg-transparent relative z-30">
           <InputBar
             onSend={handleSend}
             isLoading={isLoading}
@@ -265,7 +277,7 @@ export function App() {
       <CitationDrawer
         isOpen={isDrawerOpen}
         onClose={handleCloseDrawer}
-        chunks={allChunks}
+        chunks={drawerChunks}
         selectedChunkId={selectedChunkId}
         onSelectChunk={handleSelectDrawerChunk}
         debugMode={debugMode}

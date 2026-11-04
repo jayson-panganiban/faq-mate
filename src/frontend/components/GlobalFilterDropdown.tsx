@@ -1,8 +1,7 @@
-import { Check, ChevronDown, Search, SlidersHorizontal } from "lucide-react";
+import { Check, ChevronsUpDown, Search, SlidersHorizontal } from "lucide-react";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
-  type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -17,7 +16,7 @@ export interface GlobalFilterOption {
   value: string;
   /** Visible row label. */
   label: string;
-  /** Optional per-row tooltip line (e.g. the issuing underwriter). */
+  /** Optional per-row tooltip or secondary description (e.g. the issuing underwriter). */
   title?: string;
 }
 
@@ -79,18 +78,10 @@ export interface GlobalFilterDropdownProps {
   className?: string;
 }
 
-/**
- * Matches the app-level `lg` breakpoint, mirroring the AppShell sidebar and the
- * 44px touch-target CSS ([`src/frontend/index.css`](../frontend/index.css)).
- */
-const DESKTOP_QUERY = "(min-width: 1024px)";
+const MENU_MARGIN = 8;
+const MENU_MAX_HEIGHT = 322; // 20rem content height plus the menu border.
 
-/** Drag distance (px) past which the mobile sheet commits dismissal. */
-const DRAG_DISMISS_THRESHOLD = 96;
-const DESKTOP_MENU_MARGIN = 8;
-const DESKTOP_MENU_MAX_HEIGHT = 322; // 20rem content height plus the menu border.
-
-interface DesktopMenuPosition {
+interface MenuPosition {
   top: number;
   left: number;
   width: number;
@@ -98,64 +89,66 @@ interface DesktopMenuPosition {
   placement: "above" | "below";
 }
 
-/* --- Locked dropdown aesthetics (Spec 05 §4.1) — the single source of truth.
-     Never copy these classes to screen code; compose this component instead. */
+/**
+ * Highlight component matching EasyUI Combobox:
+ * Underlines the matching search substring as the user types.
+ */
+function Highlight({ text, query }: { text: string; query: string }) {
+  const q = query.trim().toLowerCase();
+  const i = q ? text.toLowerCase().indexOf(q) : -1;
+  if (i < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, i)}
+      <span className="font-semibold text-slate-950 underline decoration-teal-600/70 underline-offset-[3px] dark:text-white dark:decoration-teal-400/80">
+        {text.slice(i, i + q.length)}
+      </span>
+      {text.slice(i + q.length)}
+    </>
+  );
+}
 
-/** Options row: full-width flat target with the 1px hairline divider; the
-     active selection is a deepened light-gray block plus the teal checkmark. */
-const optionClass = (selected: boolean, disabled = false) =>
-  `flex h-11 w-full items-center justify-between gap-2 border-b border-slate-200/70 px-3 text-left text-sm transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600/60 dark:border-slate-700/70 dark:focus-visible:ring-teal-400/60 ${
+/* --- Combobox Aesthetics (EasyUI Combobox Design) --- */
+
+/**
+ * Combobox options row: rounded option target with active gliding highlight,
+ * search match underline, and selection checkmark.
+ */
+const optionClass = (selected: boolean, active: boolean, disabled = false) =>
+  `relative flex min-h-[44px] h-11 w-full items-center justify-between gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600/60 dark:focus-visible:ring-teal-400/60 ${
+    disabled
+      ? "cursor-not-allowed opacity-40 hover:bg-transparent dark:hover:bg-transparent"
+      : "cursor-pointer"
+  } ${
     selected
-      ? "bg-slate-200 font-medium text-slate-900 dark:bg-slate-700 dark:text-white"
-      : "text-slate-700 hover:bg-slate-50 active:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/60 dark:active:bg-slate-800/70"
-  } ${disabled ? "cursor-not-allowed opacity-40 hover:bg-transparent dark:hover:bg-transparent" : "cursor-pointer"}`;
+      ? "bg-slate-100 font-medium text-slate-900 dark:bg-slate-800 dark:text-white"
+      : active
+        ? "text-slate-900 dark:text-white"
+        : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60"
+  }`;
 
 /** Group header: muted small-caps. */
 const groupHeaderClass =
-  "px-3 pt-3 pb-1 text-[11px] font-semibold tracking-[0.08em] text-slate-500 uppercase dark:text-slate-400";
+  "px-3 pt-2.5 pb-1 text-[11px] font-semibold tracking-[0.08em] text-slate-500 uppercase dark:text-slate-400 select-none";
 
 /** Sticky search header separated by a 1px hairline border. */
 const menuBodyClass =
   "flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5 sticky top-0 z-10 dark:border-slate-800 dark:bg-slate-900";
 
-/** Compact chip trigger: icon + truncating label; teal when a choice is set. */
+/** Compact chip trigger: icon + truncating label + trailing ChevronsUpDown. */
 const chipTriggerClass =
-  "flex h-11 min-h-[44px] min-w-[44px] max-w-full cursor-pointer items-center gap-1.5 rounded-xl px-2 transition-colors duration-150 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 disabled:cursor-not-allowed dark:hover:bg-slate-800";
+  "flex h-11 min-h-[44px] min-w-[44px] max-w-full cursor-pointer items-center gap-1.5 rounded-xl px-2.5 transition-colors duration-150 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 disabled:cursor-not-allowed dark:hover:bg-slate-800";
 
-/** Form-field trigger: full-width hairline row, no pill bloat. */
+/** Form-field trigger: full-width hairline row with ChevronsUpDown. */
 const fieldTriggerClass =
-  "flex min-h-[44px] min-w-0 w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-slate-300 bg-transparent px-3 py-2 text-sm transition-colors duration-150 hover:border-slate-400 focus:outline-none focus-visible:border-teal-600 focus-visible:ring-2 focus-visible:ring-teal-500/60 disabled:cursor-not-allowed dark:border-slate-700 dark:hover:border-slate-600 dark:focus-visible:border-teal-500";
+  "flex min-h-[44px] h-11 min-w-0 w-full cursor-pointer items-center justify-between gap-2.5 rounded-xl border border-slate-300 bg-white dark:bg-slate-900 px-3 py-2 text-sm transition-colors duration-150 hover:border-slate-400 focus:outline-none focus-visible:border-teal-600 focus-visible:ring-2 focus-visible:ring-teal-500/60 disabled:cursor-not-allowed dark:border-slate-700 dark:hover:border-slate-600 dark:focus-visible:border-teal-500 shadow-2xs";
 
 /**
- * True above the 1024px breakpoint. Falls back to desktop styling when
- * `matchMedia` is unavailable (testdom / exotic embedded webviews).
- */
-function useDesktopViewport(): boolean {
-  const [isDesktop, setIsDesktop] = useState(() =>
-    typeof window.matchMedia === "function" ? window.matchMedia(DESKTOP_QUERY).matches : true
-  );
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") return;
-    const media = window.matchMedia(DESKTOP_QUERY);
-    const update = () => setIsDesktop(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-  return isDesktop;
-}
-
-/**
- * GlobalFilterDropdown — the one dropdown in the application.
+ * GlobalFilterDropdown — EasyUI Combobox component.
  *
- * Renders the approved selection menu design as a single responsive control:
- * an anchored command palette above the mobile breakpoint and a bottom sheet
- * below it. Desktop field pickers escape scroll clipping and flip to the
- * available side of their trigger. Both views share the same state logic (open/search/selection,
- * focus trap, keyboard navigation) and the locked internal UI (sticky hairline
- * search bar, muted small-caps group headers, flat hairline checklist rows,
- * deepened gray selection with a teal checkmark). Screen code must compose
- * this component — never fork its CSS.
+ * A searchable select where one highlight glides between options as you move
+ * (keyboard or mouse), the match underlines as you type, and the check pops
+ * in on selection.
  */
 export function GlobalFilterDropdown({
   value,
@@ -179,17 +172,12 @@ export function GlobalFilterDropdown({
 }: GlobalFilterDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState(0);
-  const [desktopMenuPosition, setDesktopMenuPosition] = useState<DesktopMenuPosition | null>(null);
-  const isDesktop = useDesktopViewport();
+  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const dragStartYRef = useRef<number | null>(null);
-  const dragOffsetRef = useRef(0);
 
   const ids = useMemo(
     () => ({
@@ -241,8 +229,8 @@ export function GlobalFilterDropdown({
   }, [isOpen]);
 
   useLayoutEffect(() => {
-    if (!isOpen || !isDesktop || variant !== "field") {
-      setDesktopMenuPosition(null);
+    if (!isOpen || variant !== "field") {
+      setMenuPosition(null);
       return;
     }
 
@@ -253,35 +241,32 @@ export function GlobalFilterDropdown({
     const updatePosition = () => {
       const triggerRect = trigger.getBoundingClientRect();
       const menuHeight = Math.min(
-        menu.getBoundingClientRect().height || DESKTOP_MENU_MAX_HEIGHT,
-        DESKTOP_MENU_MAX_HEIGHT,
+        menu.getBoundingClientRect().height || MENU_MAX_HEIGHT,
+        MENU_MAX_HEIGHT,
         window.innerHeight * 0.6
       );
-      const availableAbove = Math.max(0, triggerRect.top - DESKTOP_MENU_MARGIN);
-      const availableBelow = Math.max(
-        0,
-        window.innerHeight - triggerRect.bottom - DESKTOP_MENU_MARGIN
-      );
+      const availableAbove = Math.max(0, triggerRect.top - MENU_MARGIN);
+      const availableBelow = Math.max(0, window.innerHeight - triggerRect.bottom - MENU_MARGIN);
       const placement =
         availableAbove >= menuHeight || availableAbove >= availableBelow ? "above" : "below";
       const availableSpace = placement === "above" ? availableAbove : availableBelow;
-      const width = Math.min(320, window.innerWidth - DESKTOP_MENU_MARGIN * 2);
+      const width = Math.min(320, window.innerWidth - MENU_MARGIN * 2);
       const left = Math.max(
-        DESKTOP_MENU_MARGIN,
-        Math.min(triggerRect.left, window.innerWidth - width - DESKTOP_MENU_MARGIN)
+        MENU_MARGIN,
+        Math.min(triggerRect.left, window.innerWidth - width - MENU_MARGIN)
       );
-      const position: DesktopMenuPosition = {
+      const position: MenuPosition = {
         top:
           placement === "above"
-            ? triggerRect.top - Math.min(menuHeight, availableSpace)
-            : triggerRect.bottom,
+            ? triggerRect.top - Math.min(menuHeight, availableSpace) - 4
+            : triggerRect.bottom + 4,
         left,
         width,
         maxHeight: Math.min(menuHeight, availableSpace),
         placement,
       };
 
-      setDesktopMenuPosition((current) =>
+      setMenuPosition((current) =>
         current &&
         current.top === position.top &&
         current.left === position.left &&
@@ -306,11 +291,9 @@ export function GlobalFilterDropdown({
       window.removeEventListener("scroll", updatePosition, true);
       resizeObserver?.disconnect();
     };
-  }, [isDesktop, isOpen, variant]);
+  }, [isOpen, variant]);
 
   // Escape dismisses and Tab traps focus inside whichever wrapper is mounted.
-  // The content node is resolved at event time so a viewport flip (inline
-  // palette <-> portalled sheet) keeps the trap pointed at the live node.
   useEffect(() => {
     if (!isOpen) return;
     const keydown = (event: KeyboardEvent) => {
@@ -340,18 +323,21 @@ export function GlobalFilterDropdown({
     return () => document.removeEventListener("keydown", keydown);
   }, [isOpen, close]);
 
-  // Outside pointer presses dismiss the palette (the sheet's backdrop is
-  // likewise outside the content node, so one handler serves both wrappers).
+  // Outside pointer presses dismiss the palette.
   useEffect(() => {
     if (!isOpen) return;
-    const handleMouseDown = (event: MouseEvent) => {
+    const handleOutside = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node;
       if (contentRef.current?.contains(target)) return;
       if (triggerRef.current?.contains(target)) return;
       close();
     };
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => document.removeEventListener("mousedown", handleMouseDown);
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+    };
   }, [isOpen, close]);
 
   const filteredGroups = useMemo(() => {
@@ -368,10 +354,72 @@ export function GlobalFilterDropdown({
       }))
       .filter((group) => group.options.length > 0);
   }, [groups, query]);
+
+  const flatOptions = useMemo(() => {
+    const list: GlobalFilterOption[] = [];
+    if (allOption) {
+      const q = query.trim().toLowerCase();
+      if (!q || allOption.label.toLowerCase().includes(q)) {
+        list.push(allOption);
+      }
+    }
+    for (const group of filteredGroups) {
+      for (const opt of group.options) {
+        list.push(opt);
+      }
+    }
+    return list;
+  }, [allOption, query, filteredGroups]);
+
   const hasNoMatches =
     query.trim() !== "" &&
     filteredGroups.length === 0 &&
     (!isDefault || !allOption?.label.toLowerCase().includes(query.trim().toLowerCase()));
+
+  // Active highlighted option index for roving focus and gliding pill
+  const [active, setActive] = useState<number>(0);
+  const [box, setBox] = useState<{ y: number; h: number } | null>(null);
+  const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const byKeyboard = useRef(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setBox(null);
+      return;
+    }
+    const idx = flatOptions.findIndex((o) =>
+      allOption && isDefault ? o.value === allOption.value : o.value === value
+    );
+    setActive(idx >= 0 ? idx : 0);
+  }, [isOpen, value, allOption, isDefault, flatOptions]);
+
+  useLayoutEffect(() => {
+    if (!isOpen || flatOptions.length === 0) {
+      setBox(null);
+      return;
+    }
+    const currentOption = flatOptions[active];
+    if (!currentOption) {
+      setBox(null);
+      return;
+    }
+    const el = itemRefs.current.get(currentOption.value);
+    const listEl = listRef.current;
+    if (!el || !listEl) {
+      setBox(null);
+      return;
+    }
+    const listRect = listEl.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const y = elRect.top - listRect.top + listEl.scrollTop;
+    const h = elRect.height || el.offsetHeight || 44;
+    setBox({ y, h });
+
+    if (byKeyboard.current) {
+      el.scrollIntoView({ block: "nearest" });
+      byKeyboard.current = false;
+    }
+  }, [active, flatOptions, isOpen]);
 
   const focusEdgeOption = (offset: 1 | -1) => {
     const options = Array.from(
@@ -380,19 +428,35 @@ export function GlobalFilterDropdown({
       ) ?? []
     );
     if (!options.length) return;
-    options[offset === 1 ? 0 : options.length - 1].focus();
+    const targetEl = options[offset === 1 ? 0 : options.length - 1];
+    targetEl.focus();
+    const val = targetEl.getAttribute("data-value");
+    const idx = flatOptions.findIndex((o) => o.value === val);
+    if (idx >= 0) setActive(idx);
   };
 
   const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    if (event.key === "ArrowDown") {
       event.preventDefault();
-      focusEdgeOption(event.key === "ArrowDown" ? 1 : -1);
+      byKeyboard.current = true;
+      focusEdgeOption(1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      byKeyboard.current = true;
+      focusEdgeOption(-1);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const current = flatOptions[active];
+      if (current && !disabledOptionValues.includes(current.value)) {
+        handleSelect(current.value);
+      }
     }
   };
 
   const handleOptionKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
+    byKeyboard.current = true;
     const options = Array.from(
       listRef.current?.querySelectorAll<HTMLButtonElement>(
         "button[role='option']:not([disabled])"
@@ -401,48 +465,17 @@ export function GlobalFilterDropdown({
     const current = options.indexOf(event.currentTarget);
     if (current === -1) return;
     const step = event.key === "ArrowDown" ? 1 : -1;
-    options[(current + step + options.length) % options.length].focus();
+    const nextEl = options[(current + step + options.length) % options.length];
+    nextEl.focus();
+    const nextVal = nextEl.getAttribute("data-value");
+    const nextIdx = flatOptions.findIndex((o) => o.value === nextVal);
+    if (nextIdx >= 0) setActive(nextIdx);
   };
 
   const handleSelect = (nextValue: string) => {
     if (disabledOptionValues.includes(nextValue)) return;
     onSelect(nextValue);
     close();
-  };
-
-  // Bottom sheet drag-to-dismiss: the transform is applied directly so the
-  // gesture tracks pointer movement without intermediate reflow jank.
-  const applyDragOffset = (offset: number) => {
-    dragOffsetRef.current = offset;
-    setDragOffset(offset);
-  };
-
-  const handleSheetPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.isPrimary === false) return;
-    if (!(event.target as HTMLElement).closest("[data-drag-grip]")) return;
-    dragStartYRef.current = event.clientY;
-    setIsDragging(true);
-    try {
-      if (typeof event.currentTarget.setPointerCapture === "function") {
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }
-    } catch {
-      // jsdom / older engines without pointer capture still track the lift.
-    }
-  };
-
-  const handleSheetPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (dragStartYRef.current === null) return;
-    applyDragOffset(Math.max(0, event.clientY - dragStartYRef.current));
-  };
-
-  const settleDrag = () => {
-    if (dragStartYRef.current === null) return;
-    dragStartYRef.current = null;
-    const offset = dragOffsetRef.current;
-    applyDragOffset(0);
-    setIsDragging(false);
-    if (offset > DRAG_DISMISS_THRESHOLD) close();
   };
 
   const stickySearch = (
@@ -464,33 +497,74 @@ export function GlobalFilterDropdown({
     </div>
   );
 
-  const renderOption = (option: GlobalFilterOption, selected: boolean) => {
+  const renderOption = (option: GlobalFilterOption, selected: boolean, index: number) => {
     const isDisabled = disabledOptionValues.includes(option.value);
+    const isActive = active === index;
     return (
       <button
         key={option.value}
+        ref={(el) => {
+          if (el) itemRefs.current.set(option.value, el);
+          else itemRefs.current.delete(option.value);
+        }}
         type="button"
         role="option"
         aria-selected={selected}
         aria-disabled={isDisabled || undefined}
+        aria-label={option.label}
         data-value={option.value}
         title={option.title}
         onClick={() => handleSelect(option.value)}
         onKeyDown={handleOptionKeyDown}
+        onMouseMove={() => {
+          if (!isDisabled && active !== index) {
+            setActive(index);
+          }
+        }}
+        onFocus={() => {
+          if (active !== index) {
+            setActive(index);
+          }
+        }}
         disabled={isDisabled}
-        className={optionClass(selected, isDisabled)}
+        className={optionClass(selected, isActive, isDisabled)}
       >
-        <span className="truncate">{option.label}</span>
+        <span className="relative min-w-0 flex-1 truncate font-medium">
+          <Highlight text={option.label} query={query} />
+        </span>
         {selected && (
-          <Check className="h-4 w-4 shrink-0 text-teal-700 dark:text-teal-400" aria-hidden="true" />
+          <Check
+            className="h-4 w-4 shrink-0 text-teal-600 dark:text-teal-400 transition-transform duration-150 animate-in fade-in zoom-in-75"
+            aria-hidden="true"
+          />
         )}
       </button>
     );
   };
 
   const options = (
-    <div ref={listRef} role="listbox" aria-label={optionsAriaLabel} data-testid={testIds.options}>
-      {allOption && renderOption(allOption, isDefault)}
+    <div
+      ref={listRef}
+      role="listbox"
+      aria-label={optionsAriaLabel}
+      data-testid={testIds.options}
+      className="relative p-1"
+    >
+      {box && flatOptions.length > 0 && (
+        <div
+          aria-hidden="true"
+          style={{
+            transform: `translateY(${box.y}px)`,
+            height: `${box.h}px`,
+            transition:
+              "transform 150ms cubic-bezier(0.4, 0, 0.2, 1), height 150ms cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+          className="pointer-events-none absolute inset-x-1 top-0 rounded-lg bg-slate-100 dark:bg-slate-800/80"
+        />
+      )}
+      {allOption &&
+        (!query.trim() || allOption.label.toLowerCase().includes(query.trim().toLowerCase())) &&
+        renderOption(allOption, isDefault, 0)}
       {filteredGroups.map((group) => {
         const groupId = group.id ?? group.label;
         return (
@@ -507,7 +581,10 @@ export function GlobalFilterDropdown({
             >
               {group.label}
             </div>
-            {group.options.map((option) => renderOption(option, option.value === value))}
+            {group.options.map((option) => {
+              const flatIndex = flatOptions.findIndex((o) => o.value === option.value);
+              return renderOption(option, option.value === value, flatIndex);
+            })}
           </fieldset>
         );
       })}
@@ -520,42 +597,44 @@ export function GlobalFilterDropdown({
   );
 
   const chipLabel = isDefault ? (emptyLabel ?? allOption?.label ?? "") : selectedLabel;
-  const desktopMenu =
-    isOpen && isDesktop ? (
+  const comboboxMenu = isOpen ? (
+    <div
+      ref={contentRef}
+      id={ids.menu}
+      role="dialog"
+      aria-modal="true"
+      aria-label={ariaLabel}
+      data-testid={testIds.menu}
+      data-placement={menuPosition?.placement}
+      className={`${
+        variant === "field" ? "fixed" : "absolute bottom-full mb-2 left-0"
+      } z-50 w-[320px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg shadow-slate-900/10 dark:shadow-black/50 animate-in fade-in zoom-in-95 duration-100`}
+      style={
+        variant === "field"
+          ? {
+              top: menuPosition?.top ?? 0,
+              left: menuPosition?.left ?? 0,
+              width: menuPosition?.width ?? 320,
+              maxHeight: menuPosition?.maxHeight,
+              visibility: menuPosition ? "visible" : "hidden",
+            }
+          : undefined
+      }
+    >
       <div
-        ref={contentRef}
-        id={ids.menu}
-        role="dialog"
-        aria-modal="true"
-        aria-label={ariaLabel}
-        data-testid={testIds.menu}
-        data-placement={desktopMenuPosition?.placement}
-        className={`${variant === "field" ? "fixed" : "absolute bottom-full left-0"} z-50 w-[320px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900`}
+        data-testid={testIds.scroll}
+        className="max-h-[min(20rem,60vh)] overflow-y-auto overscroll-contain"
         style={
-          variant === "field"
-            ? {
-                top: desktopMenuPosition?.top ?? 0,
-                left: desktopMenuPosition?.left ?? 0,
-                width: desktopMenuPosition?.width ?? 320,
-                maxHeight: desktopMenuPosition?.maxHeight,
-                visibility: desktopMenuPosition ? "visible" : "hidden",
-              }
+          variant === "field" && menuPosition
+            ? { maxHeight: Math.max(0, menuPosition.maxHeight - 2) }
             : undefined
         }
       >
-        <div
-          className="max-h-[min(20rem,60vh)] overflow-y-auto overscroll-contain"
-          style={
-            variant === "field" && desktopMenuPosition
-              ? { maxHeight: Math.max(0, desktopMenuPosition.maxHeight - 2) }
-              : undefined
-          }
-        >
-          {stickySearch}
-          {options}
-        </div>
+        {stickySearch}
+        {options}
       </div>
-    ) : null;
+    </div>
+  ) : null;
 
   return (
     <div className={`inline-block ${anchorTo === "container" ? "" : "relative"} ${className}`}>
@@ -575,12 +654,24 @@ export function GlobalFilterDropdown({
           if (isOpen) close();
           else setIsOpen(true);
         }}
-        className={variant === "chip" ? chipTriggerClass : fieldTriggerClass}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            setIsOpen(true);
+          }
+        }}
+        className={
+          variant === "field"
+            ? `${fieldTriggerClass} ${
+                isOpen ? "border-slate-400 dark:border-slate-600 ring-2 ring-teal-500/20" : ""
+              }`
+            : chipTriggerClass
+        }
       >
         {variant === "chip" ? (
           <>
             <SlidersHorizontal
-              className={`h-5 w-5 shrink-0 ${
+              className={`h-4 w-4 shrink-0 ${
                 isDefault
                   ? "text-slate-500 dark:text-slate-400"
                   : "text-teal-700 dark:text-teal-400"
@@ -597,11 +688,17 @@ export function GlobalFilterDropdown({
             >
               {chipLabel}
             </span>
+            <ChevronsUpDown
+              className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500"
+              aria-hidden="true"
+            />
           </>
         ) : (
           <>
-            <span className="min-w-0 flex-1 truncate text-left">{selectedLabel}</span>
-            <ChevronDown
+            <span className="min-w-0 flex-1 truncate text-left font-medium text-slate-900 dark:text-slate-100">
+              {selectedLabel}
+            </span>
+            <ChevronsUpDown
               className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500"
               aria-hidden="true"
             />
@@ -612,61 +709,8 @@ export function GlobalFilterDropdown({
         </span>
       </button>
 
-      {desktopMenu &&
-        (variant === "field" ? createPortal(desktopMenu, document.body) : desktopMenu)}
-
-      {isOpen &&
-        !isDesktop &&
-        // Mobile: native bottom sheet anchored to the viewport bottom edge.
-        createPortal(
-          <div className="fixed inset-0 z-50">
-            <button
-              type="button"
-              data-testid={testIds.backdrop}
-              aria-label={`Close ${ariaLabel.toLowerCase()} backdrop`}
-              tabIndex={-1}
-              onClick={close}
-              className="absolute inset-0 w-full cursor-pointer bg-slate-950/50"
-            />
-            <div
-              ref={contentRef}
-              id={ids.menu}
-              role="dialog"
-              aria-modal="true"
-              aria-label={ariaLabel}
-              data-testid={testIds.menu}
-              onPointerDown={handleSheetPointerDown}
-              onPointerMove={handleSheetPointerMove}
-              onPointerUp={settleDrag}
-              onPointerCancel={settleDrag}
-              style={{
-                transform: dragOffset ? `translateY(${dragOffset}px)` : undefined,
-              }}
-              className={`absolute inset-x-0 bottom-0 flex max-h-[min(75dvh,36rem)] flex-col rounded-t-2xl bg-white pb-[env(safe-area-inset-bottom,0px)] shadow-2xl dark:bg-slate-900 ${
-                isDragging ? "" : "transition-transform duration-200 ease-out"
-              }`}
-            >
-              <div
-                data-drag-grip
-                data-testid={testIds.grip}
-                className="flex touch-none justify-center pb-1.5 pt-2.5"
-              >
-                <div
-                  data-testid={testIds.handle}
-                  className="h-1.5 w-10 rounded-full bg-slate-300 dark:bg-slate-600"
-                />
-              </div>
-              <div
-                data-testid={testIds.scroll}
-                className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
-              >
-                {stickySearch}
-                {options}
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      {comboboxMenu &&
+        (variant === "field" ? createPortal(comboboxMenu, document.body) : comboboxMenu)}
     </div>
   );
 }

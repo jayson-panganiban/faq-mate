@@ -92,4 +92,38 @@ describe("Dynamic Follow-Up Prompt Suggestions Generator (Ticket 05 & Spec 07)",
     expect(suggestions.length).toBeGreaterThanOrEqual(2);
     expect(suggestions.length).toBeLessThanOrEqual(3);
   });
+
+  describe("Follow-Up Substring Eligibility & Exact Query Filtering", () => {
+    const mockChunks: GroundedChunk[] = [
+      {
+        id: "chunk-excess",
+        relevanceScore: 0.9,
+        content:
+          "Basic excess applies to all building claims. An unlisted driver excess applies for motor claims.",
+        source: {
+          insurer: "Suncorp",
+          product: "Comprehensive Home & Motor",
+          docType: "PDS",
+          section: "Excess Structure",
+        },
+      },
+    ];
+
+    it("does not reject relevant follow-up prompts merely because they contain a query keyword like 'excess'", () => {
+      const suggestions = generateFollowUpSuggestions("excess", mockChunks);
+      expect(suggestions).toContain(
+        "What is the difference between basic excess and unlisted driver excess?"
+      );
+    });
+
+    it("still filters out suggestions that are identical or virtually identical to the query", () => {
+      const suggestions = generateFollowUpSuggestions(
+        "What is the difference between basic excess and unlisted driver excess?",
+        mockChunks
+      );
+      expect(suggestions).not.toContain(
+        "What is the difference between basic excess and unlisted driver excess?"
+      );
+    });
+  });
 });

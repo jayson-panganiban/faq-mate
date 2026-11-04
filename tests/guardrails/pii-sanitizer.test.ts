@@ -71,4 +71,16 @@ describe("PII Sanitizer & Multi-Turn History Scrubbing (Spec 07 & APP 3/11)", ()
     expect(res.wasRedacted).toBe(true);
     expect(res.sanitizedQuery).toContain("[REDACTED_PHONE]");
   });
+
+  it("provides both 'sanitized' and 'sanitizedQuery' consistently across overloads", async () => {
+    const singleTurn = await sanitizePii("Hello from NSW licence 12345678");
+    expect(singleTurn.sanitized).toBeDefined();
+
+    const multiTurn = await sanitizePii({
+      query: "What about my claim?",
+      history: [{ role: "user", content: "My phone is 0412 345 678" }],
+    });
+    expect(multiTurn.sanitized).toBeDefined();
+    expect(multiTurn.sanitizedQuery).toBeDefined();
+  });
 });

@@ -1,6 +1,8 @@
-import React from "react";
+import { BookOpen } from "lucide-react";
+import type React from "react";
 import type { GroundedChunk } from "../../types/chat";
 import { formatProductDoc } from "../utils/citations";
+import { PeekCard } from "./PeekCard";
 
 export interface CitationPillProps {
   /**
@@ -53,7 +55,9 @@ export interface CitationPillProps {
  * CitationPill Component
  *
  * Clickable source reference rendered inside the assistant response.
- * Inline references use small markers; standalone references keep their document names.
+ * Enhanced with EasyUI PeekCard: hovering over the citation pill reveals an origin-anchored
+ * preview of the operative clause, underwriter, and relevance match score without
+ * needing to slide open the full inspector drawer.
  */
 export function CitationPill({
   index,
@@ -89,29 +93,25 @@ export function CitationPill({
     }
   };
 
-  // A standalone reference needs its document name; a superscript alone has no context.
-  if (!compact) {
-    const sourceTitle = chunk
-      ? productDoc
-      : (label
-          ?.replace(/^\[\s*(?:Source:\s*)?/i, "")
-          .replace(/\]$/, "")
-          .replace(/[*_`]/g, "") ?? productDoc);
-    const sourceDescription = chunk ? `${productDoc}, ${effectiveSection}` : sourceTitle;
-    return (
-      <button
-        type="button"
-        data-testid="citation-pill"
-        onClick={handleClick}
-        aria-label={`View source: ${sourceDescription}`}
-        className={`inline-flex min-h-[44px] max-w-full items-center whitespace-normal break-words text-left text-sm text-slate-600 underline decoration-slate-400 underline-offset-2 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white focus-visible:outline-2 focus-visible:outline-teal-600 cursor-pointer ${className}`}
-      >
-        {sourceTitle}
-      </button>
-    );
-  }
+  const sourceTitle = chunk
+    ? productDoc
+    : (label
+        ?.replace(/^\[\s*(?:Source:\s*)?/i, "")
+        .replace(/\]$/, "")
+        .replace(/[*_`]/g, "") ?? productDoc);
+  const sourceDescription = chunk ? `${productDoc}, ${effectiveSection}` : sourceTitle;
 
-  return (
+  const pillButton = !compact ? (
+    <button
+      type="button"
+      data-testid="citation-pill"
+      onClick={handleClick}
+      aria-label={`View source: ${sourceDescription}`}
+      className={`citation-standalone inline text-left text-sm text-slate-600 underline decoration-slate-400 underline-offset-2 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white focus-visible:outline-2 focus-visible:outline-teal-600 cursor-pointer ${className}`.trim()}
+    >
+      {sourceTitle}
+    </button>
+  ) : (
     <button
       type="button"
       data-testid="citation-pill"
@@ -126,5 +126,79 @@ export function CitationPill({
       )}
       <span className="sr-only">{displayText}</span>
     </button>
+  );
+
+  // When no chunk or product metadata exists to preview, render button directly
+  if (!chunk && !effectiveProduct) {
+    return pillButton;
+  }
+
+  const peekContent = (
+    <div className="flex flex-col gap-2 p-3 text-left">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {chunk?.source.insurer && (
+            <span className="inline-flex items-center rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700 ring-1 ring-inset ring-teal-600/20 dark:bg-teal-950/60 dark:text-teal-300 dark:ring-teal-500/30">
+              {chunk.source.insurer}
+            </span>
+          )}
+          <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            {effectiveDocType}
+          </span>
+        </div>
+        {typeof chunk?.relevanceScore === "number" && (
+          <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+            {Math.round(chunk.relevanceScore * 100)}% match
+          </span>
+        )}
+      </div>
+
+      {/* Title & Section */}
+      <div>
+        <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 line-clamp-1">
+          {effectiveProduct}
+        </p>
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">
+          {effectiveSection}
+        </p>
+      </div>
+
+      {/* Snippet Excerpt */}
+      {chunk?.content && (
+        <div className="rounded-lg bg-slate-50 p-2 text-xs leading-relaxed text-slate-600 line-clamp-3 dark:bg-slate-800/60 dark:text-slate-300 font-normal">
+          {chunk.content}
+        </div>
+      )}
+
+      {/* Footer Call to Action */}
+      <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/80 text-[11px]">
+        {chunk?.source.effectiveDate ? (
+          <span className="text-slate-400 dark:text-slate-500 text-[10px]">
+            Eff. {chunk.source.effectiveDate}
+          </span>
+        ) : (
+          <span className="text-slate-400 dark:text-slate-500 text-[10px]">Operative clause</span>
+        )}
+        <span className="inline-flex items-center gap-1 font-medium text-teal-600 dark:text-teal-400 hover:underline">
+          <BookOpen className="h-3 w-3" />
+          <span>View in drawer</span>
+        </span>
+      </div>
+    </div>
+  );
+
+  return (
+    <PeekCard
+      content={peekContent}
+      onOpenFull={() => {
+        onClick?.();
+        if (resolvedChunkId) {
+          onSelect?.(resolvedChunkId);
+        }
+      }}
+    >
+      {pillButton}
+    </PeekCard>
   );
 }

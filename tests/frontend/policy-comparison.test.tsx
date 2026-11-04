@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { PolicyComparisonView } from "../../src/frontend/components/PolicyComparisonView";
 import type { GroundedChunk } from "../../src/frontend/types/chat-ui";
@@ -143,19 +142,83 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("renders retrieved session disclosures when matching chunks are provided", () => {
+  it("renders canonical PDS document sources for both default insurers without requiring chat history", () => {
+    render(<PolicyComparisonView />);
+
+    // Policy sources section must always be visible
+    expect(screen.getByText("Policy sources")).toBeInTheDocument();
+    expect(screen.getByText("Suncorp sources")).toBeInTheDocument();
+    expect(screen.getByText("NRMA sources")).toBeInTheDocument();
+
+    // "No sources yet" should never be rendered for canonical pairs
+    expect(screen.queryByText(/no sources yet/i)).not.toBeInTheDocument();
+
+    // Both canonical source buttons must be present with BookOpen icon and doc titles
+    const suncorpSourceBtn = screen.getByRole("button", {
+      name: /read source: suncorp.*pds/i,
+    });
+    expect(suncorpSourceBtn).toBeInTheDocument();
+    expect(within(suncorpSourceBtn).getByText(/suncorp.*pds/i)).toBeInTheDocument();
+
+    const nrmaSourceBtn = screen.getByRole("button", {
+      name: /read source: nrma.*pds/i,
+    });
+    expect(nrmaSourceBtn).toBeInTheDocument();
+    expect(within(nrmaSourceBtn).getByText(/nrma.*pds/i)).toBeInTheDocument();
+  });
+
+  it("does not bleed conversational chat history chunks into comparison sources list", () => {
+    const adHocChatChunks: GroundedChunk[] = [
+      {
+        id: "chunk-chat-qbe-motor",
+        relevanceScore: 0.9,
+        content: "QBE Comprehensive Car Insurance covers accidental collision damage.",
+        source: {
+          insurer: "QBE",
+          product: "QBE Comprehensive Car",
+          docType: "PDS",
+          section: "Section 3 - Accidental Damage",
+        },
+      },
+    ];
+
+    render(<PolicyComparisonView chunks={adHocChatChunks} />);
+
+    // Policy sources must show Suncorp and NRMA canonical sources, NOT QBE
+    expect(screen.getByText("Suncorp sources")).toBeInTheDocument();
+    expect(screen.getByText("NRMA sources")).toBeInTheDocument();
+    expect(screen.queryByText("QBE sources")).not.toBeInTheDocument();
+    expect(screen.queryByText(/QBE Comprehensive Car/i)).not.toBeInTheDocument();
+  });
+
+  it("triggers onSelectCitation with canonical PDS chunk when clicking a source button", () => {
     const handleSelectCitation = vi.fn();
-    render(<PolicyComparisonView chunks={mockChunks} onSelectCitation={handleSelectCitation} />);
+    render(<PolicyComparisonView onSelectCitation={handleSelectCitation} />);
 
-    expect(screen.getByText(/Policy sources/i)).toBeInTheDocument();
-    expect(screen.getByText(/Suncorp sources/i)).toBeInTheDocument();
-    expect(screen.getByText(/NRMA sources/i)).toBeInTheDocument();
+    const suncorpSourceBtn = screen.getByRole("button", {
+      name: /read source: suncorp.*pds/i,
+    });
+    fireEvent.click(suncorpSourceBtn);
 
-    // Click read source
-    const inspectButtons = screen.getAllByRole("button", { name: /read source/i });
-    expect(inspectButtons.length).toBeGreaterThan(0);
-    fireEvent.click(inspectButtons[0]);
-    expect(handleSelectCitation).toHaveBeenCalledWith(mockChunks[0]);
+    expect(handleSelectCitation).toHaveBeenCalledTimes(1);
+    const calledChunk = handleSelectCitation.mock.calls[0][0];
+    expect(calledChunk).toMatchObject({
+      source: expect.objectContaining({
+        insurer: expect.stringMatching(/suncorp/i),
+        docType: "PDS",
+      }),
+    });
+  });
+
+  it("updates canonical PDS sources dynamically when changing comparison insurer", () => {
+    render(<PolicyComparisonView />);
+
+    fireEvent.click(screen.getByTestId("insurer-b-trigger"));
+    fireEvent.click(screen.getByRole("option", { name: "Allianz" }));
+
+    expect(screen.getByText("Allianz sources")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /read source: allianz.*pds/i })).toBeInTheDocument();
+    expect(screen.queryByText("NRMA sources")).not.toBeInTheDocument();
   });
 
   it("triggers comparative query when clicking quick launch prompt", () => {
@@ -187,5 +250,118 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
     const insurerNames = Array.from(flood.querySelectorAll("dt")).map((item) => item.textContent);
     expect(insurerNames).toEqual(["Suncorp", "NRMA"]);
     expect(flood.querySelectorAll("dd")).toHaveLength(2);
+  });
+
+  it("applies responsive mobile spacing and compact card layout", () => {
+    const handleQuery = vi.fn();
+    render(
+      <PolicyComparisonView chunks={mockChunks} onSelectQuery={handleQuery} onClose={vi.fn()} />
+    );
+
+    const view = screen.getByTestId("policy-comparison-view");
+    expect(view.className).toContain("pb-12");
+    expect(view.className).toContain("sm:pb-16");
+
+    const flood = screen.getByRole("region", { name: "Flood Definition" });
+    const dl = flood.querySelector("dl");
+    expect(dl).not.toBeNull();
+    expect(dl?.className).toContain("grid-cols-1");
+    expect(dl?.className).toContain("sm:grid-cols-2");
+
+    const followUpButtons = screen.getAllByRole("button", { name: /compare/i });
+    expect(followUpButtons.length).toBeGreaterThan(0);
+    for (const btn of followUpButtons) {
+      expect(btn).toHaveAttribute("data-compact-action");
+      expect(btn).toHaveAttribute("data-follow-up");
+      expect(btn.className).toContain("citation-standalone");
+    }
+  });
+
+  // =========================================================================
+  // Quick Swap Button Removal Verification
+  // =========================================================================
+
+  it("does not render a Quick Swap button between Primary and Comparison pickers", () => {
+    render(<PolicyComparisonView />);
+    expect(screen.queryByTestId("swap-insurers-button")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: "Swap primary and comparison insurers",
+      })
+    ).not.toBeInTheDocument();
+  });
+
+  it("preserves collision disabling for counterpart when changing insurer selection", () => {
+    render(<PolicyComparisonView />);
+
+    // Select Allianz in Primary
+    fireEvent.click(screen.getByTestId("insurer-a-trigger"));
+    fireEvent.click(screen.getByRole("option", { name: "Allianz" }));
+
+    // Open Comparison: Allianz should be disabled as counterpart
+    fireEvent.click(screen.getByTestId("insurer-b-trigger"));
+    const counterpartInB = screen.getByRole("option", { name: "Allianz" });
+    expect(counterpartInB).toHaveAttribute("aria-disabled", "true");
+  });
+
+  // =========================================================================
+  // R3: Underwriter Group Transparency Badge Test Cases
+  // =========================================================================
+
+  it("renders underwriter transparency badge when insurers share corporate group / underwriter", () => {
+    render(<PolicyComparisonView />);
+
+    // Select AAMI for insurerB (both Suncorp & AAMI are under AAI Limited / Suncorp Group)
+    fireEvent.click(screen.getByTestId("insurer-b-trigger"));
+    fireEvent.click(screen.getByRole("option", { name: "AAMI" }));
+
+    const badge = screen.getByTestId("underwriter-transparency-badge");
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent(/AAI Limited/i);
+    expect(badge).toHaveTextContent(/Suncorp Group/i);
+    expect(badge).toHaveTextContent(/share common underwriting/i);
+  });
+
+  it("renders underwriter transparency badge for IAG brands (NRMA & CGU)", () => {
+    render(<PolicyComparisonView />);
+
+    // Set insurerB to CGU first (since NRMA is initially in B)
+    fireEvent.click(screen.getByTestId("insurer-b-trigger"));
+    fireEvent.click(screen.getByRole("option", { name: "CGU" }));
+
+    // Set insurerA to NRMA
+    fireEvent.click(screen.getByTestId("insurer-a-trigger"));
+    fireEvent.click(screen.getByRole("option", { name: "NRMA" }));
+
+    const badge = screen.getByTestId("underwriter-transparency-badge");
+    expect(badge).toBeInTheDocument();
+    expect(badge.textContent).toMatch(/Insurance Australia Limited|IAG/i);
+  });
+
+  it("does NOT render underwriter transparency badge when insurers belong to different groups", () => {
+    render(<PolicyComparisonView />);
+
+    // Default is Suncorp (AAI Limited) and NRMA (Insurance Australia Limited)
+    expect(screen.queryByTestId("underwriter-transparency-badge")).not.toBeInTheDocument();
+
+    // Change to Allianz
+    fireEvent.click(screen.getByTestId("insurer-b-trigger"));
+    fireEvent.click(screen.getByRole("option", { name: "Allianz" }));
+    expect(screen.queryByTestId("underwriter-transparency-badge")).not.toBeInTheDocument();
+  });
+
+  it("ensures transparency badge copy strictly complies with ASIC RG 244 factual non-advice standards", () => {
+    render(<PolicyComparisonView />);
+
+    fireEvent.click(screen.getByTestId("insurer-b-trigger"));
+    fireEvent.click(screen.getByRole("option", { name: "AAMI" }));
+
+    const badge = screen.getByTestId("underwriter-transparency-badge");
+    const text = badge.textContent || "";
+
+    // Purely factual underwriter alignment: no recommendations or switching language
+    expect(text).not.toMatch(
+      /\b(recommend|better|best|cheaper|preferable|should choose|upgrade|switch)\b/i
+    );
   });
 });

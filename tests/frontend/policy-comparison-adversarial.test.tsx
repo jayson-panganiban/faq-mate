@@ -40,7 +40,7 @@ describe("Adversarial Verification: R1 (Canonical PDS Sources) & Policy Comparis
         expect(
           chunksByCode.length,
           `Expected canonical PDS source for insurer code ${profile.code}`
-        ).toBe(1);
+        ).toBe(4);
 
         const chunk = chunksByCode[0];
         expect(chunk.id).toBe(expectedId);
@@ -53,14 +53,19 @@ describe("Adversarial Verification: R1 (Canonical PDS Sources) & Policy Comparis
         expect(chunk.content).toContain(STATUTORY_GAW);
         expect(chunk.content).toContain(profile.name);
 
+        // Verify remaining dimension clauses are present and valid
+        expect(chunksByCode[1].id).toBe(`${expectedId}-jewellery`);
+        expect(chunksByCode[2].id).toBe(`${expectedId}-accidental`);
+        expect(chunksByCode[3].id).toBe(`${expectedId}-runoff`);
+
         // Test by lowercase slug
         const chunksBySlug = getCanonicalPdsSources(profile.slug);
-        expect(chunksBySlug.length).toBe(1);
+        expect(chunksBySlug.length).toBe(4);
         expect(chunksBySlug[0].id).toBe(chunk.id);
 
         // Test by exact name
         const chunksByName = getCanonicalPdsSources(profile.name);
-        expect(chunksByName.length).toBe(1);
+        expect(chunksByName.length).toBe(4);
         expect(chunksByName[0].id).toBe(chunk.id);
       }
     });
@@ -117,7 +122,7 @@ describe("Adversarial Verification: R1 (Canonical PDS Sources) & Policy Comparis
 
       for (const { input, expectedCodeSlug, expectedName } of unusualCases) {
         const sources = getCanonicalPdsSources(input);
-        expect(sources.length, `Failed to resolve canonical PDS for ${input}`).toBe(1);
+        expect(sources.length, `Failed to resolve canonical PDS for ${input}`).toBe(4);
         expect(sources[0].id).toBe(`canonical-pds-${expectedCodeSlug}`);
         expect(sources[0].source.insurer).toBe(expectedName);
         expect(sources[0].source.docType).toBe("PDS");
@@ -137,7 +142,7 @@ describe("Adversarial Verification: R1 (Canonical PDS Sources) & Policy Comparis
 
       for (const { alias, expectedTarget } of aliasCases) {
         const sources = getCanonicalPdsSources(alias);
-        expect(sources.length, `Expected canonical source for alias ${alias}`).toBe(1);
+        expect(sources.length, `Expected canonical source for alias ${alias}`).toBe(4);
         expect(sources[0].id).toBe(`canonical-pds-${expectedTarget}`);
       }
     });
@@ -294,9 +299,9 @@ describe("Adversarial Verification: R1 (Canonical PDS Sources) & Policy Comparis
       ).not.toBeInTheDocument();
 
       // 5. Click the Suncorp canonical source button
-      const suncorpBtn = within(policySourcesSection).getByRole("button", {
+      const suncorpBtn = within(policySourcesSection).getAllByRole("button", {
         name: /read source: suncorp.*pds/i,
-      });
+      })[0];
       await act(async () => {
         fireEvent.click(suncorpBtn);
       });
@@ -595,9 +600,9 @@ describe("Adversarial Verification: R1 (Canonical PDS Sources) & Policy Comparis
       expect(comparisonView).toBeInTheDocument();
 
       // 1. Open Primary source (Suncorp)
-      const suncorpBtn = within(comparisonView).getByRole("button", {
+      const suncorpBtn = within(comparisonView).getAllByRole("button", {
         name: /read source: suncorp.*pds/i,
-      });
+      })[0];
       await act(async () => {
         fireEvent.click(suncorpBtn);
       });
@@ -614,9 +619,9 @@ describe("Adversarial Verification: R1 (Canonical PDS Sources) & Policy Comparis
       expect(screen.queryByRole("dialog", { name: /policy sources/i })).not.toBeInTheDocument();
 
       // 2. Open Comparison source (NRMA)
-      const nrmaBtn = within(comparisonView).getByRole("button", {
+      const nrmaBtn = within(comparisonView).getAllByRole("button", {
         name: /read source: nrma.*pds/i,
-      });
+      })[0];
       await act(async () => {
         fireEvent.click(nrmaBtn);
       });

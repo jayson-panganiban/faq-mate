@@ -8,6 +8,7 @@ import {
   type PrimaryInsurerCode,
   resolveInsurer,
   resolvePolicyComparisonCell,
+  toInsurerSlug,
 } from "../../constants/insurers";
 import type { GroundedChunk } from "../types/chat-ui";
 import { formatProductDoc } from "../utils/citations";
@@ -209,23 +210,46 @@ export function PolicyComparisonView({
             </h3>
             <dl className="mt-2.5 sm:mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
               {[
-                { code: insurerA, name: nameA, chunks: chunksA },
-                { code: insurerB, name: nameB, chunks: chunksB },
-              ].map(({ code, name, chunks: insurerChunks }) => (
-                <div
-                  key={code}
-                  className="flex flex-col rounded-lg border border-slate-200/80 bg-white/70 p-3 text-sm dark:border-slate-800 dark:bg-slate-900/60 shadow-2xs"
-                >
-                  <dt className="text-xs font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-400">
-                    {name}
-                  </dt>
-                  <dd className="mt-1 flex-1 text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed break-words">
-                    <MarkdownText
-                      markdown={resolvePolicyComparisonCell(dimension.id, code, insurerChunks)}
-                    />
-                  </dd>
-                </div>
-              ))}
+                { code: insurerA, name: nameA, chunks: chunksA, sources: sourcesA },
+                { code: insurerB, name: nameB, chunks: chunksB, sources: sourcesB },
+              ].map(({ code, name, chunks: insurerChunks, sources }) => {
+                const slug = toInsurerSlug(code);
+                const dimensionSource = sources.find((s) => {
+                  if (dimension.id === "flood") {
+                    return s.id.endsWith("-flood") || s.id === `canonical-pds-${slug}`;
+                  }
+                  return s.id.endsWith(`-${dimension.id}`);
+                });
+
+                return (
+                  <div
+                    key={code}
+                    className="flex flex-col rounded-lg border border-slate-200/80 bg-white/70 p-3 text-sm dark:border-slate-800 dark:bg-slate-900/60 shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-400 truncate">
+                        {name}
+                      </dt>
+                      {dimensionSource && onSelectCitation && (
+                        <button
+                          type="button"
+                          onClick={() => onSelectCitation(dimensionSource)}
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-teal-700 dark:text-slate-400 dark:hover:text-teal-400 transition-colors cursor-pointer shrink-0"
+                          aria-label={`View ${dimension.category} source clause for ${name}`}
+                        >
+                          <BookOpen className="h-3 w-3" aria-hidden="true" />
+                          <span>View clause</span>
+                        </button>
+                      )}
+                    </div>
+                    <dd className="mt-1 flex-1 text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed break-words">
+                      <MarkdownText
+                        markdown={resolvePolicyComparisonCell(dimension.id, code, insurerChunks)}
+                      />
+                    </dd>
+                  </div>
+                );
+              })}
             </dl>
           </section>
         ))}

@@ -1492,6 +1492,11 @@ export const CANONICAL_PDS_REGISTRY: Readonly<Record<string, CanonicalPdsDefinit
 
 /**
  * Returns verified canonical PDS document sources as GroundedChunk objects for any of the 39 canonical insurers.
+ * Produces structured canonical clauses across all 4 key comparison dimensions:
+ * 1. Flood Definition & Inundation (primary anchor, retains base id `canonical-pds-${slug}`)
+ * 2. Contents Valuables & Jewellery Sub-limits (`canonical-pds-${slug}-jewellery`)
+ * 3. Accidental Loss & Damage Provisions (`canonical-pds-${slug}-accidental`)
+ * 4. Storm, Rainwater Run-off & Sea Actions (`canonical-pds-${slug}-runoff`)
  */
 export function getCanonicalPdsSources(insurerInput: string): GroundedChunk[] {
   const resolved = resolveInsurer(insurerInput);
@@ -1508,38 +1513,121 @@ export function getCanonicalPdsSources(insurerInput: string): GroundedChunk[] {
   const insurerName = profile?.name ?? insurerInput;
   const underwriter = profile?.underwriter ?? "Australian Financial Services Licensee";
   const product = def?.product ?? `${insurerName} Standard Policy`;
-  const section = def?.section ?? "Section 1: Policy Coverage Terms";
   const effectiveDate = def?.effectiveDate ?? "2026-01-01";
-  const excerpt =
-    def?.excerpt ?? `Operative terms under ${insurerName} Product Disclosure Statement (PDS).`;
+  const slug = toInsurerSlug(code || insurerName);
 
-  const fullContent = [
-    `### ${insurerName} ${product} (PDS)`,
-    "",
-    `**Issuing Underwriter:** ${underwriter}`,
-    `**Operative Section:** ${section}`,
-    `**Effective Date:** ${effectiveDate}`,
-    "",
-    "#### Operative Policy Terms & Coverage Summary:",
-    excerpt,
-    "",
-    `> ${STATUTORY_GAW}`,
-  ].join("\n");
+  const buildChunk = (
+    idSuffix: string,
+    section: string,
+    excerpt: string,
+    clauseId?: string
+  ): GroundedChunk => {
+    const fullContent = [
+      `### ${insurerName} ${product} (PDS)`,
+      "",
+      `**Issuing Underwriter:** ${underwriter}`,
+      `**Operative Section:** ${section}`,
+      `**Effective Date:** ${effectiveDate}`,
+      "",
+      "#### Operative Policy Terms & Coverage Summary:",
+      excerpt,
+      "",
+      `> ${STATUTORY_GAW}`,
+    ].join("\n");
 
-  const chunk: GroundedChunk = {
-    id: `canonical-pds-${toInsurerSlug(code || insurerName)}`,
-    relevanceScore: 1.0,
-    content: fullContent,
-    source: {
-      insurer: insurerName,
-      product,
-      docType: "PDS",
-      section,
-      clauseId: def?.clauseId,
-      effectiveDate,
-      underwriter,
-    } as unknown as GroundedChunk["source"],
+    return {
+      id: idSuffix ? `canonical-pds-${slug}-${idSuffix}` : `canonical-pds-${slug}`,
+      relevanceScore: 1.0,
+      content: fullContent,
+      source: {
+        insurer: insurerName,
+        product,
+        docType: "PDS",
+        section,
+        clauseId: clauseId ?? def?.clauseId,
+        effectiveDate,
+        underwriter,
+      } as unknown as GroundedChunk["source"],
+    };
   };
 
-  return [chunk];
+  const isTravel = profile?.category === "travel-specialists";
+  const isLife = profile?.category === "life-insurers";
+
+  // 1. Primary Flood & Natural Perils Clause (main anchor, retains base id canonical-pds-${slug})
+  const floodSection =
+    def?.section ??
+    (isTravel
+      ? "Section 1: Natural Disaster & Travel Disruption"
+      : isLife
+        ? "Section 1: Life Risk & Death Benefit Schedules"
+        : "Section 2: Flood & Natural Perils");
+  const floodExcerpt =
+    CURATED_BENCHMARK_OVERRIDES[code]?.flood ??
+    def?.excerpt ??
+    (profile
+      ? isTravel
+        ? TRAVEL_DIMENSION_DISCLOSURES.flood(profile)
+        : isLife
+          ? `${profile.name} (${underwriter}) issues Life, TPD, and Income Protection PDS policies. General property perils do not apply.`
+          : GENERAL_DIMENSION_DISCLOSURES.flood(profile)
+      : "Covers the covering of normally dry land by water escaping from natural watercourses subject to 72-hour embargo.");
+
+  const floodChunk = buildChunk("", floodSection, floodExcerpt, def?.clauseId ?? "2.1");
+
+  // 2. Contents Valuables & Jewellery Sub-limits
+  const jewellerySection = isTravel
+    ? "Section 2: Luggage & Personal Effects Sub-limits"
+    : isLife
+      ? "Section 2: Total & Permanent Disability (TPD) Definitions"
+      : "Section 3: Contents Valuables & Jewellery Sub-limits";
+  const jewelleryExcerpt =
+    CURATED_BENCHMARK_OVERRIDES[code]?.jewellery ??
+    (profile
+      ? isTravel
+        ? TRAVEL_DIMENSION_DISCLOSURES.jewellery(profile)
+        : isLife
+          ? `${profile.name} (${underwriter}) issues Life and TPD risk policies; general contents and jewellery sub-limits do not apply.`
+          : GENERAL_DIMENSION_DISCLOSURES.jewellery(profile)
+      : "Standard portable valuables and jewellery sub-limits apply unless specified on policy schedule.");
+
+  const jewelleryChunk = buildChunk("jewellery", jewellerySection, jewelleryExcerpt, "3.1");
+
+  // 3. Accidental Loss & Damage Provisions
+  const accidentalSection = isTravel
+    ? "Section 3: Accidental Loss & Luggage Damage Provisions"
+    : isLife
+      ? "Section 3: Terminal Illness & Accident Benefit"
+      : "Section 4: Accidental Loss & Damage Provisions";
+  const accidentalExcerpt =
+    CURATED_BENCHMARK_OVERRIDES[code]?.accidental ??
+    (profile
+      ? isTravel
+        ? TRAVEL_DIMENSION_DISCLOSURES.accidental(profile)
+        : isLife
+          ? `${profile.name} policy schedules provide defined accidental injury and terminal illness lump sums.`
+          : GENERAL_DIMENSION_DISCLOSURES.accidental(profile)
+      : "Covered under comprehensive collision and optional home accidental damage clauses.");
+
+  const accidentalChunk = buildChunk("accidental", accidentalSection, accidentalExcerpt, "4.1");
+
+  // 4. Storm, Rainwater Run-off & Sea Actions
+  const runoffSection = isTravel
+    ? "Section 4: Severe Weather & Carrier Delay Exclusions"
+    : isLife
+      ? "Section 4: Statutory Life Fund Terms & Exclusions"
+      : "Section 5: Storm, Rainwater Run-off & Sea Actions";
+  const runoffExcerpt =
+    CURATED_BENCHMARK_OVERRIDES[code]?.runoff ??
+    (profile
+      ? isTravel
+        ? TRAVEL_DIMENSION_DISCLOSURES.runoff(profile)
+        : isLife
+          ? "Statutory life insurance benefit schedules apply independently of weather or property perils."
+          : GENERAL_DIMENSION_DISCLOSURES.runoff(profile)
+      : "Storm and rainwater run-off assessed separately from riverine flood; actions of the sea excluded.");
+
+  const runoffChunk = buildChunk("runoff", runoffSection, runoffExcerpt, "5.1");
+
+  return [floodChunk, jewelleryChunk, accidentalChunk, runoffChunk];
 }

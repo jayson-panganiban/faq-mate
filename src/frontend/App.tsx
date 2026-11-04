@@ -241,6 +241,7 @@ export function App() {
     >
       {isComparisonMode && (
         <PolicyComparisonView
+          chunks={allChunks.length > 0 ? allChunks : citations}
           onSelectCitation={handleSelectCitation}
           onSelectQuery={(q, ins) => {
             setIsComparisonMode(false);

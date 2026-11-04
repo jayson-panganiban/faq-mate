@@ -788,9 +788,9 @@ describe("Full Application Assembly & E2E Integration (Spec 05 Ticket 7)", () =>
     expect(comparisonView).toBeInTheDocument();
 
     // Click Suncorp canonical PDS source button
-    const suncorpSourceBtn = within(comparisonView).getByRole("button", {
+    const suncorpSourceBtn = within(comparisonView).getAllByRole("button", {
       name: /read source: suncorp.*pds/i,
-    });
+    })[0];
     await act(async () => {
       fireEvent.click(suncorpSourceBtn);
     });

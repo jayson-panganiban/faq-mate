@@ -142,7 +142,7 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("renders canonical PDS document sources for both default insurers without requiring chat history", () => {
+  it("renders canonical PDS document sources for both default insurers across comparison dimensions", () => {
     render(<PolicyComparisonView />);
 
     // Policy sources section must always be visible
@@ -154,17 +154,28 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
     expect(screen.queryByText(/no sources yet/i)).not.toBeInTheDocument();
 
     // Both canonical source buttons must be present with BookOpen icon and doc titles
-    const suncorpSourceBtn = screen.getByRole("button", {
+    const suncorpSourceBtns = screen.getAllByRole("button", {
       name: /read source: suncorp.*pds/i,
     });
-    expect(suncorpSourceBtn).toBeInTheDocument();
-    expect(within(suncorpSourceBtn).getByText(/suncorp.*pds/i)).toBeInTheDocument();
+    expect(suncorpSourceBtns.length).toBe(4);
+    expect(within(suncorpSourceBtns[0]).getByText(/suncorp.*pds/i)).toBeInTheDocument();
 
-    const nrmaSourceBtn = screen.getByRole("button", {
+    const nrmaSourceBtns = screen.getAllByRole("button", {
       name: /read source: nrma.*pds/i,
     });
-    expect(nrmaSourceBtn).toBeInTheDocument();
-    expect(within(nrmaSourceBtn).getByText(/nrma.*pds/i)).toBeInTheDocument();
+    expect(nrmaSourceBtns.length).toBe(4);
+    expect(within(nrmaSourceBtns[0]).getByText(/nrma.*pds/i)).toBeInTheDocument();
+  });
+
+  it("renders direct 'View clause' actions on each comparison dimension cell", () => {
+    const handleSelectCitation = vi.fn();
+    render(<PolicyComparisonView onSelectCitation={handleSelectCitation} />);
+
+    const viewClauseBtns = screen.getAllByRole("button", { name: /view .* source clause/i });
+    expect(viewClauseBtns.length).toBe(8); // 4 dimensions x 2 insurers
+
+    fireEvent.click(viewClauseBtns[0]);
+    expect(handleSelectCitation).toHaveBeenCalledTimes(1);
   });
 
   it("does not bleed conversational chat history chunks into comparison sources list", () => {
@@ -195,9 +206,9 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
     const handleSelectCitation = vi.fn();
     render(<PolicyComparisonView onSelectCitation={handleSelectCitation} />);
 
-    const suncorpSourceBtn = screen.getByRole("button", {
+    const suncorpSourceBtn = screen.getAllByRole("button", {
       name: /read source: suncorp.*pds/i,
-    });
+    })[0];
     fireEvent.click(suncorpSourceBtn);
 
     expect(handleSelectCitation).toHaveBeenCalledTimes(1);
@@ -217,7 +228,9 @@ describe("PolicyComparisonView Component (Spec 05 User Story 15)", () => {
     fireEvent.click(screen.getByRole("option", { name: "Allianz" }));
 
     expect(screen.getByText("Allianz sources")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /read source: allianz.*pds/i })).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: /read source: allianz.*pds/i })[0]
+    ).toBeInTheDocument();
     expect(screen.queryByText("NRMA sources")).not.toBeInTheDocument();
   });
 
